@@ -75,6 +75,28 @@ describe("POST /bookings (naive strategy)", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("returns the same booking id and 201 when the identical request is sent twice", async () => {
+    const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+    const app = createApp();
+    const payload = { seat_id: seatIdsByLabel.A1, user_id: "user-1", idempotency_key: randomUUID() };
+
+    const first = await app.inject({ method: "POST", url: "/bookings", payload });
+    const second = await app.inject({ method: "POST", url: "/bookings", payload });
+
+    const firstBody = first.json() as { id: string };
+    const secondBody = second.json() as { id: string };
+
+    expect(first.statusCode).toBe(201);
+    expect(second.statusCode).toBe(201);
+    expect(secondBody.id).toBe(firstBody.id);
+
+    const bookingSeatsRes = await pool.query(
+      "SELECT booking_id FROM booking_seats WHERE seat_id = $1",
+      [seatIdsByLabel.A1],
+    );
+    expect(bookingSeatsRes.rows).toHaveLength(1);
+  });
+
   it("replays the same booking for a duplicate idempotency_key instead of creating a second one", async () => {
     const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2"]);
     const app = createApp();
@@ -95,7 +117,7 @@ describe("POST /bookings (naive strategy)", () => {
     });
     const secondBody = second.json() as { id: string };
 
-    expect(second.statusCode).toBe(200);
+    expect(second.statusCode).toBe(201);
     expect(secondBody.id).toBe(firstBody.id);
 
     const countRes = await pool.query("SELECT count(*)::int AS count FROM bookings");

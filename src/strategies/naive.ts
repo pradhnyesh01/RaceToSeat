@@ -32,6 +32,19 @@ function isUniqueViolation(err: unknown, constraint: string): boolean {
 export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResult> {
   const client: PoolClient = await pool.connect();
   try {
+    // Idempotency check comes first, ahead of the seat-availability read: a
+    // genuine retry's seat may no longer be 'available' (the first attempt
+    // already booked it), and it must still replay the original booking
+    // rather than fall through to a 409 (issue #4).
+    const existingRes = await client.query<{ id: string; created_at: Date }>(
+      "SELECT id, created_at FROM bookings WHERE idempotency_key = $1",
+      [input.idempotencyKey],
+    );
+    const existingBooking = existingRes.rows[0];
+    if (existingBooking) {
+      return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.created_at };
+    }
+
     const seatRes = await client.query<{ status: string }>(
       "SELECT status FROM seats WHERE id = $1",
       [input.seatId],

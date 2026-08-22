@@ -33,7 +33,10 @@ export function registerBookingsRoutes(app: FastifyInstance): void {
         reply.status(201).send({ id: result.bookingId, created_at: result.createdAt });
         return;
       case "idempotent_replay":
-        reply.status(200).send({ id: result.bookingId, created_at: result.createdAt });
+        // Issue #4: a retry with the same idempotency_key returns the
+        // original booking's 201, not a 200 — the client can't tell this
+        // apart from its first attempt succeeding.
+        reply.status(201).send({ id: result.bookingId, created_at: result.createdAt });
         return;
       case "conflict":
         reply.status(409).send({ error: "Seat is not available" });
