@@ -1,0 +1,45 @@
+{
+  "strategy": "pessimistic",
+  "concurrency": 1000,
+  "eventId": "11ce8634-b21d-43df-8625-bb8b57103887",
+  "seatId": "ec20e8a3-5a91-4ce4-8059-27d69359ab8a",
+  "runs": [
+    {
+      "attempt": 1,
+      "ranAt": "2026-08-22T17:49:47.096Z",
+      "durationMs": 742,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 999,
+        "other": 0
+      },
+      "winningBookingIds": [
+        "075093ba-c450-4bc7-8e0a-28a1c2be16ce"
+      ],
+      "winningUserIds": [
+        "load-user-133"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    },
+    {
+      "attempt": 2,
+      "ranAt": "2026-08-22T17:49:47.888Z",
+      "durationMs": 547,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 999,
+        "other": 0
+      },
+      "winningBookingIds": [
+        "0b17229b-f0a2-4c07-8d6c-6407797f764c"
+      ],
+      "winningUserIds": [
+        "load-user-259"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    }
+  ],
+  "anyDoubleBooked": false
+}

@@ -1,48 +1,25 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
+import { isUniqueViolation } from "../db/pgErrors.js";
+import { findExistingBookingByIdempotencyKey, runTransactionalBooking } from "./idempotency.js";
+import type { BookSeatInput, BookSeatResult } from "./types.js";
 
-export type BookSeatResult =
-  | { kind: "created"; bookingId: string; createdAt: Date }
-  | { kind: "idempotent_replay"; bookingId: string; createdAt: Date }
-  | { kind: "conflict" }
-  | { kind: "not_found" };
-
-interface BookSeatInput {
-  seatId: string;
-  userId: string;
-  idempotencyKey: string;
-}
-
-function isUniqueViolation(err: unknown, constraint: string): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code?: string }).code === "23505" &&
-    "constraint" in err &&
-    (err as { constraint?: string }).constraint === constraint
-  );
-}
+export type { BookSeatResult };
 
 // Deliberately naive: reads seat status, then writes, with no locking and no
 // transaction isolation guarding the gap between the two. Two concurrent
 // requests for the same seat can both observe 'available' before either
-// commits its write — this is Phase 0's Exhibit A bug, fixed starting in
-// Phase 1 (todo.md).
+// commits its write — this was Phase 0's Exhibit A bug. Since ADR-0008 added
+// a shared UNIQUE constraint on booking_seats.seat_id, the race can no longer
+// produce a double-booking: the loser's INSERT now fails at the constraint
+// and is caught below, so naive is safe under concurrency even though its
+// read-then-write shape is unchanged.
 export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResult> {
   const client: PoolClient = await pool.connect();
   try {
-    // Idempotency check comes first, ahead of the seat-availability read: a
-    // genuine retry's seat may no longer be 'available' (the first attempt
-    // already booked it), and it must still replay the original booking
-    // rather than fall through to a 409 (issue #4).
-    const existingRes = await client.query<{ id: string; created_at: Date }>(
-      "SELECT id, created_at FROM bookings WHERE idempotency_key = $1",
-      [input.idempotencyKey],
-    );
-    const existingBooking = existingRes.rows[0];
+    const existingBooking = await findExistingBookingByIdempotencyKey(client, input.idempotencyKey);
     if (existingBooking) {
-      return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.created_at };
+      return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
     }
 
     const seatRes = await client.query<{ status: string }>(
@@ -57,34 +34,32 @@ export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResul
       return { kind: "conflict" };
     }
 
-    try {
-      const bookingRes = await client.query<{ id: string; created_at: Date }>(
+    return await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
+      const bookingRes = await txClient.query<{ id: string; created_at: Date }>(
         "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id, created_at",
         [input.userId, input.idempotencyKey],
       );
       const booking = bookingRes.rows[0]!;
 
-      await client.query(
-        "INSERT INTO booking_seats (booking_id, seat_id) VALUES ($1, $2)",
-        [booking.id, input.seatId],
-      );
-      await client.query(
+      try {
+        await txClient.query(
+          "INSERT INTO booking_seats (booking_id, seat_id) VALUES ($1, $2)",
+          [booking.id, input.seatId],
+        );
+      } catch (err) {
+        if (isUniqueViolation(err, "booking_seats_seat_id_key")) {
+          return { kind: "conflict" };
+        }
+        throw err;
+      }
+
+      await txClient.query(
         "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = $2",
         [input.userId, input.seatId],
       );
 
       return { kind: "created", bookingId: booking.id, createdAt: booking.created_at };
-    } catch (err) {
-      if (isUniqueViolation(err, "bookings_idempotency_key_key")) {
-        const existing = await client.query<{ id: string; created_at: Date }>(
-          "SELECT id, created_at FROM bookings WHERE idempotency_key = $1",
-          [input.idempotencyKey],
-        );
-        const booking = existing.rows[0]!;
-        return { kind: "idempotent_replay", bookingId: booking.id, createdAt: booking.created_at };
-      }
-      throw err;
-    }
+    });
   } finally {
     client.release();
   }

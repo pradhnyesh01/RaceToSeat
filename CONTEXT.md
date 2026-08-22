@@ -23,4 +23,8 @@ _Avoid_: Reservation, order, group booking (a Booking IS the group — there's n
 **Hold**:
 A temporary, time-limited claim on a Seat, not yet a Booking. Expires back to `available` if not confirmed into a Booking before its TTL elapses.
 _Avoid_: Reservation, lock (a lock is an implementation mechanism, not this domain concept)
-</content>
+
+**Cancel**:
+Deleting a Booking, releasing every Seat it claimed back to `available`. Not ownership-gated — any caller holding a valid Booking id can cancel it, matching the project's minimal-identifier stance (no full auth system). Distinct from a Hold's expiry, which also returns a Seat to `available` but happens automatically via TTL, not by request.
+_Avoid_: Reservation, un-book, refund (no payment concept exists in this domain)
+

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { pool } from "../src/db/pool.js";
 
 export async function resetDb(): Promise<void> {
@@ -21,4 +22,24 @@ export async function seedEventWithSeats(seatLabels: string[]): Promise<{ eventI
   }
 
   return { eventId, seatIdsByLabel };
+}
+
+// Seeds a booking directly against the DB, bypassing the API — the only way
+// to construct a multi-seat booking before Phase 3 adds multi-seat requests.
+export async function seedBooking(seatIds: string[], userId: string): Promise<{ bookingId: string }> {
+  const bookingRes = await pool.query<{ id: string }>(
+    "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id",
+    [userId, `seed-${randomUUID()}`],
+  );
+  const bookingId = bookingRes.rows[0]!.id;
+
+  for (const seatId of seatIds) {
+    await pool.query("INSERT INTO booking_seats (booking_id, seat_id) VALUES ($1, $2)", [bookingId, seatId]);
+    await pool.query(
+      "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = $2",
+      [userId, seatId],
+    );
+  }
+
+  return { bookingId };
 }

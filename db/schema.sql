@@ -39,8 +39,10 @@ CREATE TABLE bookings (
 
 CREATE TABLE booking_seats (
     booking_id UUID NOT NULL REFERENCES bookings (id),
-    seat_id UUID NOT NULL REFERENCES seats (id),
+    seat_id UUID NOT NULL REFERENCES seats (id) UNIQUE,
     PRIMARY KEY (booking_id, seat_id)
 );
-
-CREATE INDEX booking_seats_seat_id_idx ON booking_seats (seat_id);
+-- UNIQUE(seat_id) is a defense-in-depth backstop shared by every mechanism,
+-- not just the unique-constraint one (ADR-0008): no seat can ever appear in
+-- more than one booking, regardless of which strategy raced to insert it.
+-- Its index also covers the seat_id lookups that used to need a separate one.

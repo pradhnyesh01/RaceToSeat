@@ -17,16 +17,13 @@ phase ends with a working, demonstrable system plus a piece of evidence.
       see [docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)
 
 ## Phase 1 — Baseline Correctness
-- [ ] Implement unique-constraint approach (`INSERT ... ON CONFLICT DO NOTHING`)
-- [ ] Implement pessimistic locking (`SELECT ... FOR UPDATE`)
-- [ ] Implement `DELETE /bookings/{id}` (FR5 cancellation, releases seat to `available`) — a real gap in
-      this roadmap until now (PRD calls it necessary for "a complete, testable system" but never assigned
-      it a phase); placed here rather than Phase 5 so it isn't at risk if the stretch phase gets cut, and
-      so the load harness can reset seat state between runs via the real API instead of raw SQL
-- [ ] Re-run Phase 0 load harness against both, using `DELETE /bookings/{id}` to reset seat state between runs
-- [ ] Confirm: exactly one success per seat, rest return clean 409s
-- [ ] Repeat runs to confirm zero double-bookings (not a one-off pass)
-- [ ] **Deliverable:** before/after comparison vs. naive baseline
+- [x] Implement unique-constraint approach (`INSERT ... ON CONFLICT DO NOTHING`) — `src/strategies/uniqueConstraint.ts` (issue #9)
+- [x] Implement pessimistic locking (`SELECT ... FOR UPDATE`) — `src/strategies/pessimistic.ts`, `NOWAIT` per ADR-0006 (issue #10)
+- [x] Implement `DELETE /bookings/{id}` (FR5 cancellation, releases seat to `available`) — `src/routes/bookings.ts` (issue #8)
+- [x] Re-run Phase 0 load harness against both, using `DELETE /bookings/{id}` to reset seat state between runs — `load-harness/run.ts`'s `--repeat` flag (issue #11)
+- [x] Confirm: exactly one success per seat, rest return clean 409s
+- [x] Repeat runs to confirm zero double-bookings (not a one-off pass) — 2 independent 1,000-concurrent repeats per mechanism
+- [x] **Deliverable:** before/after comparison vs. naive baseline — [docs/evidence/exhibit-b-phase1-correctness.md](docs/evidence/exhibit-b-phase1-correctness.md)
 
 ## Phase 2 — Mechanism Expansion + Benchmark Harness
 - [ ] Implement optimistic locking (version column + retry-on-conflict)

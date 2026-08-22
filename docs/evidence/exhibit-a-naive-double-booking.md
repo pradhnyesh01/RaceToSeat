@@ -17,7 +17,7 @@ distinct bookings actually claimed the seat.
 docker compose up -d     # schema applies automatically on a fresh volume
 npm run db:seed
 npm run start             # BOOKING_STRATEGY=naive (default)
-npm run harness:naive -- --concurrency 1000
+npm run harness -- --concurrency 1000
 ```
 
 ## Results (two independent runs, 1,000 concurrent requests each)
@@ -33,8 +33,15 @@ that got a 201 read the seat as `available` in its `SELECT` before any of the
 concurrent writers had committed — the classic lost-update race described in
 problem-statement.md.
 
+Note: since ADR-0008 added a shared `UNIQUE` constraint on
+`booking_seats.seat_id`, re-running the command above against naive today no
+longer reproduces this double-booking live — the constraint now backstops
+every mechanism, naive included. This captured evidence remains the
+historical "before" record; it is not re-run.
+
 ## Next step
 
-Phase 1 (todo.md) replaces this with the unique-constraint and pessimistic-
-locking mechanisms and re-runs this same harness to confirm exactly one
-winner per seat.
+Phase 1 (todo.md) replaces naive-only booking with the unique-constraint and
+pessimistic-locking mechanisms — see
+[exhibit-b-phase1-correctness.md](exhibit-b-phase1-correctness.md) for the
+"after" comparison.

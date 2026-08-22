@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "db:migrate": "tsx db/migrate.ts",
     "db:seed": "tsx db/seed.ts",
-    "harness:naive": "tsx load-harness/run.ts"
+    "harness": "tsx load-harness/run.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

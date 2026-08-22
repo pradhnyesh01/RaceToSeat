@@ -4,12 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-Phase 0 (scaffolding) is complete: a TypeScript/Fastify API (`src/`), the shared
-Postgres schema (`db/schema.sql`), the deliberately-naive booking strategy, and the
-k6-based load-generation harness (`load-harness/hammer-seat.k6.js` + `run.ts`) all
-exist and are exercised by `npm test`. See
+Phase 0 (scaffolding) and Phase 1 (baseline correctness) are complete. The TypeScript/
+Fastify API (`src/`) now supports three interchangeable `BOOKING_STRATEGY` mechanisms —
+`naive`, `unique_constraint`, `pessimistic` (`src/strategies/`) — sharing one Postgres
+schema (`db/schema.sql`, including ADR-0008's `booking_seats.seat_id UNIQUE` constraint)
+and one idempotency helper (`src/strategies/idempotency.ts`). `DELETE /bookings/{id}`
+(cancellation) is implemented once, independent of strategy. The k6-based load harness
+(`load-harness/hammer-seat.k6.js` + `run.ts`) now reuses and resets one seat across
+repeated runs via the real `DELETE` endpoint (`--repeat` flag), rather than reseeding.
+All of this is exercised by `npm test`. See
 [docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)
-for Exhibit A. Phases 1+ are not yet implemented. Before extending the implementation,
+(Phase 0, naive fails under load) and
+[docs/evidence/exhibit-b-phase1-correctness.md](docs/evidence/exhibit-b-phase1-correctness.md)
+(Phase 1, both new mechanisms hold under load) for the before/after evidence.
+Phases 2+ are not yet implemented. Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
 
