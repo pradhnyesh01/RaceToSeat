@@ -10,7 +10,8 @@ phase ends with a working, demonstrable system plus a piece of evidence.
 - [x] Stand up API skeleton (`POST /bookings`, `GET /seats`)
 - [x] Implement **naive** booking logic (read-then-write, no locking) — deliberately
 - [x] Build load-generation harness (k6 / Locust / custom async client)
-      capable of firing N concurrent requests at one seat — `load-harness/hammer-seat.ts`
+      capable of firing N concurrent requests at one seat — `load-harness/hammer-seat.k6.js`
+      (fired by `load-harness/run.ts`, which seeds/verifies)
 - [x] Run naive version under load (e.g. 1,000 concurrent requests, 1 seat)
 - [x] **Deliverable:** capture evidence of double-booking (logs/screenshot) — "Exhibit A" —
       see [docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)

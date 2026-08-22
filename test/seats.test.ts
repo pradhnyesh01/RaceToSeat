@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { createApp } from "../src/app.js";
 import { pool } from "../src/db/pool.js";
 import { resetDb, seedEventWithSeats } from "./testDb.js";
-import { startTestServer } from "./testServer.js";
 
 describe("GET /seats", () => {
   beforeEach(resetDb);
@@ -9,27 +9,19 @@ describe("GET /seats", () => {
 
   it("returns the seats for the given event, ordered by label", async () => {
     const { eventId } = await seedEventWithSeats(["A1", "A2", "B1"]);
-    const server = await startTestServer();
+    const app = createApp();
 
-    try {
-      const res = await fetch(`${server.baseUrl}/seats?event_id=${eventId}`);
-      const body = (await res.json()) as { seats: Array<{ label: string; status: string }> };
+    const res = await app.inject({ method: "GET", url: `/seats?event_id=${eventId}` });
+    const body = res.json() as { seats: Array<{ label: string; status: string }> };
 
-      expect(res.status).toBe(200);
-      expect(body.seats.map((s: { label: string }) => s.label)).toEqual(["A1", "A2", "B1"]);
-      expect(body.seats.every((s: { status: string }) => s.status === "available")).toBe(true);
-    } finally {
-      await server.close();
-    }
+    expect(res.statusCode).toBe(200);
+    expect(body.seats.map((s) => s.label)).toEqual(["A1", "A2", "B1"]);
+    expect(body.seats.every((s) => s.status === "available")).toBe(true);
   });
 
   it("400s when event_id is missing", async () => {
-    const server = await startTestServer();
-    try {
-      const res = await fetch(`${server.baseUrl}/seats`);
-      expect(res.status).toBe(400);
-    } finally {
-      await server.close();
-    }
+    const app = createApp();
+    const res = await app.inject({ method: "GET", url: "/seats" });
+    expect(res.statusCode).toBe(400);
   });
 });

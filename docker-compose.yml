@@ -10,6 +10,10 @@ services:
       - "5433:5432"
     volumes:
       - racetoseat-pgdata:/var/lib/postgresql/data
+      # Postgres only runs *.sql files here on a fresh (empty) data
+      # directory — `db:migrate` remains the way to reapply the schema
+      # against an existing volume (e.g. after a schema change).
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 
 volumes:
   racetoseat-pgdata:

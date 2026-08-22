@@ -1,0 +1,31 @@
+{
+  "ranAt": "2026-08-22T13:09:15.310Z",
+  "durationMs": 587,
+  "strategy": "naive",
+  "concurrency": 1000,
+  "eventId": "e73dabb1-e7db-4f5a-9652-b9969f7a319d",
+  "seatId": "54a60c88-cde6-4aec-be9a-15ef9dd6459c",
+  "httpStatusTally": {
+    "201": 14,
+    "409": 986,
+    "other": 0
+  },
+  "winningBookingCount": 14,
+  "winningUserIds": [
+    "load-user-293",
+    "load-user-216",
+    "load-user-215",
+    "load-user-331",
+    "load-user-249",
+    "load-user-208",
+    "load-user-291",
+    "load-user-209",
+    "load-user-247",
+    "load-user-21",
+    "load-user-22",
+    "load-user-129",
+    "load-user-329",
+    "load-user-12"
+  ],
+  "doubleBooked": true
+}

@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-Phase 0 (scaffolding) is complete: a TypeScript/Express API (`src/`), the shared
+Phase 0 (scaffolding) is complete: a TypeScript/Fastify API (`src/`), the shared
 Postgres schema (`db/schema.sql`), the deliberately-naive booking strategy, and the
-load-generation harness (`load-harness/hammer-seat.ts`) all exist and are exercised by
-`npm test`. See [docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)
+k6-based load-generation harness (`load-harness/hammer-seat.k6.js` + `run.ts`) all
+exist and are exercised by `npm test`. See
+[docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)
 for Exhibit A. Phases 1+ are not yet implemented. Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
