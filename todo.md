@@ -4,19 +4,25 @@ Roadmap follows a risk-driven, incremental (spiral-style) approach: every
 phase ends with a working, demonstrable system plus a piece of evidence.
 
 ## Phase 0 — Scaffolding
-- [ ] Design schema: `seats(id, event_id, status, version, held_until, booked_by)`
-- [ ] Design schema: `bookings(id, seat_id, user_id, idempotency_key, created_at)`
-- [ ] Stand up API skeleton (`POST /bookings`, `GET /seats`)
-- [ ] Implement **naive** booking logic (read-then-write, no locking) — deliberately
-- [ ] Build load-generation harness (k6 / Locust / custom async client)
-      capable of firing N concurrent requests at one seat
-- [ ] Run naive version under load (e.g. 1,000 concurrent requests, 1 seat)
-- [ ] **Deliverable:** capture evidence of double-booking (logs/screenshot) — "Exhibit A"
+- [x] Design schema: `seats(id, event_id, status, version, held_until, booked_by)`
+- [x] Design schema: `bookings(id, seat_id, user_id, idempotency_key, created_at)` —
+      shipped as `bookings` + `booking_seats` join table per ADR-0005
+- [x] Stand up API skeleton (`POST /bookings`, `GET /seats`)
+- [x] Implement **naive** booking logic (read-then-write, no locking) — deliberately
+- [x] Build load-generation harness (k6 / Locust / custom async client)
+      capable of firing N concurrent requests at one seat — `load-harness/hammer-seat.ts`
+- [x] Run naive version under load (e.g. 1,000 concurrent requests, 1 seat)
+- [x] **Deliverable:** capture evidence of double-booking (logs/screenshot) — "Exhibit A" —
+      see [docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)
 
 ## Phase 1 — Baseline Correctness
 - [ ] Implement unique-constraint approach (`INSERT ... ON CONFLICT DO NOTHING`)
 - [ ] Implement pessimistic locking (`SELECT ... FOR UPDATE`)
-- [ ] Re-run Phase 0 load harness against both
+- [ ] Implement `DELETE /bookings/{id}` (FR5 cancellation, releases seat to `available`) — a real gap in
+      this roadmap until now (PRD calls it necessary for "a complete, testable system" but never assigned
+      it a phase); placed here rather than Phase 5 so it isn't at risk if the stretch phase gets cut, and
+      so the load harness can reset seat state between runs via the real API instead of raw SQL
+- [ ] Re-run Phase 0 load harness against both, using `DELETE /bookings/{id}` to reset seat state between runs
 - [ ] Confirm: exactly one success per seat, rest return clean 409s
 - [ ] Repeat runs to confirm zero double-bookings (not a one-off pass)
 - [ ] **Deliverable:** before/after comparison vs. naive baseline
@@ -50,9 +56,12 @@ phase ends with a working, demonstrable system plus a piece of evidence.
 - [ ] Add `held` status with TTL to seat state machine
 - [ ] Implement reaper (background worker / Redis TTL) to release expired holds
 - [ ] Implement `POST /holds` and `POST /holds/{id}/confirm` endpoints
-- [ ] Add idempotency-key dedupe table to prevent duplicate client-retry bookings
 - [ ] Load test: expire holds mid-flight under concurrent confirm attempts
 - [ ] **Deliverable:** evidence of no double-confirm, no permanently stuck seats
+
+> Note: this phase no longer includes a standalone "idempotency-key dedupe table" (an earlier draft of
+> this roadmap called for one). It's superseded by the `UNIQUE` constraint on `bookings.idempotency_key`
+> + lookup-on-conflict, in place since Phase 0/1 — see RaceToSeat#1.
 
 ## Phase 6 — Formal Rigor: Proof + Chaos Testing (high priority, don't defer)
 - [ ] Write lightweight TLA+ (or Alloy) spec of the seat-acquisition state machine

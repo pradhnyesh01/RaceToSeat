@@ -4,11 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-This repository currently contains **planning documents only** — no code has been
-written yet, and it is not a git repository. There is no build, lint, or test
-tooling to run. Before writing code, read all three planning docs in full; they
-define scope, sequencing, and acceptance criteria that should govern implementation
-decisions:
+Phase 0 (scaffolding) is complete: a TypeScript/Express API (`src/`), the shared
+Postgres schema (`db/schema.sql`), the deliberately-naive booking strategy, and the
+load-generation harness (`load-harness/hammer-seat.ts`) all exist and are exercised by
+`npm test`. See [docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)
+for Exhibit A. Phases 1+ are not yet implemented. Before extending the implementation,
+read all three planning docs in full; they define scope, sequencing, and acceptance
+criteria that should govern implementation decisions:
 
 - [problem-statement.md](problem-statement.md) — the core bug being solved (lost-update
   race condition in read-then-write booking) and why it matters.
@@ -79,3 +81,13 @@ relative to a typical tutorial version of this system and should not be dropped 
 deadline pressure — a thin version (chaos-only or proof-only) is the acceptable
 fallback, not skipping it. If asked to scope down, cut elsewhere first (e.g. Phase 7
 scale-out, or trimming the mechanism count in Phase 2) before cutting Phase 6.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked as GitHub issues (via the `gh` CLI) in `pradhnyesh01/RaceToSeat`. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context layout (`CONTEXT.md` + `docs/adr/` at repo root). See `docs/agents/domain.md`.

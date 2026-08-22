@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: racetoseat-postgres
+    environment:
+      POSTGRES_USER: racetoseat
+      POSTGRES_PASSWORD: racetoseat
+      POSTGRES_DB: racetoseat
+    ports:
+      - "5433:5432"
+    volumes:
+      - racetoseat-pgdata:/var/lib/postgresql/data
+
+volumes:
+  racetoseat-pgdata:
