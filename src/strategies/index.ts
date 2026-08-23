@@ -1,4 +1,5 @@
 import { config } from "../config.js";
+import { bookSeatAdvisory } from "./advisory.js";
 import { bookSeatNaive } from "./naive.js";
 import { bookSeatOptimistic } from "./optimistic.js";
 import { bookSeatPessimistic } from "./pessimistic.js";
@@ -17,6 +18,7 @@ const strategies: Record<string, Strategy> = {
   unique_constraint: bookSeatUniqueConstraint,
   pessimistic: bookSeatPessimistic,
   optimistic: bookSeatOptimistic,
+  advisory: bookSeatAdvisory,
 };
 
 function resolveStrategy(): Strategy {
