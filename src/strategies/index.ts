@@ -3,6 +3,7 @@ import { bookSeatAdvisory } from "./advisory.js";
 import { bookSeatNaive } from "./naive.js";
 import { bookSeatOptimistic } from "./optimistic.js";
 import { bookSeatPessimistic } from "./pessimistic.js";
+import { bookSeatSerializable } from "./serializable.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 import { bookSeatUniqueConstraint } from "./uniqueConstraint.js";
 
@@ -19,6 +20,7 @@ const strategies: Record<string, Strategy> = {
   pessimistic: bookSeatPessimistic,
   optimistic: bookSeatOptimistic,
   advisory: bookSeatAdvisory,
+  serializable: bookSeatSerializable,
 };
 
 function resolveStrategy(): Strategy {

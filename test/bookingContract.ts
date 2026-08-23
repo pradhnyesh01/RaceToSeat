@@ -146,21 +146,37 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
 // behavior for a single request at a time.
 //
 // `loserStatus` defaults to 409 (an ordinary conflict) but a mechanism whose
-// retry budget is forced to 0 (optimistic, ADR-0012) exhausts on the very
-// first CAS miss instead — every losing response there is still a clean,
-// single-attempt outcome, so it also carries X-Booking-Retries: 0 just like
-// every other mechanism's losers do.
+// retry budget is forced to 0 (optimistic, serializable — ADR-0012) exhausts
+// on the very first attempt instead. `acceptableLoserStatuses` overrides
+// `loserStatus` for a mechanism whose losers can genuinely split across more
+// than one status under real (non-zero-cap) contention — serializable's
+// losers resolve via either an ordinary re-read (409) or, on the rarer
+// timing where their own read raced the winner's commit, a genuine
+// SERIALIZABLE conflict that exhausts its retry budget (503); which one
+// happens for a given loser isn't controllable from outside (confirmed
+// empirically), so the two must be accepted together rather than asserting
+// an exact count for either.
+//
+// `checkZeroRetries` defaults to true: every losing response is a clean,
+// single-attempt outcome for every mechanism except serializable under a
+// real (non-zero-cap) race, where a loser can only discover it lost by
+// retrying the whole transaction and re-reading — unlike optimistic's cheap
+// re-read-before-retrying, there's no way to learn "someone else won"
+// without spending a retry, so its ordinary losers legitimately report a
+// nonzero count. Callers for whom that's expected pass `false`.
 export function runBookingConcurrencyContractTest(
   strategyLabel: string,
   createApp: () => FastifyInstance,
-  options: { loserStatus?: number } = {},
+  options: { loserStatus?: number; acceptableLoserStatuses?: number[]; checkZeroRetries?: boolean } = {},
 ): void {
   const loserStatus = options.loserStatus ?? 409;
+  const acceptableLoserStatuses = options.acceptableLoserStatuses ?? [loserStatus];
+  const checkZeroRetries = options.checkZeroRetries ?? true;
 
   describe(`POST /bookings (${strategyLabel} strategy) — concurrency`, () => {
     beforeEach(resetDb);
 
-    it(`under concurrent requests for one seat, exactly one 201 and the rest ${loserStatus} — never 500`, async () => {
+    it(`under concurrent requests for one seat, exactly one 201 and the rest ${acceptableLoserStatuses.join("/")} — never 500`, async () => {
       const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
       const app = createApp();
       const concurrency = 25;
@@ -180,12 +196,16 @@ export function runBookingConcurrencyContractTest(
         return counts;
       }, {});
 
+      const loserCount = acceptableLoserStatuses.reduce((sum, status) => sum + (statusCounts[status] ?? 0), 0);
+
       expect(statusCounts[201]).toBe(1);
-      expect(statusCounts[loserStatus]).toBe(concurrency - 1);
+      expect(loserCount).toBe(concurrency - 1);
       expect(statusCounts[500]).toBeUndefined();
 
-      for (const res of responses) {
-        expect(res.headers["x-booking-retries"]).toBe("0");
+      if (checkZeroRetries) {
+        for (const res of responses) {
+          expect(res.headers["x-booking-retries"]).toBe("0");
+        }
       }
 
       const bookingSeatsRes = await pool.query(

@@ -20,3 +20,10 @@ export function isLockNotAvailable(err: unknown): boolean {
 export function isInvalidTextRepresentation(err: unknown): boolean {
   return hasPgErrorCode(err, "22P02");
 }
+
+// Raised on COMMIT (or occasionally an earlier statement) when a SERIALIZABLE
+// transaction can't be serialized against concurrent transactions (ADR-0011)
+// — the trigger for withSerializableTransaction's retry loop.
+export function isSerializationFailure(err: unknown): boolean {
+  return hasPgErrorCode(err, "40001");
+}

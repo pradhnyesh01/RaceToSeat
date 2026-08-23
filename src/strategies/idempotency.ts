@@ -24,14 +24,36 @@ export async function findExistingBookingByIdempotencyKey(
   return row ? { id: row.id, createdAt: row.created_at } : undefined;
 }
 
+// The fallback for every mechanism's shared race: two requests carrying the
+// same idempotency_key both pass findExistingBookingByIdempotencyKey and
+// both reach the insert — the loser hits bookings.idempotency_key's
+// unique-violation, caught here, and replays what the winner created instead
+// of surfacing the raw constraint error. Any other error is rethrown
+// unchanged. Shared by runTransactionalBooking (every plain-BEGIN mechanism)
+// and the serializable strategy directly (ADR-0011's dedicated transaction
+// helper means it can't funnel through runTransactionalBooking itself, but
+// this race has nothing to do with isolation level or the retry loop, so
+// there's no reason for it to have its own copy).
+export async function resolveIdempotencyKeyRace(
+  client: PoolClient,
+  idempotencyKey: string,
+  err: unknown,
+): Promise<BookSeatResult> {
+  if (!isUniqueViolation(err, "bookings_idempotency_key_key")) {
+    throw err;
+  }
+  const existing = await findExistingBookingByIdempotencyKey(client, idempotencyKey);
+  if (!existing) {
+    throw new Error(
+      `Expected a booking with idempotency_key "${idempotencyKey}" after a unique-violation, found none`,
+    );
+  }
+  return { kind: "idempotent_replay", bookingId: existing.id, createdAt: existing.createdAt };
+}
+
 // Runs `work` inside a transaction (via withTransaction), committing only on
 // a genuine "created" result and rolling back a losing/unknown outcome so no
-// stray locks or partial writes survive it. Also owns the fallback for every
-// mechanism's shared race: two requests carrying the same idempotency_key
-// both pass findExistingBookingByIdempotencyKey and both reach the insert —
-// the loser hits bookings.idempotency_key's unique-violation here and
-// replays what the winner created, instead of surfacing the raw constraint
-// error.
+// stray locks or partial writes survive it.
 export async function runTransactionalBooking(
   client: PoolClient,
   idempotencyKey: string,
@@ -40,15 +62,6 @@ export async function runTransactionalBooking(
   try {
     return await withTransaction(client, work, (result) => result.kind === "created");
   } catch (err) {
-    if (isUniqueViolation(err, "bookings_idempotency_key_key")) {
-      const existing = await findExistingBookingByIdempotencyKey(client, idempotencyKey);
-      if (!existing) {
-        throw new Error(
-          `Expected a booking with idempotency_key "${idempotencyKey}" after a unique-violation, found none`,
-        );
-      }
-      return { kind: "idempotent_replay", bookingId: existing.id, createdAt: existing.createdAt };
-    }
-    throw err;
+    return await resolveIdempotencyKeyRace(client, idempotencyKey, err);
   }
 }
