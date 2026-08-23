@@ -4,20 +4,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Current state
 
-Phase 0 (scaffolding) and Phase 1 (baseline correctness) are complete. The TypeScript/
-Fastify API (`src/`) now supports three interchangeable `BOOKING_STRATEGY` mechanisms —
-`naive`, `unique_constraint`, `pessimistic` (`src/strategies/`) — sharing one Postgres
-schema (`db/schema.sql`, including ADR-0008's `booking_seats.seat_id UNIQUE` constraint)
-and one idempotency helper (`src/strategies/idempotency.ts`). `DELETE /bookings/{id}`
-(cancellation) is implemented once, independent of strategy. The k6-based load harness
-(`load-harness/hammer-seat.k6.js` + `run.ts`) now reuses and resets one seat across
-repeated runs via the real `DELETE` endpoint (`--repeat` flag), rather than reseeding.
-All of this is exercised by `npm test`. See
+Phase 0 (scaffolding), Phase 1 (baseline correctness), and Phase 2 (mechanism
+expansion + benchmark harness) are complete. The TypeScript/Fastify API (`src/`) now
+supports six interchangeable `BOOKING_STRATEGY` mechanisms — `naive`, `unique_constraint`,
+`pessimistic`, `optimistic`, `advisory`, `serializable` (`src/strategies/`) — sharing one
+Postgres schema (`db/schema.sql`, including ADR-0008's `booking_seats.seat_id UNIQUE`
+constraint) and one idempotency helper (`src/strategies/idempotency.ts`). `BookSeatResult`
+carries a `retry_exhausted` kind (HTTP 503, ADR-0012), and every `POST /bookings` response
+carries an `X-Booking-Retries` header. `DELETE /bookings/{id}` (cancellation) is implemented
+once, independent of strategy. The k6-based load harness now has two sibling load patterns —
+`hammer-seat.k6.js` (all-same-seat contention) and `spread-across-seats.k6.js`
+(zero-contention per-mechanism overhead) — both selectable via `run.ts --pattern`, both
+resetting via the real `DELETE` endpoint (`--repeat` flag) rather than reseeding, and both
+tallying `X-Booking-Retries` and retry-exhaustion (HTTP 503) as their own metrics. A new
+aggregation script (`load-harness/aggregate.ts`, `npm run harness:aggregate`) reads the
+JSON reports the harness writes and produces a Markdown comparison document. All of this is
+exercised by `npm test`. See
 [docs/evidence/exhibit-a-naive-double-booking.md](docs/evidence/exhibit-a-naive-double-booking.md)
-(Phase 0, naive fails under load) and
+(Phase 0, naive fails under load),
 [docs/evidence/exhibit-b-phase1-correctness.md](docs/evidence/exhibit-b-phase1-correctness.md)
-(Phase 1, both new mechanisms hold under load) for the before/after evidence.
-Phases 2+ are not yet implemented. Before extending the implementation,
+(Phase 1, the first two new mechanisms hold under load), and
+[docs/evidence/exhibit-c-phase2-comparison.md](docs/evidence/exhibit-c-phase2-comparison.md)
+(Phase 2, all six mechanisms benchmarked against each other) for the before/after evidence.
+Phases 3+ are not yet implemented. Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
 

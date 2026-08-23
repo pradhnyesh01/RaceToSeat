@@ -88,24 +88,48 @@ async function seedSpreadSeats(n: number): Promise<{ eventId: string; seatIds: s
 }
 
 interface K6Summary {
-  // k6's --summary-export stores each metric's fields (count, rate, ...)
-  // directly on the metric object, not nested under a `.values` key. A
-  // Counter that never received a single .add() call in the run (e.g. zero
-  // conflicts) is omitted from `metrics` entirely, hence the fallback to 0.
-  metrics: Record<string, { count?: number }>;
+  // k6's --summary-export stores each metric's fields (count, rate, avg,
+  // med, "p(99)", ...) directly on the metric object, not nested under a
+  // `.values` key. A Counter that never received a single .add() call in
+  // the run (e.g. zero conflicts) is omitted from `metrics` entirely, hence
+  // the fallback to 0 in metricCount/metricStat.
+  metrics: Record<string, Record<string, number>>;
 }
 
 function metricCount(summary: K6Summary, name: string): number {
   return summary.metrics[name]?.count ?? 0;
 }
 
+// Reads a Trend stat (e.g. "med" for p50, "p(99)") or Counter's "rate" off
+// a k6 summary metric — both are issue #18 additions for Exhibit C's
+// throughput/latency columns.
+function metricStat(summary: K6Summary, name: string, field: string): number {
+  return summary.metrics[name]?.[field] ?? 0;
+}
+
+interface HttpStatusTally {
+  201: number;
+  409: number;
+  // retry_exhausted (ADR-0012), tallied separately from `other` so
+  // Exhibit C can report retry-exhaustion rate as its own column.
+  503: number;
+  other: number;
+}
+
+interface LatencyStats {
+  p50Ms: number;
+  p99Ms: number;
+}
+
 interface RunReport {
   attempt: number;
   ranAt: string;
   durationMs: number;
-  httpStatusTally: { 201: number; 409: number; other: number };
+  httpStatusTally: HttpStatusTally;
   // Sum of X-Booking-Retries (ADR-0012) across every response in the run.
   retriesTotal: number;
+  latency: LatencyStats;
+  throughputRps: number;
   winningBookingIds: string[];
   winningUserIds: string[];
   winningBookingCount: number;
@@ -165,9 +189,15 @@ async function runOnce(args: Args, seatId: string, attempt: number): Promise<Run
     httpStatusTally: {
       201: metricCount(summary, "booking_created"),
       409: metricCount(summary, "booking_conflict"),
+      503: metricCount(summary, "booking_retry_exhausted"),
       other: metricCount(summary, "booking_other_status"),
     },
     retriesTotal: metricCount(summary, "booking_retries"),
+    latency: {
+      p50Ms: metricStat(summary, "http_req_duration", "med"),
+      p99Ms: metricStat(summary, "http_req_duration", "p(99)"),
+    },
+    throughputRps: metricStat(summary, "http_reqs", "rate"),
     winningBookingIds: winningBookings.map((r) => r.booking_id),
     winningUserIds: winningBookings.map((r) => r.user_id),
     winningBookingCount: winningBookings.length,
@@ -281,9 +311,11 @@ interface SpreadRunReport {
   attempt: number;
   ranAt: string;
   durationMs: number;
-  httpStatusTally: { 201: number; 409: number; other: number };
+  httpStatusTally: HttpStatusTally;
   // Sum of X-Booking-Retries (ADR-0012) across every response in the run.
   retriesTotal: number;
+  latency: LatencyStats;
+  throughputRps: number;
   seatCount: number;
   seatsWithWinner: number;
   seatsDoubleBooked: number;
@@ -347,9 +379,15 @@ async function runSpreadSeatsOnce(args: Args, seatIds: string[], attempt: number
     httpStatusTally: {
       201: metricCount(summary, "booking_created"),
       409: metricCount(summary, "booking_conflict"),
+      503: metricCount(summary, "booking_retry_exhausted"),
       other: metricCount(summary, "booking_other_status"),
     },
     retriesTotal: metricCount(summary, "booking_retries"),
+    latency: {
+      p50Ms: metricStat(summary, "http_req_duration", "med"),
+      p99Ms: metricStat(summary, "http_req_duration", "p(99)"),
+    },
+    throughputRps: metricStat(summary, "http_reqs", "rate"),
     seatCount: seatIds.length,
     seatsWithWinner: winnersPerSeat.size,
     seatsDoubleBooked,

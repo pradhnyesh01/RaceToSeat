@@ -1,0 +1,35 @@
+{
+  "strategy": "pessimistic",
+  "pattern": "hammer-seat",
+  "concurrency": 1000,
+  "eventId": "edfadec2-1447-49c0-81c1-0f2f2b5487cc",
+  "seatId": "ba068163-dd5a-4e18-95a6-3dcb0fb9ef39",
+  "runs": [
+    {
+      "attempt": 1,
+      "ranAt": "2026-08-23T08:09:03.129Z",
+      "durationMs": 525,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 999,
+        "503": 0,
+        "other": 0
+      },
+      "retriesTotal": 0,
+      "latency": {
+        "p50Ms": 54.0075,
+        "p99Ms": 105.26663
+      },
+      "throughputRps": 5685.112963194579,
+      "winningBookingIds": [
+        "3dcb4ddc-0600-4533-802a-2a3b2b27a66f"
+      ],
+      "winningUserIds": [
+        "load-user-287"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    }
+  ],
+  "anyDoubleBooked": false
+}

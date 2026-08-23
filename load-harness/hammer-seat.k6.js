@@ -9,6 +9,10 @@ import { Counter } from "k6/metrics";
 
 const createdCount = new Counter("booking_created");
 const conflictCount = new Counter("booking_conflict");
+// 503 (ADR-0012's retry_exhausted kind) tallied separately from other
+// unexpected statuses (issue #18) so retry-exhaustion rate can be reported
+// as its own column rather than folded into a generic failure tally.
+const retryExhaustedCount = new Counter("booking_retry_exhausted");
 const otherStatusCount = new Counter("booking_other_status");
 // Tallies the X-Booking-Retries header (ADR-0012, issue #17) across every
 // response, so retry rate is captured from the same run as throughput/
@@ -24,6 +28,9 @@ if (!SEAT_ID) throw new Error("SEAT_ID env var is required");
 if (!RUN_ID) throw new Error("RUN_ID env var is required");
 
 export const options = {
+  // Default trend stats omit p(99); issue #18's mechanism comparison needs
+  // it alongside the default p50 (med) for http_req_duration.
+  summaryTrendStats: ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max"],
   scenarios: {
     hammer_one_seat: {
       executor: "per-vu-iterations",
@@ -57,6 +64,7 @@ export default function () {
 
   if (res.status === 201) createdCount.add(1);
   else if (res.status === 409) conflictCount.add(1);
+  else if (res.status === 503) retryExhaustedCount.add(1);
   else otherStatusCount.add(1);
 
   retriesCount.add(Number(res.headers["X-Booking-Retries"] ?? 0));
