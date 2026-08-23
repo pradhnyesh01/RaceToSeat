@@ -54,7 +54,7 @@ export default function () {
   const res = http.post(
     `${BASE_URL}/bookings`,
     JSON.stringify({
-      seat_id: seatId,
+      seat_ids: [seatId],
       user_id: `load-user-${__VU}`,
       // Unique per VU within this run, same scheme as hammer-seat.k6.js.
       idempotency_key: `${RUN_ID}-${__VU}`,

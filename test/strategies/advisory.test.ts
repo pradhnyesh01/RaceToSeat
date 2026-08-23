@@ -3,7 +3,8 @@ process.env.BOOKING_STRATEGY = "advisory";
 const { randomUUID } = await import("node:crypto");
 const { createApp } = await import("../../src/app.js");
 const { pool } = await import("../../src/db/pool.js");
-const { runBookingConcurrencyContractTest, runBookingContractTests } = await import("../bookingContract.js");
+const { runBookingConcurrencyContractTest, runBookingContractTests, runMultiSeatBookingContractTests } =
+  await import("../bookingContract.js");
 const { resetDb, seedEventWithSeats } = await import("../testDb.js");
 
 const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
@@ -12,6 +13,7 @@ afterAll(() => pool.end());
 
 runBookingContractTests("advisory", createApp);
 runBookingConcurrencyContractTest("advisory", createApp);
+runMultiSeatBookingContractTests("advisory", createApp);
 
 // Holds the exact advisory-lock key the strategy would derive for
 // `lockSeatId` open in an uncommitted transaction on a separate connection,
@@ -48,7 +50,7 @@ describe("POST /bookings (advisory strategy) — non-blocking acquisition", () =
       const response = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatId, user_id: "user-1", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatId], user_id: "user-1", idempotency_key: randomUUID() },
       });
       elapsedMs = Date.now() - start;
       return response;
@@ -75,7 +77,7 @@ describe("POST /bookings (advisory strategy) — non-blocking acquisition", () =
       app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatId.toUpperCase(), user_id: "user-1", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatId.toUpperCase()], user_id: "user-1", idempotency_key: randomUUID() },
       }),
     );
 
@@ -98,7 +100,7 @@ describe("POST /bookings (advisory strategy) — non-blocking acquisition", () =
       app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: unknownSeatId, user_id: "user-1", idempotency_key: randomUUID() },
+        payload: { seat_ids: [unknownSeatId], user_id: "user-1", idempotency_key: randomUUID() },
       }),
     );
 

@@ -25,7 +25,7 @@ describe("DELETE /bookings/:id", () => {
     const bookRes = await app.inject({
       method: "POST",
       url: "/bookings",
-      payload: { seat_id: seatIdsByLabel.A1, user_id: "user-1", idempotency_key: randomUUID() },
+      payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() },
     });
     const { id: bookingId } = bookRes.json() as { id: string };
 
@@ -86,7 +86,7 @@ describe("DELETE /bookings/:id", () => {
     const bookRes = await app.inject({
       method: "POST",
       url: "/bookings",
-      payload: { seat_id: seatIdsByLabel.A1, user_id: "user-1", idempotency_key: randomUUID() },
+      payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() },
     });
     const { id: bookingId } = bookRes.json() as { id: string };
 
@@ -104,7 +104,7 @@ describe("DELETE /bookings/:id", () => {
     const bookRes = await app.inject({
       method: "POST",
       url: "/bookings",
-      payload: { seat_id: seatIdsByLabel.A1, user_id: "owner", idempotency_key: randomUUID() },
+      payload: { seat_ids: [seatIdsByLabel.A1], user_id: "owner", idempotency_key: randomUUID() },
     });
     const { id: bookingId } = bookRes.json() as { id: string };
 

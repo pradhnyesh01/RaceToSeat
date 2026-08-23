@@ -3,7 +3,8 @@ process.env.BOOKING_STRATEGY = "serializable";
 const { randomUUID } = await import("node:crypto");
 const { createApp } = await import("../../src/app.js");
 const { pool } = await import("../../src/db/pool.js");
-const { runBookingConcurrencyContractTest, runBookingContractTests } = await import("../bookingContract.js");
+const { runBookingConcurrencyContractTest, runBookingContractTests, runMultiSeatBookingContractTests } =
+  await import("../bookingContract.js");
 const { commitBookingOnClient, interceptQuery, resetDb, seedEventWithSeats } = await import("../testDb.js");
 
 const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
@@ -11,6 +12,7 @@ const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
 afterAll(() => pool.end());
 
 runBookingContractTests("serializable", createApp);
+runMultiSeatBookingContractTests("serializable", createApp);
 
 // checkZeroRetries: false — under real SERIALIZABLE contention, a losing
 // request can only discover the seat was taken by retrying the whole
@@ -47,7 +49,7 @@ describe("POST /bookings (serializable strategy) — ordinary conflict via the u
     // 23505 through withSerializableTransaction's retry logic — though a
     // 23505 isn't a serialization failure, so it wouldn't retry there
     // either; it would instead propagate all the way to an uncaught 500).
-    const interceptor = interceptQuery("SELECT status FROM seats", async (connect) => {
+    const interceptor = interceptQuery("SELECT id, status FROM seats", async (connect) => {
       const winnerClient = await connect();
       try {
         // Plain BEGIN, deliberately not SERIALIZABLE: confirmed empirically
@@ -68,7 +70,7 @@ describe("POST /bookings (serializable strategy) — ordinary conflict via the u
       res = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatId, user_id: "user-1", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatId], user_id: "user-1", idempotency_key: randomUUID() },
       });
     } finally {
       interceptor.restore();

@@ -18,6 +18,10 @@ export interface BookSeatSerializableOptions {
 // mechanisms need. The idempotency-key-race fallback (resolveIdempotencyKeyRace)
 // IS shared, though: that race is a plain 23505 outside any retry loop,
 // unrelated to isolation level, so there's no reason to duplicate it here.
+//
+// Multi-seat (Phase 3, issue #24): seat_ids is iterated in request order, not
+// sorted (ordering, and extending this retry loop to also treat a deadlock
+// abort as retriable, are this mechanism's own follow-up ticket's job).
 export async function bookSeatSerializable(
   input: BookSeatInput,
   options: BookSeatSerializableOptions = {},
@@ -33,15 +37,18 @@ export async function bookSeatSerializable(
       return await withSerializableTransaction(
         client,
         async (txClient, attempt) => {
-          const seatRes = await txClient.query<{ status: string }>(
-            "SELECT status FROM seats WHERE id = $1",
-            [input.seatId],
+          // The whole requested set's existence is checked in one query
+          // before any per-seat availability check or write starts: a seat
+          // missing from the result set is unknown, taking precedence over
+          // any other seat in the same request already being booked.
+          const seatRes = await txClient.query<{ id: string; status: string }>(
+            "SELECT id, status FROM seats WHERE id = ANY($1)",
+            [input.seatIds],
           );
-          const seat = seatRes.rows[0];
-          if (!seat) {
+          if (seatRes.rows.length !== input.seatIds.length) {
             return { kind: "not_found" };
           }
-          if (seat.status !== "available") {
+          if (seatRes.rows.some((seat) => seat.status !== "available")) {
             return { kind: "conflict", retries: attempt };
           }
 
@@ -57,10 +64,14 @@ export async function bookSeatSerializable(
           // check above (a genuine SERIALIZABLE race) resolve here via a
           // plain 23505 well before Postgres's serialization-failure
           // detection would fire, the same as naive's backstop.
+          // One batched statement, not a per-seat loop: a unique-violation on
+          // any one generated row aborts the whole INSERT (no partial rows),
+          // so all-or-nothing holds without needing to catch and roll back a
+          // loop.
           try {
             await txClient.query(
-              "INSERT INTO booking_seats (booking_id, seat_id) VALUES ($1, $2)",
-              [booking.id, input.seatId],
+              "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
+              [booking.id, input.seatIds],
             );
           } catch (err) {
             if (isUniqueViolation(err, "booking_seats_seat_id_key")) {
@@ -69,8 +80,8 @@ export async function bookSeatSerializable(
             throw err;
           }
           await txClient.query(
-            "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = $2",
-            [input.userId, input.seatId],
+            "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
+            [input.userId, input.seatIds],
           );
 
           return { kind: "created", bookingId: booking.id, createdAt: booking.created_at, retries: attempt };

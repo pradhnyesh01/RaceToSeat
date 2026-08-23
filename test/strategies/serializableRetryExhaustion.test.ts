@@ -35,7 +35,7 @@ describe("POST /bookings (serializable strategy, max retries = 0) — retry exha
     // intercepted request then attempts its own write, it collides with
     // that already-committed write and Postgres raises a genuine 40001 —
     // not a stub, a real serialization failure.
-    const interceptor = interceptQuery("SELECT status FROM seats", async (connect) => {
+    const interceptor = interceptQuery("SELECT id, status FROM seats", async (connect) => {
       const winnerClient = await connect();
       try {
         // Must also be SERIALIZABLE, not just committed — see
@@ -58,7 +58,7 @@ describe("POST /bookings (serializable strategy, max retries = 0) — retry exha
       res = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatId, user_id: "user-1", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatId], user_id: "user-1", idempotency_key: randomUUID() },
       });
     } finally {
       interceptor.restore();
@@ -89,7 +89,7 @@ describe("POST /bookings (serializable strategy, max retries = 0) — retry exha
         app.inject({
           method: "POST",
           url: "/bookings",
-          payload: { seat_id: seatIdsByLabel.A1, user_id: `user-${i}`, idempotency_key: `race-${i}` },
+          payload: { seat_ids: [seatIdsByLabel.A1], user_id: `user-${i}`, idempotency_key: `race-${i}` },
         }),
       ),
     );

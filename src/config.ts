@@ -35,4 +35,8 @@ export const config = {
   // concurrency rather than firing only on a rare race. Overridable per-call
   // for the same test-determinism reason as optimisticMaxRetries.
   serializableMaxRetries: intEnv("SERIALIZABLE_MAX_RETRIES", 5),
+  // Governs withDeadlockRetry (ADR-0014). Same default and jittered-backoff
+  // tuning rationale as serializableMaxRetries: a deadlock under adversarial
+  // multi-seat load scales with concurrency, not a narrow rare race.
+  deadlockMaxRetries: intEnv("DEADLOCK_MAX_RETRIES", 5),
 };

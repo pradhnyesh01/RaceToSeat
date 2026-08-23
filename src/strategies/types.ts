@@ -12,7 +12,7 @@ export type BookSeatResult =
   | { kind: "retry_exhausted"; retries: number };
 
 export interface BookSeatInput {
-  seatId: string;
+  seatIds: string[];
   userId: string;
   idempotencyKey: string;
 }

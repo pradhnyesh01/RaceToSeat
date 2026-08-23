@@ -48,7 +48,7 @@ export default function () {
   const res = http.post(
     `${BASE_URL}/bookings`,
     JSON.stringify({
-      seat_id: SEAT_ID,
+      seat_ids: [SEAT_ID],
       user_id: `load-user-${__VU}`,
       // Unique per VU within this run: RUN_ID changes every invocation, __VU
       // is unique within one run. bookings.idempotency_key is a plain TEXT

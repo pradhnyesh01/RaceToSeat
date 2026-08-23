@@ -27,3 +27,11 @@ export function isInvalidTextRepresentation(err: unknown): boolean {
 export function isSerializationFailure(err: unknown): boolean {
   return hasPgErrorCode(err, "40001");
 }
+
+// Raised when Postgres's deadlock detector aborts one side of a wait-for
+// cycle between two transactions holding row locks in opposite order
+// (ADR-0014) — the trigger for withDeadlockRetry's retry loop, and for
+// withSerializableTransaction's extended one.
+export function isDeadlockDetected(err: unknown): boolean {
+  return hasPgErrorCode(err, "40P01");
+}

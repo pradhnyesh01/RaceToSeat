@@ -21,7 +21,7 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
       const res = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatIdsByLabel.A1, user_id: "user-1", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() },
       });
       const body = res.json() as { id: string };
 
@@ -52,13 +52,13 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
       await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatIdsByLabel.A1, user_id: "user-1", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() },
       });
 
       const res = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatIdsByLabel.A1, user_id: "user-2", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-2", idempotency_key: randomUUID() },
       });
 
       expect(res.statusCode).toBe(409);
@@ -71,7 +71,7 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
         method: "POST",
         url: "/bookings",
         payload: {
-          seat_id: "00000000-0000-0000-0000-000000000000",
+          seat_ids: ["00000000-0000-0000-0000-000000000000"],
           user_id: "user-1",
           idempotency_key: randomUUID(),
         },
@@ -88,7 +88,7 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
     it("returns the same booking id and 201 when the identical request is sent twice", async () => {
       const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
       const app = createApp();
-      const payload = { seat_id: seatIdsByLabel.A1, user_id: "user-1", idempotency_key: randomUUID() };
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
 
       const first = await app.inject({ method: "POST", url: "/bookings", payload });
       const second = await app.inject({ method: "POST", url: "/bookings", payload });
@@ -116,7 +116,7 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
       const first = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatIdsByLabel.A1, user_id: "user-1", idempotency_key: idempotencyKey },
+        payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: idempotencyKey },
       });
       const firstBody = first.json() as { id: string };
 
@@ -124,7 +124,7 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
       const second = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatIdsByLabel.A2, user_id: "user-1", idempotency_key: idempotencyKey },
+        payload: { seat_ids: [seatIdsByLabel.A2], user_id: "user-1", idempotency_key: idempotencyKey },
       });
       const secondBody = second.json() as { id: string };
 
@@ -136,6 +136,137 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
 
       const seatA2 = await pool.query("SELECT status FROM seats WHERE id = $1", [seatIdsByLabel.A2]);
       expect(seatA2.rows[0].status).toBe("available");
+    });
+  });
+}
+
+// Shared multi-seat HTTP contract (Phase 3, issue #24): all-or-nothing,
+// duplicate-seat 400, and 404-before-409 precedence — mirroring
+// runBookingContractTests' pattern so a future fix to this contract doesn't
+// need six copy-pasted edits. Deliberately no concurrency/ordering/deadlock
+// coverage here (that's the deadlock-harness ticket's job, issue #25) — every
+// request below is a single, sequential HTTP call.
+export function runMultiSeatBookingContractTests(strategyLabel: string, createApp: () => FastifyInstance): void {
+  describe(`POST /bookings (${strategyLabel} strategy) — multi-seat`, () => {
+    beforeEach(resetDb);
+
+    it("books multiple available seats in one request", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2"]);
+      const app = createApp();
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: {
+          seat_ids: [seatIdsByLabel.A1, seatIdsByLabel.A2],
+          user_id: "user-1",
+          idempotency_key: randomUUID(),
+        },
+      });
+      const body = res.json() as { id: string; created_at: string };
+
+      expect(res.statusCode).toBe(201);
+      // The 201 body shape is unchanged regardless of seat count (spec):
+      // {id, created_at}, never a per-seat list.
+      expect(Object.keys(body).sort()).toEqual(["created_at", "id"]);
+
+      const seatRes = await pool.query("SELECT status FROM seats WHERE id = ANY($1)", [
+        [seatIdsByLabel.A1, seatIdsByLabel.A2],
+      ]);
+      expect(seatRes.rows.every((row) => row.status === "booked")).toBe(true);
+
+      const bookingSeatsRes = await pool.query("SELECT seat_id FROM booking_seats WHERE booking_id = $1", [
+        body.id,
+      ]);
+      expect(bookingSeatsRes.rows).toHaveLength(2);
+    });
+
+    it("400s when seat_ids contains a duplicate", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: {
+          seat_ids: [seatIdsByLabel.A1, seatIdsByLabel.A1],
+          user_id: "user-1",
+          idempotency_key: randomUUID(),
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("400s when seat_ids contains the same seat spelled with different UUID casing", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: {
+          seat_ids: [seatIdsByLabel.A1, seatIdsByLabel.A1!.toUpperCase()],
+          user_id: "user-1",
+          idempotency_key: randomUUID(),
+        },
+      });
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it("is all-or-nothing: one seat already booked fails the whole request, leaving the other seat untouched", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2"]);
+      const app = createApp();
+
+      await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() },
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: {
+          seat_ids: [seatIdsByLabel.A2, seatIdsByLabel.A1],
+          user_id: "user-2",
+          idempotency_key: randomUUID(),
+        },
+      });
+
+      expect(res.statusCode).toBe(409);
+
+      const seatA2 = await pool.query("SELECT status FROM seats WHERE id = $1", [seatIdsByLabel.A2]);
+      expect(seatA2.rows[0].status).toBe("available");
+
+      const bookingSeatsRes = await pool.query("SELECT seat_id FROM booking_seats WHERE seat_id = $1", [
+        seatIdsByLabel.A2,
+      ]);
+      expect(bookingSeatsRes.rows).toHaveLength(0);
+    });
+
+    it("404s for a request naming one unknown seat and one already-booked seat — 404 takes precedence over 409", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+
+      await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() },
+      });
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: {
+          seat_ids: [seatIdsByLabel.A1, "00000000-0000-0000-0000-000000000000"],
+          user_id: "user-2",
+          idempotency_key: randomUUID(),
+        },
+      });
+
+      expect(res.statusCode).toBe(404);
     });
   });
 }
@@ -186,7 +317,7 @@ export function runBookingConcurrencyContractTest(
           app.inject({
             method: "POST",
             url: "/bookings",
-            payload: { seat_id: seatIdsByLabel.A1, user_id: `user-${i}`, idempotency_key: `race-${i}` },
+            payload: { seat_ids: [seatIdsByLabel.A1], user_id: `user-${i}`, idempotency_key: `race-${i}` },
           }),
         ),
       );

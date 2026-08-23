@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { Pool } from "pg";
 import { config } from "../config.js";
-import { isSerializationFailure } from "./pgErrors.js";
+import { isDeadlockDetected, isSerializationFailure } from "./pgErrors.js";
 
 // Default pg pool max (10) would serialize most of a 1,000-concurrent-request
 // load test behind pool.connect() queuing rather than real DB concurrency —
@@ -102,6 +102,59 @@ export async function withSerializableTransaction<T>(
       }
       if (attempt >= maxRetries) {
         throw new SerializationRetriesExhaustedError(attempt);
+      }
+      attempt++;
+      await sleep(jitteredBackoffMs());
+    }
+  }
+}
+
+export interface WithDeadlockRetryOptions {
+  maxRetries?: number;
+}
+
+// Thrown when withDeadlockRetry exhausts its retry budget without resolving
+// (ADR-0014/ADR-0015), mirroring SerializationRetriesExhaustedError's shape:
+// the DB layer doesn't know about BookSeatResult, so it signals exhaustion
+// via this error rather than a result kind — the calling strategy maps it to
+// { kind: "retry_exhausted", retries }.
+export class DeadlockRetriesExhaustedError extends Error {
+  constructor(public readonly retries: number) {
+    super(`Transaction did not succeed after ${retries} ${retries === 1 ? "retry" : "retries"} following a deadlock abort`);
+    this.name = "DeadlockRetriesExhaustedError";
+  }
+}
+
+// Plain BEGIN/COMMIT/ROLLBACK (not SERIALIZABLE) with the same retry/backoff/
+// cap shape as withSerializableTransaction (ADR-0011), checking
+// isDeadlockDetected (40P01) instead of isSerializationFailure (40001) —
+// ADR-0014's dedicated helper for naive, unique_constraint, and optimistic's
+// multi-seat deadlock-abort recovery. Not used by pessimistic or advisory
+// (their NOWAIT/TRY acquisition can't enter a wait-for cycle, ADR-0006) or by
+// serializable (its own withSerializableTransaction loop is extended to also
+// treat 40P01 as retriable, rather than nesting a second retry-from-BEGIN
+// layer around it).
+export async function withDeadlockRetry<T>(
+  client: PoolClient,
+  fn: (client: PoolClient, attempt: number) => Promise<T>,
+  shouldCommit: (result: T) => boolean = () => true,
+  options: WithDeadlockRetryOptions = {},
+): Promise<T> {
+  const maxRetries = options.maxRetries ?? config.deadlockMaxRetries;
+  let attempt = 0;
+  while (true) {
+    await client.query("BEGIN");
+    try {
+      const result = await fn(client, attempt);
+      await client.query(shouldCommit(result) ? "COMMIT" : "ROLLBACK");
+      return result;
+    } catch (err) {
+      await client.query("ROLLBACK");
+      if (!isDeadlockDetected(err)) {
+        throw err;
+      }
+      if (attempt >= maxRetries) {
+        throw new DeadlockRetriesExhaustedError(attempt);
       }
       attempt++;
       await sleep(jitteredBackoffMs());

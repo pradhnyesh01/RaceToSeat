@@ -3,7 +3,8 @@ process.env.BOOKING_STRATEGY = "optimistic";
 const { randomUUID } = await import("node:crypto");
 const { createApp } = await import("../../src/app.js");
 const { pool } = await import("../../src/db/pool.js");
-const { runBookingConcurrencyContractTest, runBookingContractTests } = await import("../bookingContract.js");
+const { runBookingConcurrencyContractTest, runBookingContractTests, runMultiSeatBookingContractTests } =
+  await import("../bookingContract.js");
 const { interceptQuery, resetDb, seedBooking, seedEventWithSeats } = await import("../testDb.js");
 
 const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
@@ -12,6 +13,7 @@ afterAll(() => pool.end());
 
 runBookingContractTests("optimistic", createApp);
 runBookingConcurrencyContractTest("optimistic", createApp);
+runMultiSeatBookingContractTests("optimistic", createApp);
 
 describe("POST /bookings (optimistic strategy) — concurrent cancellation race", () => {
   beforeEach(resetDb);
@@ -58,7 +60,7 @@ describe("POST /bookings (optimistic strategy) — concurrent cancellation race"
       res = await app.inject({
         method: "POST",
         url: "/bookings",
-        payload: { seat_id: seatId, user_id: "user-2", idempotency_key: randomUUID() },
+        payload: { seat_ids: [seatId], user_id: "user-2", idempotency_key: randomUUID() },
       });
     } finally {
       interceptor.restore();
@@ -70,5 +72,26 @@ describe("POST /bookings (optimistic strategy) — concurrent cancellation race"
 
     const seatRow = await pool.query("SELECT status, booked_by, version FROM seats WHERE id = $1", [seatId]);
     expect(seatRow.rows[0]).toMatchObject({ status: "booked", booked_by: "user-2", version: 3 });
+  });
+});
+
+describe("POST /bookings (optimistic strategy) — UUID casing", () => {
+  beforeEach(resetDb);
+
+  it("books a seat whose id is spelled with different casing than Postgres's own canonical form, without crashing", async () => {
+    const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+    const app = createApp();
+
+    // The CAS loop's seat lookup is keyed by a fresh SELECT's row.id (always
+    // Postgres's canonical lowercase uuid text), not by the client's spelling
+    // — a naive Map keyed by one and read by the other would miss and throw
+    // on a non-null assertion instead of booking the seat.
+    const res = await app.inject({
+      method: "POST",
+      url: "/bookings",
+      payload: { seat_ids: [seatIdsByLabel.A1!.toUpperCase()], user_id: "user-1", idempotency_key: randomUUID() },
+    });
+
+    expect(res.statusCode).toBe(201);
   });
 });

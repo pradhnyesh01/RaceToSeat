@@ -35,7 +35,7 @@ describe("POST /bookings (optimistic strategy, max retries = 0) — retry exhaus
         app.inject({
           method: "POST",
           url: "/bookings",
-          payload: { seat_id: seatIdsByLabel.A1, user_id: `user-${i}`, idempotency_key: `race-${i}` },
+          payload: { seat_ids: [seatIdsByLabel.A1], user_id: `user-${i}`, idempotency_key: `race-${i}` },
         }),
       ),
     );

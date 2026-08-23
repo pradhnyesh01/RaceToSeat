@@ -4,7 +4,7 @@ import { isInvalidTextRepresentation } from "../db/pgErrors.js";
 import { bookSeat } from "../strategies/index.js";
 
 interface CreateBookingBody {
-  seat_id?: unknown;
+  seat_ids?: unknown;
   user_id?: unknown;
   idempotency_key?: unknown;
 }
@@ -14,18 +14,32 @@ export function registerBookingsRoutes(app: FastifyInstance): void {
     const body = request.body as CreateBookingBody;
 
     if (
-      typeof body?.seat_id !== "string" ||
+      !Array.isArray(body?.seat_ids) ||
+      body.seat_ids.length === 0 ||
+      !body.seat_ids.every((seatId): seatId is string => typeof seatId === "string") ||
       typeof body?.user_id !== "string" ||
       typeof body?.idempotency_key !== "string"
     ) {
       reply.status(400).send({
-        error: "seat_id, user_id, and idempotency_key are all required strings",
+        error: "seat_ids (a non-empty array of strings), user_id, and idempotency_key are all required",
       });
       return;
     }
 
+    // A single-seat booking is seat_ids: [x] — no parallel singular field, so
+    // a client-side bug sending the same seat twice can't silently produce a
+    // confusing partial result. Compared case-insensitively: seat ids are
+    // UUIDs, which Postgres compares case-insensitively too (every strategy's
+    // WHERE id = ANY($1) would otherwise silently collapse two differently-
+    // cased spellings of the same seat into one row and report a spurious
+    // not_found via the resulting length mismatch, instead of this 400).
+    if (new Set(body.seat_ids.map((seatId) => seatId.toLowerCase())).size !== body.seat_ids.length) {
+      reply.status(400).send({ error: "seat_ids must not contain duplicates" });
+      return;
+    }
+
     const result = await bookSeat({
-      seatId: body.seat_id,
+      seatIds: body.seat_ids,
       userId: body.user_id,
       idempotencyKey: body.idempotency_key,
     });
