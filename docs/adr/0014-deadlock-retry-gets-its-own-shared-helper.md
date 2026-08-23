@@ -1,0 +1,7 @@
+---
+status: accepted
+---
+
+# Deadlock-abort retry gets its own shared helper, not a parameter on withSerializableTransaction
+
+`withTransaction` (`src/db/pool.ts`) has no retry loop at all; `withSerializableTransaction` (ADR-0011) already has exactly the shape a deadlock-abort recovery needs — `BEGIN` → try → `ROLLBACK` on error → check error code → retry-or-throw — just checking a different Postgres error code (`40P01` instead of `40001`). Multi-seat `naive`, `unique_constraint`, and `optimistic` (Phase 3, todo.md) all need this recovery as a fallback layer behind consistent seat-id ordering (the primary defense): ordering alone doesn't cover every scenario a real deadlock detector can still trip on. A new `withDeadlockRetry` helper sits alongside `withTransaction` and `withSerializableTransaction` in `pool.ts`, following ADR-0011's own precedent of a dedicated helper rather than making an existing one aware of a second retriable error code — this keeps the concern isolated to only the mechanisms that need it (`pessimistic`'s `FOR UPDATE NOWAIT` and `advisory`'s `pg_try_advisory_xact_lock` can't deadlock in the first place, ADR-0006). `serializable`, which already retries a genuine `40001` from fresh `BEGIN`, extends that existing loop to also treat `40P01` as retriable rather than wrapping it in a second retry-from-`BEGIN` layer — nesting two loops that each restart the transaction would double-`BEGIN` incorrectly, so extending the one that already exists is the only coherent option.
