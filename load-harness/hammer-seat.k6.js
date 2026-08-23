@@ -10,6 +10,10 @@ import { Counter } from "k6/metrics";
 const createdCount = new Counter("booking_created");
 const conflictCount = new Counter("booking_conflict");
 const otherStatusCount = new Counter("booking_other_status");
+// Tallies the X-Booking-Retries header (ADR-0012, issue #17) across every
+// response, so retry rate is captured from the same run as throughput/
+// latency/conflict counts rather than a separate pass.
+const retriesCount = new Counter("booking_retries");
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 const SEAT_ID = __ENV.SEAT_ID;
@@ -54,4 +58,6 @@ export default function () {
   if (res.status === 201) createdCount.add(1);
   else if (res.status === 409) conflictCount.add(1);
   else otherStatusCount.add(1);
+
+  retriesCount.add(Number(res.headers["X-Booking-Retries"] ?? 0));
 }
