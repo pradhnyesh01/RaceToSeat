@@ -30,4 +30,9 @@ export const config = {
   // strategy's own options param (tests force it to 0 to exercise
   // retry-exhaustion deterministically without a real cancellation race).
   optimisticMaxRetries: intEnv("OPTIMISTIC_MAX_RETRIES", 3),
+  // Production default per ADR-0011 — more permissive than optimistic's,
+  // since serialization failures are expected to scale with ordinary
+  // concurrency rather than firing only on a rare race. Overridable per-call
+  // for the same test-determinism reason as optimisticMaxRetries.
+  serializableMaxRetries: intEnv("SERIALIZABLE_MAX_RETRIES", 5),
 };
