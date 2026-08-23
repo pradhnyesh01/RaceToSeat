@@ -1,17 +1,21 @@
-// Orchestrates concurrency-evidence runs (issue #5, extended by issue #11
-// and issue #17): seeds seat(s), then fires N concurrent-request runs
+// Orchestrates concurrency-evidence runs (issue #5, extended by issue #11,
+// #17, and #25): seeds seat(s), then fires N concurrent-request runs
 // against them via k6, resetting between runs through the real HTTP
 // DELETE /bookings/{id} endpoint (issue #8) rather than raw SQL or
 // reseeding — the harness exercises the same API surface it's evidencing.
 //
-// Two load patterns, selected via --pattern:
+// Three load patterns, selected via --pattern:
 //   hammer-seat (default): all CONCURRENCY requests race one seat
 //     (hammer-seat.k6.js) — the existing double-booking/correctness evidence.
 //   spread-seats: one VU per seat across CONCURRENCY distinct, pre-seeded
 //     seats (spread-across-seats.k6.js) — zero conflicts ever fire, so this
 //     establishes each mechanism's raw per-request overhead (issue #17).
+//   deadlock-pairs: CONCURRENCY disjoint 2-seat pairs, both orderings of
+//     each pair fired concurrently (deadlock-pairs.k6.js) — the adversarial
+//     deadlock harness (issue #25); deadlock rate reads off the same
+//     X-Booking-Retries/retry_exhausted tally the other two patterns report.
 //
-// Usage: tsx load-harness/run.ts [--concurrency 1000] [--repeat 2] [--base-url http://localhost:3000] [--pattern hammer-seat|spread-seats]
+// Usage: tsx load-harness/run.ts [--concurrency 1000] [--repeat 2] [--base-url http://localhost:3000] [--pattern hammer-seat|spread-seats|deadlock-pairs]
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -19,11 +23,12 @@ import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { pool } from "../src/db/pool.js";
 
-type Pattern = "hammer-seat" | "spread-seats";
+type Pattern = "hammer-seat" | "spread-seats" | "deadlock-pairs";
 
 interface Args {
   // hammer-seat: number of concurrent requests racing the one target seat.
   // spread-seats: number of distinct seats seeded, one VU each.
+  // deadlock-pairs: number of disjoint 2-seat pairs seeded (2x seats, 2x VUs).
   concurrency: number;
   baseUrl: string;
   repeat: number;
@@ -39,8 +44,10 @@ function parsePositiveInt(flag: string, value: string | undefined): number {
 }
 
 function parsePattern(value: string | undefined): Pattern {
-  if (value !== "hammer-seat" && value !== "spread-seats") {
-    throw new Error(`--pattern must be "hammer-seat" or "spread-seats", got ${JSON.stringify(value)}`);
+  if (value !== "hammer-seat" && value !== "spread-seats" && value !== "deadlock-pairs") {
+    throw new Error(
+      `--pattern must be "hammer-seat", "spread-seats", or "deadlock-pairs", got ${JSON.stringify(value)}`,
+    );
   }
   return value;
 }
@@ -85,6 +92,33 @@ async function seedSpreadSeats(n: number): Promise<{ eventId: string; seatIds: s
     [eventId, n],
   );
   return { eventId, seatIds: seatsRes.rows.map((row) => row.id) };
+}
+
+// Seeds N disjoint 2-seat pairs under one event for the deadlock-pairs
+// pattern (issue #25) — bulk-inserted via generate_series like
+// seedSpreadSeats, then chunked into consecutive pairs. Which two ids land
+// in the same pair doesn't matter for correctness, only that every id is
+// distinct and appears in exactly one pair — both guaranteed by RETURNING
+// on a single INSERT of n*2 freshly-generated rows, regardless of what
+// order those rows come back in.
+async function seedDeadlockPairs(n: number): Promise<{ eventId: string; pairs: [string, string][] }> {
+  const eventRes = await pool.query<{ id: string }>(
+    "INSERT INTO events (name) VALUES ($1) RETURNING id",
+    ["Load Harness: Deadlock Pairs"],
+  );
+  const eventId = eventRes.rows[0]!.id;
+  const seatsRes = await pool.query<{ id: string }>(
+    `INSERT INTO seats (event_id, label)
+     SELECT $1, 'D' || gs FROM generate_series(1, $2) AS gs
+     RETURNING id`,
+    [eventId, n * 2],
+  );
+  const seatIds = seatsRes.rows.map((row) => row.id);
+  const pairs: [string, string][] = [];
+  for (let i = 0; i < seatIds.length; i += 2) {
+    pairs.push([seatIds[i]!, seatIds[i + 1]!]);
+  }
+  return { eventId, pairs };
 }
 
 interface K6Summary {
@@ -255,6 +289,8 @@ async function run() {
   const args = parseArgs(process.argv.slice(2));
   if (args.pattern === "spread-seats") {
     await runSpreadPattern(args);
+  } else if (args.pattern === "deadlock-pairs") {
+    await runDeadlockPairsPattern(args);
   } else {
     await runHammerPattern(args);
   }
@@ -441,6 +477,172 @@ async function runSpreadPattern(args: Args) {
 
       const outPath = new URL(
         `../docs/evidence/${strategy}-spread-seats-load-run-${runs[0]!.ranAt.replace(/[:.]/g, "-")}.json`,
+        import.meta.url,
+      );
+      await writeFile(outPath, JSON.stringify(combined, null, 2));
+      console.log(`\nReport written to ${outPath.pathname}`);
+
+      if (combined.anyDoubleBooked) {
+        process.exitCode = 1;
+      }
+    }
+  }
+}
+
+interface DeadlockPairsRunReport {
+  attempt: number;
+  ranAt: string;
+  durationMs: number;
+  httpStatusTally: HttpStatusTally;
+  // Sum of X-Booking-Retries (ADR-0012) across every response in the run —
+  // this and httpStatusTally[503] are the deadlock-rate signal (ADR-0015,
+  // issue #25's acceptance criterion: no new instrumentation).
+  retriesTotal: number;
+  latency: LatencyStats;
+  throughputRps: number;
+  pairCount: number;
+  seatsWithWinner: number;
+  seatsDoubleBooked: number;
+  winningBookingIds: string[];
+  anyDoubleBooked: boolean;
+}
+
+async function runDeadlockPairsOnce(
+  args: Args,
+  pairs: [string, string][],
+  attempt: number,
+): Promise<DeadlockPairsRunReport> {
+  const runId = randomUUID();
+  const scriptPath = fileURLToPath(new URL("./deadlock-pairs.k6.js", import.meta.url));
+  const summaryPath = fileURLToPath(new URL(`../docs/evidence/.k6-summary-${runId}.json`, import.meta.url));
+  await mkdir(new URL("../docs/evidence/", import.meta.url), { recursive: true });
+
+  console.log(`Firing both orderings of ${pairs.length} disjoint seat pairs (${pairs.length * 2} requests) via k6...`);
+  const startedAt = new Date();
+  const k6Result = spawnSync(
+    "k6",
+    ["run", `--summary-export=${summaryPath}`, scriptPath],
+    {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        BASE_URL: args.baseUrl,
+        RUN_ID: runId,
+        SEAT_PAIRS: JSON.stringify(pairs),
+      },
+    },
+  );
+  const finishedAt = new Date();
+
+  if (k6Result.error) {
+    throw new Error(
+      `Failed to run k6 (is it installed? \`brew install k6\`): ${k6Result.error.message}`,
+    );
+  }
+  if (k6Result.status !== 0) {
+    throw new Error(`k6 exited with status ${k6Result.status}`);
+  }
+
+  const summary: K6Summary = JSON.parse(await readFile(summaryPath, "utf8"));
+  await rm(summaryPath);
+
+  // Ground truth: how many distinct bookings actually claimed each seeded
+  // seat, read straight from booking_seats rather than trusting HTTP
+  // responses — same invariant check as spread-across-seats, just over the
+  // flattened pair seat set.
+  const seatIds = pairs.flat();
+  const { rows: winningBookings } = await pool.query<{ seat_id: string; booking_id: string }>(
+    `SELECT bs.seat_id, bs.booking_id FROM booking_seats bs WHERE bs.seat_id = ANY($1)`,
+    [seatIds],
+  );
+
+  const winnersPerSeat = new Map<string, number>();
+  for (const row of winningBookings) {
+    winnersPerSeat.set(row.seat_id, (winnersPerSeat.get(row.seat_id) ?? 0) + 1);
+  }
+  const seatsDoubleBooked = [...winnersPerSeat.values()].filter((count) => count > 1).length;
+
+  const report: DeadlockPairsRunReport = {
+    attempt,
+    ranAt: startedAt.toISOString(),
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    httpStatusTally: {
+      201: metricCount(summary, "booking_created"),
+      409: metricCount(summary, "booking_conflict"),
+      503: metricCount(summary, "booking_retry_exhausted"),
+      other: metricCount(summary, "booking_other_status"),
+    },
+    retriesTotal: metricCount(summary, "booking_retries"),
+    latency: {
+      p50Ms: metricStat(summary, "http_req_duration", "med"),
+      p99Ms: metricStat(summary, "http_req_duration", "p(99)"),
+    },
+    throughputRps: metricStat(summary, "http_reqs", "rate"),
+    pairCount: pairs.length,
+    seatsWithWinner: winnersPerSeat.size,
+    seatsDoubleBooked,
+    // Deduped: a winning booking here spans both seats of its pair, so the
+    // ground-truth query above returns two rows (one per seat) for it.
+    winningBookingIds: [...new Set(winningBookings.map((r) => r.booking_id))],
+    anyDoubleBooked: seatsDoubleBooked > 0,
+  };
+
+  console.log(JSON.stringify(report, null, 2));
+  if (report.anyDoubleBooked) {
+    console.error(
+      `\n*** DOUBLE-BOOKING CONFIRMED: ${seatsDoubleBooked} seat(s) had more than one winner. ***`,
+    );
+  } else {
+    // Unlike spread-across-seats, seatsWithWinner < seatIds.length is an
+    // expected outcome here, not a bug: a pair where both orderings hit
+    // retry_exhausted (ADR-0015) leaves both its seats unclaimed, which the
+    // 503 tally above already accounts for — so this doesn't get the same
+    // "all X/Y" phrasing spread-across-seats' report uses, since "all" would
+    // misdescribe a run with unresolved pairs.
+    console.log(
+      `\n${report.seatsWithWinner}/${seatIds.length} seats had exactly one winner. ` +
+        `Retries: ${report.retriesTotal}, retry-exhausted: ${report.httpStatusTally[503]}.`,
+    );
+  }
+
+  return report;
+}
+
+async function runDeadlockPairsPattern(args: Args) {
+  const strategy = process.env.BOOKING_STRATEGY ?? "naive";
+
+  console.log(`Seeding ${args.concurrency} disjoint seat pairs...`);
+  const { eventId, pairs } = await seedDeadlockPairs(args.concurrency);
+
+  const runs: DeadlockPairsRunReport[] = [];
+  try {
+    for (let attempt = 1; attempt <= args.repeat; attempt += 1) {
+      console.log(`\n=== Run ${attempt}/${args.repeat} (strategy=${strategy}, pattern=deadlock-pairs) ===`);
+      const report = await runDeadlockPairsOnce(args, pairs, attempt);
+      runs.push(report);
+
+      if (attempt < args.repeat && report.winningBookingIds.length > 0) {
+        console.log(`Resetting ${report.winningBookingIds.length} booking(s) via DELETE /bookings/{id} before the next run...`);
+        await resetSeatViaApi(args.baseUrl, report.winningBookingIds);
+      }
+    }
+  } finally {
+    // Write whatever repeats completed even if a later one throws — mirrors
+    // runHammerPattern/runSpreadPattern's already-verified-repeats-shouldn't
+    // -be-lost handling.
+    if (runs.length > 0) {
+      const combined = {
+        strategy,
+        pattern: args.pattern,
+        concurrency: args.concurrency,
+        eventId,
+        pairs,
+        runs,
+        anyDoubleBooked: runs.some((r) => r.anyDoubleBooked),
+      };
+
+      const outPath = new URL(
+        `../docs/evidence/${strategy}-deadlock-pairs-load-run-${runs[0]!.ranAt.replace(/[:.]/g, "-")}.json`,
         import.meta.url,
       );
       await writeFile(outPath, JSON.stringify(combined, null, 2));

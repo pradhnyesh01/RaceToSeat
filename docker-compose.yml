@@ -2,6 +2,19 @@ services:
   postgres:
     image: postgres:17
     container_name: racetoseat-postgres
+    # Default deadlock_timeout (1s) leaves too little room under NFR3's p99 <
+    # 1s budget for a genuine deadlock's detect-then-abort-then-retry cycle
+    # (issue #25) — this is the only Postgres this project runs, dev and
+    # test alike, so tuning it here scopes the change to that environment
+    # without touching any production config. It is a server-wide setting,
+    # not scoped to the deadlock-pairs pattern alone: it also lowers the
+    # deadlock-check interval for any ordinary blocking lock wait under
+    # hammer-seat/spread-seats (e.g. naive/unique_constraint/optimistic/
+    # serializable's blocking UPDATE under contention) — a re-run of
+    # Exhibits A-C's benchmarks against this container won't reproduce their
+    # published numbers under the prior 1s setting. pessimistic and advisory
+    # never block on a lock (ADR-0006), so this doesn't affect them.
+    command: ["postgres", "-c", "deadlock_timeout=100ms"]
     environment:
       POSTGRES_USER: racetoseat
       POSTGRES_PASSWORD: racetoseat
