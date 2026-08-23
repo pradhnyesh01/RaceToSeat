@@ -144,11 +144,23 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
 // exactly one request wins. Separate from runBookingContractTests since it's
 // the one test whose point is exercising genuine contention, not just HTTP
 // behavior for a single request at a time.
-export function runBookingConcurrencyContractTest(strategyLabel: string, createApp: () => FastifyInstance): void {
+//
+// `loserStatus` defaults to 409 (an ordinary conflict) but a mechanism whose
+// retry budget is forced to 0 (optimistic, ADR-0012) exhausts on the very
+// first CAS miss instead — every losing response there is still a clean,
+// single-attempt outcome, so it also carries X-Booking-Retries: 0 just like
+// every other mechanism's losers do.
+export function runBookingConcurrencyContractTest(
+  strategyLabel: string,
+  createApp: () => FastifyInstance,
+  options: { loserStatus?: number } = {},
+): void {
+  const loserStatus = options.loserStatus ?? 409;
+
   describe(`POST /bookings (${strategyLabel} strategy) — concurrency`, () => {
     beforeEach(resetDb);
 
-    it("under concurrent requests for one seat, exactly one 201 and the rest 409 — never 500", async () => {
+    it(`under concurrent requests for one seat, exactly one 201 and the rest ${loserStatus} — never 500`, async () => {
       const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
       const app = createApp();
       const concurrency = 25;
@@ -169,8 +181,12 @@ export function runBookingConcurrencyContractTest(strategyLabel: string, createA
       }, {});
 
       expect(statusCounts[201]).toBe(1);
-      expect(statusCounts[409]).toBe(concurrency - 1);
+      expect(statusCounts[loserStatus]).toBe(concurrency - 1);
       expect(statusCounts[500]).toBeUndefined();
+
+      for (const res of responses) {
+        expect(res.headers["x-booking-retries"]).toBe("0");
+      }
 
       const bookingSeatsRes = await pool.query(
         "SELECT booking_id FROM booking_seats WHERE seat_id = $1",
