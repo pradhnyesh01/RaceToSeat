@@ -27,8 +27,8 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
 
       expect(res.statusCode).toBe(201);
       expect(body.id).toBeTypeOf("string");
-      // Every mechanism carries this header (ADR-0012); the three existing
-      // mechanisms never retry, so it must always read "0" for them.
+      // Every mechanism carries this header (ADR-0012); naive, unique_constraint,
+      // pessimistic, and advisory never retry, so it must always read "0" for them.
       expect(res.headers["x-booking-retries"]).toBe("0");
 
       const seatRes = await pool.query("SELECT status, booked_by, version FROM seats WHERE id = $1", [
