@@ -30,6 +30,10 @@ export function registerBookingsRoutes(app: FastifyInstance): void {
       idempotencyKey: body.idempotency_key,
     });
 
+    // Every mechanism carries this header (ADR-0012), regardless of outcome —
+    // "0" for the four mechanisms that never retry.
+    reply.header("X-Booking-Retries", String(result.retries ?? 0));
+
     switch (result.kind) {
       case "created":
         reply.status(201).send({ id: result.bookingId, created_at: result.createdAt });
@@ -45,6 +49,12 @@ export function registerBookingsRoutes(app: FastifyInstance): void {
         return;
       case "not_found":
         reply.status(404).send({ error: "Seat not found" });
+        return;
+      case "retry_exhausted":
+        // Distinct from conflict (ADR-0012): the mechanism couldn't resolve
+        // contention within its retry budget, so it never learned whether
+        // the seat was genuinely taken.
+        reply.status(503).send({ error: "Booking mechanism could not resolve contention in time" });
         return;
     }
   });

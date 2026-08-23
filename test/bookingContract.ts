@@ -27,6 +27,9 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
 
       expect(res.statusCode).toBe(201);
       expect(body.id).toBeTypeOf("string");
+      // Every mechanism carries this header (ADR-0012); the three existing
+      // mechanisms never retry, so it must always read "0" for them.
+      expect(res.headers["x-booking-retries"]).toBe("0");
 
       const seatRes = await pool.query("SELECT status, booked_by, version FROM seats WHERE id = $1", [
         seatIdsByLabel.A1,
@@ -59,6 +62,7 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
       });
 
       expect(res.statusCode).toBe(409);
+      expect(res.headers["x-booking-retries"]).toBe("0");
     });
 
     it("404s for an unknown seat", async () => {
@@ -95,6 +99,7 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
       expect(first.statusCode).toBe(201);
       expect(second.statusCode).toBe(201);
       expect(secondBody.id).toBe(firstBody.id);
+      expect(second.headers["x-booking-retries"]).toBe("0");
 
       const bookingSeatsRes = await pool.query(
         "SELECT booking_id FROM booking_seats WHERE seat_id = $1",
