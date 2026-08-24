@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
-import { DeadlockRetriesExhaustedError, pool, withDeadlockRetry } from "../db/pool.js";
+import { pool } from "../db/pool.js";
 import { isUniqueViolation } from "../db/pgErrors.js";
-import { findExistingBookingByIdempotencyKey, resolveIdempotencyKeyRace } from "./idempotency.js";
+import { findExistingBookingByIdempotencyKey, normalizeSeatIds, runDeadlockRetryBooking } from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -39,12 +39,7 @@ export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResul
       return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
     }
 
-    // Lowercased once, then a plain default sort — not localeCompare, whose
-    // collation depends on the runtime's default locale/ICU build and so
-    // isn't guaranteed to agree across processes. Default sort compares
-    // UTF-16 code units, which for hex-and-hyphen UUID strings is an
-    // unambiguous ordinal order every process arrives at identically.
-    const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
+    const seatIds = normalizeSeatIds(input.seatIds);
 
     // The whole requested set's existence and availability is checked in one
     // query before any per-seat write starts (still racy against a
@@ -62,50 +57,41 @@ export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResul
       return { kind: "conflict" };
     }
 
-    try {
-      return await withDeadlockRetry(
-        client,
-        async (txClient, attempt) => {
-          const bookingRes = await txClient.query<{ id: string; created_at: Date }>(
-            "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id, created_at",
-            [input.userId, input.idempotencyKey],
-          );
-          const booking = bookingRes.rows[0]!;
+    return await runDeadlockRetryBooking(
+      client,
+      input.idempotencyKey,
+      async (txClient, attempt) => {
+        const bookingRes = await txClient.query<{ id: string; created_at: Date }>(
+          "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id, created_at",
+          [input.userId, input.idempotencyKey],
+        );
+        const booking = bookingRes.rows[0]!;
 
-          // One batched statement, not a per-seat loop: a unique-violation on
-          // any one generated row aborts the whole INSERT (no partial rows),
-          // so all-or-nothing holds without needing to catch and roll back a
-          // loop.
-          try {
-            await txClient.query(
-              "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
-              [booking.id, seatIds],
-            );
-          } catch (err) {
-            if (isUniqueViolation(err, "booking_seats_seat_id_key")) {
-              return { kind: "conflict", retries: attempt };
-            }
-            throw err;
-          }
-
+        // One batched statement, not a per-seat loop: a unique-violation on
+        // any one generated row aborts the whole INSERT (no partial rows),
+        // so all-or-nothing holds without needing to catch and roll back a
+        // loop.
+        try {
           await txClient.query(
-            "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
-            [input.userId, seatIds],
+            "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
+            [booking.id, seatIds],
           );
+        } catch (err) {
+          if (isUniqueViolation(err, "booking_seats_seat_id_key")) {
+            return { kind: "conflict", retries: attempt };
+          }
+          throw err;
+        }
 
-          return { kind: "created", bookingId: booking.id, createdAt: booking.created_at, retries: attempt };
-        },
-        (result) => result.kind === "created",
-      );
-    } catch (err) {
-      if (err instanceof DeadlockRetriesExhaustedError) {
-        // ADR-0015: a deadlock abort that exhausts the retry budget is the
-        // existing retry_exhausted kind (503), not a new one — the mechanism
-        // never learned whether the requested seats were genuinely available.
-        return { kind: "retry_exhausted", retries: err.retries };
-      }
-      return await resolveIdempotencyKeyRace(client, input.idempotencyKey, err);
-    }
+        await txClient.query(
+          "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
+          [input.userId, seatIds],
+        );
+
+        return { kind: "created", bookingId: booking.id, createdAt: booking.created_at, retries: attempt };
+      },
+      (result) => result.kind === "created",
+    );
   } finally {
     client.release();
   }

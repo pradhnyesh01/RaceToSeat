@@ -54,11 +54,20 @@ retries." `pessimistic` and `advisory` needed no such fix (ADR-0006's non-blocki
 acquisition already can't deadlock) but now ship a consistency pass sorting `seat_ids` for
 uniformity with the other four (issue #30), confirmed via the adversarial harness showing
 zero deadlocks/hangs/double-bookings across repeated runs against both mechanisms — the last
-item for Phase 3, which is now complete. A follow-up (issue #31) will extract the
-`withDeadlockRetry`-wrap/catch pattern now duplicated across `naive.ts`, `uniqueConstraint.ts`,
-and `optimistic.ts` into a shared helper (not `serializable.ts`, which never uses that helper),
-deferred until #28 landed so the extraction covers every real call site. Before extending
-the implementation,
+item for Phase 3, which is now complete. Issue #31 then extracted two shared helpers into
+`src/strategies/idempotency.ts`: `normalizeSeatIds` (lowercase + sort, the identical
+expression `naive`/`unique_constraint`/`optimistic`/`serializable` all duplicated) and
+`runDeadlockRetryBooking` (mirroring the existing `runTransactionalBooking`'s shape but
+wrapping `withDeadlockRetry` instead of `withTransaction`, mapping
+`DeadlockRetriesExhaustedError` to `{ kind: "retry_exhausted", retries }` internally).
+`naive.ts` and `uniqueConstraint.ts` now use both helpers; `optimistic.ts` uses both too,
+its CAS-retry loop unaffected; `serializable.ts` uses only `normalizeSeatIds` (it extends its
+own `withSerializableTransaction` loop rather than `withDeadlockRetry`, per ADR-0014).
+`pessimistic.ts`/`advisory.ts` are not call sites for either helper (out of this ticket's
+scope; ADR-0006's non-blocking lock acquisition doesn't need deadlock retry, and issue #31's
+acceptance criteria scoped `normalizeSeatIds` to the four mechanisms whose sort is either
+load-bearing or already documented that way). No observable behavior change — the full test
+suite passes unmodified. Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
 

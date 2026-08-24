@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { SerializationRetriesExhaustedError, pool, withSerializableTransaction } from "../db/pool.js";
 import { isUniqueViolation } from "../db/pgErrors.js";
-import { findExistingBookingByIdempotencyKey, resolveIdempotencyKeyRace } from "./idempotency.js";
+import { findExistingBookingByIdempotencyKey, normalizeSeatIds, resolveIdempotencyKeyRace } from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -20,15 +20,16 @@ export interface BookSeatSerializableOptions {
 // unrelated to isolation level, so there's no reason to duplicate it here.
 //
 // Multi-seat deadlock fix (Phase 3, issue #29; same phenomenon as naive's,
-// unique_constraint's, and optimistic's, issues #26-#28): seat_ids is sorted
-// once, case-insensitively, before any write — see naive.ts for why not
-// localeCompare. Unlike those three mechanisms, this mechanism doesn't gain
-// withDeadlockRetry — its own withSerializableTransaction loop (ADR-0011,
-// src/db/pool.ts) is extended instead to also treat a deadlock abort as
-// retriable, using the same counter/cap/backoff it already applies to a
-// genuine serialization failure (see that function's doc comment for why
-// nesting withDeadlockRetry here would be wrong: two nested retry-from-BEGIN
-// loops would double-BEGIN on every retry).
+// unique_constraint's, and optimistic's, issues #26-#28): seat_ids is
+// normalized via normalizeSeatIds (issue #31; see idempotency.ts for why not
+// localeCompare) before any write. Unlike those three mechanisms, this
+// mechanism doesn't gain withDeadlockRetry — its own
+// withSerializableTransaction loop (ADR-0011, src/db/pool.ts) is extended
+// instead to also treat a deadlock abort as retriable, using the same
+// counter/cap/backoff it already applies to a genuine serialization failure
+// (see that function's doc comment for why nesting withDeadlockRetry here
+// would be wrong: two nested retry-from-BEGIN loops would double-BEGIN on
+// every retry).
 export async function bookSeatSerializable(
   input: BookSeatInput,
   options: BookSeatSerializableOptions = {},
@@ -40,7 +41,7 @@ export async function bookSeatSerializable(
       return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
     }
 
-    const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
+    const seatIds = normalizeSeatIds(input.seatIds);
 
     try {
       return await withSerializableTransaction(
