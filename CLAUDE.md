@@ -36,14 +36,19 @@ detect-and-abort cycle stays inside NFR3's latency budget. `naive`'s multi-seat 
 sorts `seat_ids` before writing and wraps its transactional attempt in `withDeadlockRetry`
 (`src/db/pool.ts`, ADR-0014) — see
 [docs/evidence/exhibit-d-naive-multiseat-deadlock.md](docs/evidence/exhibit-d-naive-multiseat-deadlock.md)
-(issue #26) for measured before/after deadlock rates. `unique_constraint` now ships the same
-fix (issue #27, sorted `seat_ids` + `withDeadlockRetry`, no separate before/after demo per
-ADR-0016). `optimistic` and `serializable` still need the same deadlock-safety fix (issues
-#28–#29) — each performs a blocking multi-row write vulnerable to the same class of wait-for
-cycle Exhibit D found. `pessimistic` and `advisory` need no such fix (ADR-0006's non-blocking
-lock acquisition already can't deadlock) but still get a consistency pass sorting `seat_ids`
-for uniformity with the other four (issue #30). Phase 3 isn't complete until all of #28–#30
-land. Before extending the implementation,
+(issue #26) for measured before/after deadlock rates. `unique_constraint` (issue #27) and
+`optimistic` (issue #28) now ship the same fix — sorted `seat_ids` + `withDeadlockRetry`, no
+separate before/after demo per ADR-0016 — `optimistic`'s CAS-retry loop restarting cleanly
+from a fresh read (`attempt = 0`) on every deadlock-triggered retry rather than resuming
+mid-loop, with its existing ordinary CAS-conflict retry accounting (ADR-0009) left unaffected.
+`serializable` still needs the same deadlock-safety fix (issue #29) — it performs a blocking
+multi-row write vulnerable to the same class of wait-for cycle Exhibit D found. `pessimistic`
+and `advisory` need no such fix (ADR-0006's non-blocking lock acquisition already can't
+deadlock) but still get a consistency pass sorting `seat_ids` for uniformity with the other
+four (issue #30). Phase 3 isn't complete until #29 and #30 land. A follow-up (issue #31) will
+extract the `withDeadlockRetry`-wrap/catch pattern now duplicated across `naive.ts`,
+`uniqueConstraint.ts`, and `optimistic.ts` into a shared helper, deferred until #28 landed so
+the extraction covers every real call site. Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
 
