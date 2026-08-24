@@ -19,9 +19,16 @@ export interface BookSeatSerializableOptions {
 // IS shared, though: that race is a plain 23505 outside any retry loop,
 // unrelated to isolation level, so there's no reason to duplicate it here.
 //
-// Multi-seat (Phase 3, issue #24): seat_ids is iterated in request order, not
-// sorted (ordering, and extending this retry loop to also treat a deadlock
-// abort as retriable, are this mechanism's own follow-up ticket's job).
+// Multi-seat deadlock fix (Phase 3, issue #29; same phenomenon as naive's,
+// unique_constraint's, and optimistic's, issues #26-#28): seat_ids is sorted
+// once, case-insensitively, before any write — see naive.ts for why not
+// localeCompare. Unlike those three mechanisms, this mechanism doesn't gain
+// withDeadlockRetry — its own withSerializableTransaction loop (ADR-0011,
+// src/db/pool.ts) is extended instead to also treat a deadlock abort as
+// retriable, using the same counter/cap/backoff it already applies to a
+// genuine serialization failure (see that function's doc comment for why
+// nesting withDeadlockRetry here would be wrong: two nested retry-from-BEGIN
+// loops would double-BEGIN on every retry).
 export async function bookSeatSerializable(
   input: BookSeatInput,
   options: BookSeatSerializableOptions = {},
@@ -33,6 +40,8 @@ export async function bookSeatSerializable(
       return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
     }
 
+    const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
+
     try {
       return await withSerializableTransaction(
         client,
@@ -43,9 +52,9 @@ export async function bookSeatSerializable(
           // any other seat in the same request already being booked.
           const seatRes = await txClient.query<{ id: string; status: string }>(
             "SELECT id, status FROM seats WHERE id = ANY($1)",
-            [input.seatIds],
+            [seatIds],
           );
-          if (seatRes.rows.length !== input.seatIds.length) {
+          if (seatRes.rows.length !== seatIds.length) {
             return { kind: "not_found" };
           }
           if (seatRes.rows.some((seat) => seat.status !== "available")) {
@@ -71,7 +80,7 @@ export async function bookSeatSerializable(
           try {
             await txClient.query(
               "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
-              [booking.id, input.seatIds],
+              [booking.id, seatIds],
             );
           } catch (err) {
             if (isUniqueViolation(err, "booking_seats_seat_id_key")) {
@@ -81,7 +90,7 @@ export async function bookSeatSerializable(
           }
           await txClient.query(
             "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
-            [input.userId, input.seatIds],
+            [input.userId, seatIds],
           );
 
           return { kind: "created", bookingId: booking.id, createdAt: booking.created_at, retries: attempt };

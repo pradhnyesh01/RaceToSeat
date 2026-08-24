@@ -39,9 +39,13 @@ export interface WithSerializableTransactionOptions {
 }
 
 // Thrown when withSerializableTransaction exhausts its retry budget without
-// resolving (ADR-0011/ADR-0012). The DB layer doesn't know about
-// BookSeatResult, so it signals exhaustion via this error rather than a
-// result kind — callers map it to their own "exhausted" outcome.
+// resolving (ADR-0011/ADR-0012) — whether the retries were spent on genuine
+// serialization failures (40001), deadlock aborts (40P01, issue #29's
+// extension), or a mix of both; the loop shares one counter and cap across
+// both causes, so there's no way to attribute exhaustion to just one. The DB
+// layer doesn't know about BookSeatResult, so it signals exhaustion via this
+// error rather than a result kind — callers map it to their own "exhausted"
+// outcome.
 export class SerializationRetriesExhaustedError extends Error {
   constructor(public readonly retries: number) {
     super(`Serializable transaction did not succeed after ${retries} ${retries === 1 ? "retry" : "retries"}`);
@@ -70,6 +74,22 @@ function sleep(ms: number): Promise<void> {
 // rare race — a tight retry loop here would distort this project's own p99
 // latency measurements.
 //
+// Also retries a deadlock abort (40P01, issue #29): serializable's multi-seat
+// write is the same batched `INSERT INTO booking_seats ... SELECT
+// unnest($ids)` shape naive's and unique_constraint's are (issues #26-#27),
+// not optimistic's per-seat loop (#28) — so the deadlock risk here is
+// specifically the ordered-array-order-preserving INSERT, same as ADR-0016's
+// issue #26 correction found, not the later `UPDATE seats ... WHERE id =
+// ANY($2)` (whose row-visitation order is plan-determined, not array-order-
+// determined, so it can't deadlock regardless of ordering). Rather than
+// nesting withDeadlockRetry (ADR-0014) as a second retry-from-BEGIN layer
+// around a loop that already retries from BEGIN — which would issue two
+// nested BEGINs on every retry — this loop's existing serialization-failure
+// handling is extended to treat 40P01 the same way it treats 40001: same
+// counter, same cap, same jittered backoff. Whichever error code triggered a
+// given retry isn't tracked separately, matching ADR-0015's reasoning for
+// reusing retry_exhausted rather than growing the result-kind vocabulary.
+//
 // Postgres fact worth knowing if you're staging a deterministic test against
 // this function (see test/strategies/serializableRetryExhaustion.test.ts):
 // a genuine 40001 requires BOTH sides of the conflict to be running under
@@ -97,7 +117,7 @@ export async function withSerializableTransaction<T>(
       return result;
     } catch (err) {
       await client.query("ROLLBACK");
-      if (!isSerializationFailure(err)) {
+      if (!isSerializationFailure(err) && !isDeadlockDetected(err)) {
         throw err;
       }
       if (attempt >= maxRetries) {
