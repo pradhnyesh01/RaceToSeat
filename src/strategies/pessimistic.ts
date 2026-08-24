@@ -14,11 +14,11 @@ export type { BookSeatResult };
 // Multi-seat (Phase 3, issue #24): one SELECT ... WHERE id = ANY($1) FOR
 // UPDATE NOWAIT locks every requested row in a single statement — NOWAIT
 // still fails the whole statement immediately if any one row is already
-// locked, so the "never queue" contract holds unchanged. seat_ids is not
-// sorted here (unlike naive/unique_constraint/optimistic/serializable, this
-// mechanism's NOWAIT acquisition can't enter a wait-for cycle in the first
-// place, ADR-0006/ADR-0016) — that's this mechanism's own follow-up ticket's
-// job, purely for behavioral consistency rather than correctness.
+// locked, so the "never queue" contract holds unchanged. This mechanism's
+// NOWAIT acquisition can't enter a wait-for cycle in the first place
+// (ADR-0006), so unlike naive/unique_constraint/optimistic/serializable,
+// sorting seat_ids here is not load-bearing for correctness — it's done
+// purely for behavioral consistency across mechanisms (issue #30).
 export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSeatResult> {
   const client: PoolClient = await pool.connect();
   try {
@@ -27,12 +27,16 @@ export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSea
       return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
     }
 
+    // Lowercased once, then a plain default sort — see naive.ts for why this
+    // (not localeCompare) is the collation-safe choice for UUID strings.
+    const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
+
     return await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
       let seatRes;
       try {
         seatRes = await txClient.query<{ id: string; status: string }>(
           "SELECT id, status FROM seats WHERE id = ANY($1) FOR UPDATE NOWAIT",
-          [input.seatIds],
+          [seatIds],
         );
       } catch (err) {
         if (isLockNotAvailable(err)) {
@@ -47,8 +51,8 @@ export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSea
           // the failed statement already left this transaction aborted
           // (25P02), so any further query on txClient before a ROLLBACK
           // would itself fail.
-          const existsRes = await pool.query("SELECT 1 FROM seats WHERE id = ANY($1)", [input.seatIds]);
-          if (existsRes.rowCount !== input.seatIds.length) {
+          const existsRes = await pool.query("SELECT 1 FROM seats WHERE id = ANY($1)", [seatIds]);
+          if (existsRes.rowCount !== seatIds.length) {
             return { kind: "not_found" };
           }
           return { kind: "conflict" };
@@ -59,7 +63,7 @@ export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSea
       // A seat missing from the locked result set is unknown — checked
       // before the availability check below, so it takes precedence over any
       // other seat in the same request already being booked.
-      if (seatRes.rows.length !== input.seatIds.length) {
+      if (seatRes.rows.length !== seatIds.length) {
         return { kind: "not_found" };
       }
       if (seatRes.rows.some((seat) => seat.status !== "available")) {
@@ -74,11 +78,11 @@ export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSea
 
       await txClient.query(
         "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
-        [booking.id, input.seatIds],
+        [booking.id, seatIds],
       );
       await txClient.query(
         "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
-        [input.userId, input.seatIds],
+        [input.userId, seatIds],
       );
 
       return { kind: "created", bookingId: booking.id, createdAt: booking.created_at };
