@@ -264,6 +264,8 @@ interface IsolationCell {
   strategy: string;
   baseline: IsolationFile | null;
   combined: IsolationFile | null;
+  baselineRepeats: number;
+  combinedRepeats: number;
   baselineP99Ms: number | null;
   combinedP99Ms: number | null;
   degradationPct: number | null;
@@ -300,6 +302,8 @@ function buildIsolationCell(strategy: string, matrix: Map<string, IsolationFile>
     strategy,
     baseline,
     combined,
+    baselineRepeats: baseline?.report.runs.length ?? 0,
+    combinedRepeats: combined?.report.runs.length ?? 0,
     baselineP99Ms,
     combinedP99Ms,
     degradationPct,
@@ -322,15 +326,15 @@ function fmtPctSigned(n: number | null): string {
 
 function renderIsolationTable(cells: IsolationCell[]): string {
   const header =
-    "| Mechanism | Baseline p99 (ms) | Combined p99 (ms) | Degradation | Pass (<10%)? | Baseline bg throughput (req/s) | Combined bg throughput (req/s) | Double-booked? | Reports |\n" +
-    "|---|---|---|---|---|---|---|---|---|\n";
+    "| Mechanism | Repeats (baseline/combined) | Baseline p99 (ms) | Combined p99 (ms) | Degradation | Pass (<10%)? | Baseline bg throughput (req/s) | Combined bg throughput (req/s) | Double-booked? | Reports |\n" +
+    "|---|---|---|---|---|---|---|---|---|---|\n";
   const rows = cells
     .map((c) => {
       const reports = [c.baseline?.file, c.combined?.file]
         .filter((f): f is string => !!f)
         .map((f) => `[${f}](${f})`)
         .join(", ");
-      return `| \`${c.strategy}\` | ${fmtMs(c.baselineP99Ms)} | ${fmtMs(c.combinedP99Ms)} | ${fmtPctSigned(c.degradationPct)} | ${fmtPassLabel(c.pass)} | ${fmtMs(c.baselineThroughputRps)} | ${fmtMs(c.combinedThroughputRps)} | ${c.anyDoubleBooked ? "**YES**" : "no"} | ${reports || "—"} |`;
+      return `| \`${c.strategy}\` | ${c.baselineRepeats}/${c.combinedRepeats} | ${fmtMs(c.baselineP99Ms)} | ${fmtMs(c.combinedP99Ms)} | ${fmtPctSigned(c.degradationPct)} | ${fmtPassLabel(c.pass)} | ${fmtMs(c.baselineThroughputRps)} | ${fmtMs(c.combinedThroughputRps)} | ${c.anyDoubleBooked ? "**YES**" : "no"} | ${reports || "—"} |`;
     })
     .join("\n");
   return header + rows + "\n";
@@ -408,6 +412,15 @@ BOOKING_STRATEGY=<mechanism> npm run harness -- --pattern isolation             
 npm run harness:aggregate -- --exhibit e   # this script — reads docs/evidence/*.json, writes this file
 \`\`\`
 
+**\`pessimistic\`'s exception (5 repeats, not 2):** the original 2-repeat
+measurement reported +37.5% (a FAIL). A same-session follow-up grilling pass
+found this didn't reproduce — three independent single-repeat reruns swung
+from -41% to +4%, including negative-degradation runs, with baseline p99
+alone varying 174-482ms with zero hot-seat contention at all — clear
+2-repeat noise, not a stable signal. \`pessimistic\` was re-measured at
+\`--repeat 5\` for both variants and Exhibit E regenerated, which is why its
+row below shows 5/5 repeats where every other mechanism shows 2/2.
+
 **Negative control:** to confirm the measurement can actually detect a
 violation before reporting six results all expected to pass, \`pessimistic\`
 — the one mechanism whose lock acquisition genuinely blocks
@@ -439,6 +452,7 @@ ${renderNegativeControl(negativeControl, cellsByStrategy)}
 ## Findings
 
 ${failingStrategies.length > 0 ? `\`${failingStrategies.join("`, `")}\` exceed(s) the 10% degradation threshold at the widened connection configuration. Per this project's single hard correctness gate (PRD §Metrics & Acceptance Criteria: zero double-booking), this is **not** a blocker for this ticket's completion — NFR2 is a measured non-functional target, not the correctness gate. Investigating and fixing the degradation is its own follow-up ticket.` : "All six mechanisms pass the 10% degradation threshold at the widened connection configuration — no follow-up ticket required from this exhibit alone."}
+${failingStrategies.includes("optimistic") ? `\n\`optimistic\`'s +14.4% above is from only 2 repeats — a same-session follow-up found the true effect is likely larger (independent single-repeat reruns showed up to +573%, direction consistently positive) and traced a concrete code-level hypothesis (the CAS-miss path's extra round-trips vs. the other five mechanisms). Tracked as [issue #36](https://github.com/pradhnyesh01/RaceToSeat/issues/36) — do not anchor on +14.4% as the true magnitude.\n` : ""}
 
 The negative control demonstrates the measurement is sensitive enough to
 catch a real violation: run against the project's prior, un-widened
@@ -449,17 +463,20 @@ queuing rather than row-lock contention (the caveat already noted inline in
 
 ## Reading the columns
 
-- **Baseline / Combined p99**: mean across 2 repeats of the *background
-  stream's* \`http_req_duration\` p99 (k6 \`--summary-export\`) — baseline is
-  the background-only run (no hot-seat contention), combined is the same
-  background stream measured while the hot-seat burst runs concurrently.
-  The hot stream's own latency isn't what NFR2 asks about and isn't in this
-  table.
+- **Repeats (baseline/combined)**: how many independent repeats each side's
+  mean is drawn from — 2/2 for five mechanisms, 5/5 for \`pessimistic\` (see
+  Method's exception note above).
+- **Baseline / Combined p99**: mean across that many repeats of the
+  *background stream's* \`http_req_duration\` p99 (k6 \`--summary-export\`) —
+  baseline is the background-only run (no hot-seat contention), combined is
+  the same background stream measured while the hot-seat burst runs
+  concurrently. The hot stream's own latency isn't what NFR2 asks about and
+  isn't in this table.
 - **Degradation**: \`(combined p99 − baseline p99) / baseline p99\`, computed
   once per mechanism from the two already-averaged p99s above, not averaged
   per-repeat.
 - **Pass (<10%)?**: NFR2's stated threshold (PRD.md).
-- **Baseline / Combined bg throughput**: mean across 2 repeats of the
+- **Baseline / Combined bg throughput**: mean across the same repeats of the
   background stream's \`http_reqs\` rate.
 - **Double-booked?**: ground truth from \`booking_seats\` (see \`run.ts\`'s
   \`runIsolationOnce\`) — the single hard pass/fail gate, unaffected by
@@ -467,9 +484,11 @@ queuing rather than row-lock contention (the caveat already noted inline in
 
 ## Next step
 
-Any mechanism flagged under Findings above gets its own follow-up
-investigation ticket (out of scope here, per issue #35's acceptance
-criteria). Otherwise, Phase 4 (todo.md) is complete.
+\`pessimistic\`'s finding didn't survive re-measurement and needed no ticket
+(corrected above, same session). \`optimistic\`'s did — tracked as
+[issue #36](https://github.com/pradhnyesh01/RaceToSeat/issues/36), out of
+scope here per issue #35's acceptance criteria. Otherwise, Phase 4 (todo.md)
+is complete.
 `;
 
   await writeFile(outPath, doc);
