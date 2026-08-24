@@ -3,8 +3,12 @@ process.env.BOOKING_STRATEGY = "pessimistic";
 const { randomUUID } = await import("node:crypto");
 const { createApp } = await import("../../src/app.js");
 const { pool } = await import("../../src/db/pool.js");
-const { runBookingConcurrencyContractTest, runBookingContractTests, runMultiSeatBookingContractTests } =
-  await import("../bookingContract.js");
+const {
+  runBookingConcurrencyContractTest,
+  runBookingContractTests,
+  runCrossSeatIsolationContractTest,
+  runMultiSeatBookingContractTests,
+} = await import("../bookingContract.js");
 const { resetDb, seedEventWithSeats } = await import("../testDb.js");
 
 const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
@@ -31,6 +35,8 @@ async function withHeldRowLock<T>(lockSeatId: string, fn: () => Promise<T>): Pro
     lockClient.release();
   }
 }
+
+runCrossSeatIsolationContractTest("pessimistic", createApp, withHeldRowLock);
 
 describe("POST /bookings (pessimistic strategy) — multi-seat NOWAIT precedence", () => {
   beforeEach(resetDb);

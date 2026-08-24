@@ -351,3 +351,48 @@ export function runBookingConcurrencyContractTest(
     });
   });
 }
+
+// Shared assertion shell for issue #34's cross-seat isolation proof: seed two
+// seats, hold a claim on one via the caller-supplied, mechanism-specific
+// `withHeldSeatA` (naive's open UPDATE, unique_constraint's open
+// booking_seats INSERT, optimistic's open CAS, serializable's open
+// SERIALIZABLE transaction, pessimistic's FOR UPDATE NOWAIT hold, advisory's
+// pg_advisory_xact_lock hold), and assert a concurrent request for the other
+// seat still resolves quickly. Only the hold technique is mechanism-specific
+// (the acceptance criterion this ticket cares about); the timing/assertion
+// shape itself is identical across all six mechanisms, so it lives here once
+// rather than being copy-pasted per strategy file.
+export function runCrossSeatIsolationContractTest(
+  strategyLabel: string,
+  createApp: () => FastifyInstance,
+  withHeldSeatA: <T>(lockSeatId: string, fn: () => Promise<T>) => Promise<T>,
+): void {
+  describe(`POST /bookings (${strategyLabel} strategy) — cross-seat isolation`, () => {
+    beforeEach(resetDb);
+
+    it("a request for an unrelated seat resolves quickly while another seat's claim is held open", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1", "B1"]);
+      const heldSeatId = seatIdsByLabel.A1!;
+      const otherSeatId = seatIdsByLabel.B1!;
+      const app = createApp();
+
+      // Generous relative to a real block (which would run into the held
+      // claim's own release well before this) — this confirms "fast", not a
+      // tight latency budget.
+      let elapsedMs = 0;
+      const res = await withHeldSeatA(heldSeatId, async () => {
+        const start = Date.now();
+        const response = await app.inject({
+          method: "POST",
+          url: "/bookings",
+          payload: { seat_ids: [otherSeatId], user_id: "user-1", idempotency_key: randomUUID() },
+        });
+        elapsedMs = Date.now() - start;
+        return response;
+      });
+
+      expect(res.statusCode).toBe(201);
+      expect(elapsedMs).toBeLessThan(2000);
+    });
+  });
+}

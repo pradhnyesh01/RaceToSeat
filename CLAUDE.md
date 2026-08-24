@@ -96,6 +96,29 @@ looks like a genuine NFR2 violation but is actually pool exhaustion, not row-loc
 itself produce isolation-degradation numbers or an exhibit document — full test suite passes
 unmodified.
 
+Issue #34 adds the unit-level half of Phase 4's cross-seat proof, alongside issue #33's
+load-harness half: each of the six strategy test files (`test/strategies/*.test.ts`) now
+carries a deterministic test showing a request for an unrelated seat resolves quickly while
+another seat is held/contended, extending the `withHeldRowLock`/`withHeldSeatLock` pattern
+`pessimistic`/`advisory` already used for their own same-seat "losing request resolves fast"
+tests to a cross-seat variant, reusing those same two helpers unchanged. The other four
+mechanisms hold seat A via their own distinguishing write, standing in for "another in-flight
+booking on this mechanism currently touches this row" rather than a one-size-fits-all stub:
+`naive`'s own unguarded `UPDATE seats SET status = 'booked' ...`, `unique_constraint`'s own
+`INSERT INTO booking_seats ... ON CONFLICT DO NOTHING`, `optimistic`'s own CAS `UPDATE ...
+WHERE version = $3 AND status = 'available'`, and `serializable`'s own
+`BEGIN ISOLATION LEVEL SERIALIZABLE` read-then-write — each held open, uncommitted, on a
+separate connection, then rolled back rather than committed (a synthetic in-flight writer, not
+a booking meant to persist; for `serializable` specifically, rolling back also means the hold
+can never complete an SSI conflict cycle, so the test only proves "no unwanted blocking," not
+"zero retries," consistent with ADR-0013's already-nonzero baseline for that mechanism). A
+code-review pass surfaced that all six tests shared an identical assertion/timing shape (seed
+two seats, time a request through the held claim, assert 201 and sub-2s latency) with only the
+hold function differing — consolidated into a new `runCrossSeatIsolationContractTest` in
+`test/bookingContract.ts`, parameterized by each file's hold function, mirroring the existing
+`runBookingConcurrencyContractTest` sharing convention. No production code changed; the full
+test suite passes (118 tests, up from 112) and `npm run typecheck` is clean.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
