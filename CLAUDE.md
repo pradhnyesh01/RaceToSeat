@@ -142,6 +142,22 @@ dedup doesn't confuse it with `pessimistic`'s real matrix cell. Zero double-book
 six mechanisms and both configurations throughout. Phase 4 (todo.md) is complete; full test
 suite passes unmodified (118 tests) and `npm run typecheck` is clean.
 
+A same-session follow-up grilling pass on Exhibit E's two findings split them: `pessimistic`'s
++37.5% didn't reproduce (three independent single-repeat reruns swung from -41% to +4%,
+including negative-degradation runs — 2-repeat noise, not a stable signal), so it was
+re-measured at `--repeat 5` and Exhibit E corrected directly (now -13.6%, PASS; the negative
+control's degradation shifted from +405.6% to +374.7% since its reference is `pessimistic`'s own
+widened-config baseline). `aggregate.ts`'s isolation table now reports each mechanism's actual
+repeat count, since it's no longer uniformly 2 across all six. No GitHub issue was needed for
+this — it resolved same-session as a correction, not tracked work. `optimistic`'s +14.4% did
+reproduce (direction consistently positive across reruns, magnitude often far larger, up to
++573%), so it's tracked as [issue #36](https://github.com/pradhnyesh01/RaceToSeat/issues/36): a
+real investigation, not yet started, with a code-derived starting hypothesis (an ordinary
+CAS-miss under hot-seat contention costs ~4 extra round-trips vs. the other five mechanisms'
+single-shot check — `optimistic.ts`'s initial `readSeats` + `SAVEPOINT` + CAS miss +
+`ROLLBACK TO SAVEPOINT` + a second `readSeats` for ADR-0009's cancellation-race check) and a
+scoped pool-size scaling test to confirm or rule it out before committing to a fix.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
