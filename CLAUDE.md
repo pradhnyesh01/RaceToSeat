@@ -27,7 +27,7 @@ exercised by `npm test`. See
 [docs/evidence/exhibit-c-phase2-comparison.md](docs/evidence/exhibit-c-phase2-comparison.md)
 (Phase 2, all six mechanisms benchmarked against each other) for the before/after evidence.
 
-Phase 3 (multi-seat transactions + deadlock freedom) is underway. `POST /bookings` accepts
+Phase 3 (multi-seat transactions + deadlock freedom) is complete. `POST /bookings` accepts
 multi-seat `seat_ids` across all six mechanisms (issue #24). A third k6 load pattern,
 `deadlock-pairs.k6.js` (issue #25), seeds disjoint 2-seat pairs and fires both lock
 orderings of each pair concurrently to adversarially trigger deadlocks; test/dev Postgres's
@@ -50,13 +50,15 @@ serialization failure (`40001`). Unlike the other three mechanisms' near-zero co
 baseline, `serializable`'s retry/503 rate under the adversarial harness is legitimately
 nonzero regardless of deadlocks (already true before this ticket, ADR-0013) — so the evidence
 for this fix is "zero unhandled errors, zero hangs, zero double-booking" rather than "zero
-retries." `pessimistic` and `advisory` need no such fix (ADR-0006's non-blocking lock
-acquisition already can't deadlock) but still get a consistency pass sorting `seat_ids` for
-uniformity with the other four (issue #30) — the last item before Phase 3 is complete. A
-follow-up (issue #31) will extract the `withDeadlockRetry`-wrap/catch pattern now duplicated
-across `naive.ts`, `uniqueConstraint.ts`, and `optimistic.ts` into a shared helper (not
-`serializable.ts`, which never uses that helper), deferred until #28 landed so the extraction
-covers every real call site. Before extending the implementation,
+retries." `pessimistic` and `advisory` needed no such fix (ADR-0006's non-blocking lock
+acquisition already can't deadlock) but now ship a consistency pass sorting `seat_ids` for
+uniformity with the other four (issue #30), confirmed via the adversarial harness showing
+zero deadlocks/hangs/double-bookings across repeated runs against both mechanisms — the last
+item for Phase 3, which is now complete. A follow-up (issue #31) will extract the
+`withDeadlockRetry`-wrap/catch pattern now duplicated across `naive.ts`, `uniqueConstraint.ts`,
+and `optimistic.ts` into a shared helper (not `serializable.ts`, which never uses that helper),
+deferred until #28 landed so the extraction covers every real call site. Before extending
+the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
 
