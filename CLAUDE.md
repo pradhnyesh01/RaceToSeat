@@ -158,6 +158,29 @@ single-shot check — `optimistic.ts`'s initial `readSeats` + `SAVEPOINT` + CAS 
 `ROLLBACK TO SAVEPOINT` + a second `readSeats` for ADR-0009's cancellation-race check) and a
 scoped pool-size scaling test to confirm or rule it out before committing to a fix.
 
+Issue #36 resolved same-session: `optimistic` was re-measured at `--repeat 5` (matching
+`pessimistic`'s bar), landing at a corrected +60.1% — much larger than the original +14.4%, and
+(unlike `pessimistic`) a real, reproducible signal, not noise. The CAS-miss hypothesis was
+confirmed empirically, not just analytically: comparing Postgres query-log volume for an
+identical 50-concurrent single-seat burst, `naive` issued 169 total statements vs
+`optimistic`'s 405 — ~2.4x. The pool-size scaling test (`PG_POOL_MAX` 500→1000, Postgres
+`max_connections` temporarily raised to 1200 to give it headroom, then restored to 600) only
+modestly reduced the degradation (+60.1%→+52.3%), ruling out connection-pool spillover as the
+primary cause and confirming it's genuine extra per-request Postgres work from the CAS-miss
+path's shape (initial `readSeats` + `SAVEPOINT` + CAS miss + `ROLLBACK TO SAVEPOINT` + a second
+`readSeats`) — not a mechanism-agnostic infrastructure problem, unlike the negative control's
+own pool-queuing finding. Final recommendation: **document as an inherent trade-off of the
+CAS-retry design, not fix** — the second `readSeats` is ADR-0009's correctness mechanism for
+distinguishing a genuine conflict from a concurrent cancellation race, not incidental overhead;
+removing it would weaken that guarantee, and a real fix would need a different query shape
+entirely (changing what Exhibit C's own comparative benchmark measures for this mechanism),
+which is out of scope for an isolation-measurement ticket. `aggregate.ts` gained a third small
+matrix (alongside the main table and the negative control) for pool-scaling reports, marked the
+same hand-applied-filename way as the negative control. `docs/evidence/exhibit-e-phase4-isolation.md`
+updated throughout to reflect all of this. Phase 4 and its NFR2 follow-up work are both now
+fully closed out (issues #32-#36 all closed); full test suite passes unmodified (118 tests) and
+`npm run typecheck` is clean.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

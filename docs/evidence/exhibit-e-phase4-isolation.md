@@ -32,14 +32,17 @@ BOOKING_STRATEGY=<mechanism> npm run harness -- --pattern isolation             
 npm run harness:aggregate -- --exhibit e   # this script — reads docs/evidence/*.json, writes this file
 ```
 
-**`pessimistic`'s exception (5 repeats, not 2):** the original 2-repeat
-measurement reported +37.5% (a FAIL). A same-session follow-up grilling pass
-found this didn't reproduce — three independent single-repeat reruns swung
-from -41% to +4%, including negative-degradation runs, with baseline p99
-alone varying 174-482ms with zero hot-seat contention at all — clear
-2-repeat noise, not a stable signal. `pessimistic` was re-measured at
-`--repeat 5` for both variants and Exhibit E regenerated, which is why its
-row below shows 5/5 repeats where every other mechanism shows 2/2.
+**`pessimistic` and `optimistic`'s exception (5 repeats, not 2):** the
+original 2-repeat measurement reported +37.5% for `pessimistic` and +14.4%
+for `optimistic` (both FAIL). A same-session follow-up grilling pass found
+`pessimistic`'s didn't reproduce — three independent single-repeat reruns
+swung from -41% to +4%, including negative-degradation runs, with baseline
+p99 alone varying 174-482ms with zero hot-seat contention at all — clear
+2-repeat noise, not a stable signal. `optimistic`'s did reproduce (all
+positive, several far larger than +14.4%) and was carried into issue #36's
+investigation. Both were re-measured at `--repeat 5` for both variants and
+Exhibit E regenerated, which is why their rows below show 5/5 repeats where
+the other four mechanisms show 2/2.
 
 **Negative control:** to confirm the measurement can actually detect a
 violation before reporting six results all expected to pass, `pessimistic`
@@ -68,7 +71,7 @@ docker compose up -d   # restores max_connections=600
 | `naive` | 2/2 | 595.8 | 218.0 | -63.4% | **PASS** | 2308.2 | 327.1 | no | [naive-isolation-baseline-load-run-2026-08-24T16-46-18-421Z.json](naive-isolation-baseline-load-run-2026-08-24T16-46-18-421Z.json), [naive-isolation-load-run-2026-08-24T16-46-21-551Z.json](naive-isolation-load-run-2026-08-24T16-46-21-551Z.json) |
 | `unique_constraint` | 2/2 | 282.4 | 228.5 | -19.1% | **PASS** | 2784.6 | 517.5 | no | [unique_constraint-isolation-baseline-load-run-2026-08-24T16-46-33-067Z.json](unique_constraint-isolation-baseline-load-run-2026-08-24T16-46-33-067Z.json), [unique_constraint-isolation-load-run-2026-08-24T16-46-35-895Z.json](unique_constraint-isolation-load-run-2026-08-24T16-46-35-895Z.json) |
 | `pessimistic` | 5/5 | 189.0 | 163.3 | -13.6% | **PASS** | 2907.0 | 517.6 | no | [pessimistic-isolation-baseline-load-run-2026-08-24T17-04-41-616Z.json](pessimistic-isolation-baseline-load-run-2026-08-24T17-04-41-616Z.json), [pessimistic-isolation-load-run-2026-08-24T17-04-48-608Z.json](pessimistic-isolation-load-run-2026-08-24T17-04-48-608Z.json) |
-| `optimistic` | 2/2 | 279.8 | 320.1 | +14.4% | **FAIL** | 1306.9 | 568.8 | no | [optimistic-isolation-baseline-load-run-2026-08-24T16-47-03-650Z.json](optimistic-isolation-baseline-load-run-2026-08-24T16-47-03-650Z.json), [optimistic-isolation-load-run-2026-08-24T16-47-09-560Z.json](optimistic-isolation-load-run-2026-08-24T16-47-09-560Z.json) |
+| `optimistic` | 5/5 | 234.2 | 374.9 | +60.1% | **FAIL** | 2733.4 | 1043.0 | no | [optimistic-isolation-baseline-load-run-2026-08-24T17-14-52-243Z.json](optimistic-isolation-baseline-load-run-2026-08-24T17-14-52-243Z.json), [optimistic-isolation-load-run-2026-08-24T17-14-59-192Z.json](optimistic-isolation-load-run-2026-08-24T17-14-59-192Z.json) |
 | `advisory` | 2/2 | 272.2 | 266.5 | -2.1% | **PASS** | 1052.6 | 540.3 | no | [advisory-isolation-baseline-load-run-2026-08-24T16-47-18-132Z.json](advisory-isolation-baseline-load-run-2026-08-24T16-47-18-132Z.json), [advisory-isolation-load-run-2026-08-24T16-47-22-341Z.json](advisory-isolation-load-run-2026-08-24T16-47-22-341Z.json) |
 | `serializable` | 2/2 | 444.4 | 286.5 | -35.5% | **PASS** | 2013.8 | 1256.3 | no | [serializable-isolation-baseline-load-run-2026-08-24T16-47-32-748Z.json](serializable-isolation-baseline-load-run-2026-08-24T16-47-32-748Z.json), [serializable-isolation-load-run-2026-08-24T16-47-36-584Z.json](serializable-isolation-load-run-2026-08-24T16-47-36-584Z.json) |
 
@@ -85,25 +88,78 @@ Representative mechanism: `pessimistic`. Its combined isolation variant was run 
 Full report: [pessimistic-isolation-negative-control-load-run-2026-08-24T16-48-28-650Z.json](pessimistic-isolation-negative-control-load-run-2026-08-24T16-48-28-650Z.json).
 
 
+## Results — pool-scaling test (`optimistic`, issue #36)
+
+Representative mechanism: `optimistic`, re-run at `PG_POOL_MAX=1000` (Postgres temporarily reconfigured to `max_connections=1200` to give that pool real headroom, restored to 600 afterward) — a scoped confirmatory test, hence 3 repeats rather than the 5+ used for a trustworthy magnitude elsewhere in this exhibit.
+
+| | Repeats | Baseline p99 (ms) | Combined p99 (ms) | Degradation |
+|---|---|---|---|---|
+| Default pool (`PG_POOL_MAX=500`) | 5/5 | 234.2 | 374.9 | +60.1% |
+| Scaled pool (`PG_POOL_MAX=1000`) | 3/3 | 394.3 | 600.6 | +52.3% |
+
+2x the pool headroom only modestly reduced the degradation (+60.1% → +52.3%), not the substantial drop a pool-spillover-dominated cause would predict — evidence *against* connection-pool queuing as the primary driver, and *for* the genuine extra per-request Postgres work identified below.
+
+Full reports: [optimistic-isolation-pool-scaling-baseline-load-run-2026-08-24T17-15-57-108Z.json](optimistic-isolation-pool-scaling-baseline-load-run-2026-08-24T17-15-57-108Z.json), [optimistic-isolation-pool-scaling-load-run-2026-08-24T17-16-04-631Z.json](optimistic-isolation-pool-scaling-load-run-2026-08-24T17-16-04-631Z.json).
+
+
 ## Findings
 
-`optimistic` exceed(s) the 10% degradation threshold at the widened connection configuration. Per this project's single hard correctness gate (PRD §Metrics & Acceptance Criteria: zero double-booking), this is **not** a blocker for this ticket's completion — NFR2 is a measured non-functional target, not the correctness gate. Investigating and fixing the degradation is its own follow-up ticket.
+`optimistic` exceed(s) the 10% degradation threshold at the widened connection configuration. Per this project's single hard correctness gate (PRD §Metrics & Acceptance Criteria: zero double-booking), this is **not** a blocker for this exhibit's completion — NFR2 is a measured non-functional target, not the correctness gate.
 
-`optimistic`'s +14.4% above is from only 2 repeats — a same-session follow-up found the true effect is likely larger (independent single-repeat reruns showed up to +573%, direction consistently positive) and traced a concrete code-level hypothesis (the CAS-miss path's extra round-trips vs. the other five mechanisms). Tracked as [issue #36](https://github.com/pradhnyesh01/RaceToSeat/issues/36) — do not anchor on +14.4% as the true magnitude.
+### `optimistic` (issue #36 investigation, this exhibit's numbers below are always current)
 
+Current magnitude at 5 repeats: `+60.1%`
+— substantially larger than the original 2-repeat +14.4%, and (unlike
+`pessimistic`'s) a real, reproducible signal: three independent
+single-repeat reruns during the follow-up investigation were all positive
+(up to +573%).
+
+**Root cause, confirmed empirically:** a losing request under hot-seat
+contention takes a more expensive path in `optimistic` than in the other
+five mechanisms. Comparing Postgres query-log volume for the identical
+50-concurrent single-seat burst: `naive` issued 169 total statements,
+`optimistic` issued 405 — **~2.4x**. This matches the code path exactly:
+an ordinary CAS miss (the seat is already `'booked'`, not a concurrent-
+cancellation race) runs an initial `readSeats`, a `SAVEPOINT`, the CAS
+`UPDATE` itself (a real row check even though it affects 0 rows), a
+`ROLLBACK TO SAVEPOINT`, and a second `readSeats` (ADR-0009's
+cancellation-race check) — roughly double `naive`'s single read-then-write
+path, before accounting for connection-pool round-trip overhead on top.
+
+**Pool-scaling test rules out pool spillover as the primary cause** (see
+above): doubling `PG_POOL_MAX` only modestly reduced the degradation. The
+cost is genuine extra Postgres-side work from the CAS-miss path's shape, not
+connections queuing for a slot.
+
+**Recommendation: document as an inherent trade-off, not fix.** The second
+`readSeats` isn't incidental overhead — it's ADR-0009's correctness
+mechanism for distinguishing a genuine conflict from a concurrent
+cancellation race (see `optimistic.test.ts`'s "retries and succeeds when a
+CAS miss turns out to be a concurrent cancellation" test). Removing it to
+cut round-trips would weaken that guarantee; a real fix would need a
+different query shape entirely (e.g. a single `UPDATE ... RETURNING`
+combining the CAS and the conflict-vs-cancellation check), which changes
+what Exhibit C's own comparative benchmark is measuring for this mechanism —
+out of scope for an isolation-measurement ticket. `optimistic`'s extra
+cost under hot-seat contention is a property of the CAS-retry design this
+project set out to compare against pessimistic/advisory locking, not a bug
+in it.
 
 The negative control demonstrates the measurement is sensitive enough to
 catch a real violation: run against the project's prior, un-widened
 connection configuration, the same pattern that (mostly) passes above
 produces a measurably larger degradation, consistent with connection-pool
 queuing rather than row-lock contention (the caveat already noted inline in
-`cross-seat-isolation.k6.js` since issue #33).
+`cross-seat-isolation.k6.js` since issue #33) — the same phenomenon the
+pool-scaling test above found does *not* explain `optimistic`'s own
+degradation, a useful contrast: two different mechanisms can each show a
+real NFR2 finding for two different underlying reasons.
 
 ## Reading the columns
 
 - **Repeats (baseline/combined)**: how many independent repeats each side's
-  mean is drawn from — 2/2 for five mechanisms, 5/5 for `pessimistic` (see
-  Method's exception note above).
+  mean is drawn from — 2/2 for four mechanisms, 5/5 for `pessimistic` and
+  `optimistic` (see Method's exception note above).
 - **Baseline / Combined p99**: mean across that many repeats of the
   *background stream's* `http_req_duration` p99 (k6 `--summary-export`) —
   baseline is the background-only run (no hot-seat contention), combined is
@@ -122,8 +178,9 @@ queuing rather than row-lock contention (the caveat already noted inline in
 
 ## Next step
 
-`pessimistic`'s finding didn't survive re-measurement and needed no ticket
-(corrected above, same session). `optimistic`'s did — tracked as
-[issue #36](https://github.com/pradhnyesh01/RaceToSeat/issues/36), out of
-scope here per issue #35's acceptance criteria. Otherwise, Phase 4 (todo.md)
-is complete.
+Both of Exhibit E's original findings are resolved. `pessimistic`'s didn't
+survive re-measurement and needed no ticket (corrected above, same session).
+`optimistic`'s did reproduce and was root-caused in
+[issue #36](https://github.com/pradhnyesh01/RaceToSeat/issues/36): documented
+above as an inherent trade-off of the CAS-retry design, not fixed — no
+further follow-up ticket from this exhibit. Phase 4 (todo.md) is complete.
