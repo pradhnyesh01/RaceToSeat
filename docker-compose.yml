@@ -14,7 +14,23 @@ services:
     # Exhibits A-C's benchmarks against this container won't reproduce their
     # published numbers under the prior 1s setting. pessimistic and advisory
     # never block on a lock (ADR-0006), so this doesn't affect them.
-    command: ["postgres", "-c", "deadlock_timeout=100ms"]
+    # max_connections raised from Postgres's default (100) to 600 (issue
+    # #33): the cross-seat-isolation pattern seeds a hot-seat burst (1,000
+    # concurrent requests) alongside a background stream (1,000 distinct
+    # seats) in one k6 invocation, and the app pool below is raised to match
+    # (500) — 100 would queue most of that behind connection admission
+    # before a single query runs, swamping the isolation signal this pattern
+    # exists to measure. 600 (not Postgres's ~2-5k practical ceiling) is
+    # comfortably above this test's peak demand (pool max 500 + this
+    # container's own internal connections) without paying the per-connection
+    # memory cost (~5-10MB each) of pushing toward that ceiling — this is the
+    # only Postgres this project runs, dev and test alike, so as with
+    # deadlock_timeout below, tuning it here scopes the change to that
+    # environment without touching any production config. Caveat: some
+    # residual pool-queuing effect may still remain at peak concurrency,
+    # since 500 pooled connections still isn't one-per-request at 1,000
+    # concurrent VUs.
+    command: ["postgres", "-c", "deadlock_timeout=100ms", "-c", "max_connections=600"]
     environment:
       POSTGRES_USER: racetoseat
       POSTGRES_PASSWORD: racetoseat

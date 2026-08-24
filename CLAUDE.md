@@ -67,7 +67,36 @@ own `withSerializableTransaction` loop rather than `withDeadlockRetry`, per ADR-
 scope; ADR-0006's non-blocking lock acquisition doesn't need deadlock retry, and issue #31's
 acceptance criteria scoped `normalizeSeatIds` to the four mechanisms whose sort is either
 load-bearing or already documented that way). No observable behavior change — the full test
-suite passes unmodified. Before extending the implementation,
+suite passes unmodified.
+
+Phase 4 (cross-seat isolation verification) has begun: issue #33 lays its foundation. A
+fourth k6 load pattern, `cross-seat-isolation.k6.js`, fires a hot-seat burst (all-VUs-race-
+one-seat, `hammer-seat.k6.js`'s shape) and a background stream (one-VU-per-distinct-seat,
+`spread-across-seats.k6.js`'s shape) as two k6 scenarios executing concurrently in one
+invocation, rather than approximating "at the same time" by orchestrating two separate
+processes — selectable as `run.ts --pattern isolation`, with `--background-only` dropping
+the hot-seat stream for the matched no-contention baseline. Each stream's status/retry/
+latency/throughput metrics are tallied under its own prefixed k6 metric name (`hot_*`/`bg_*`)
+and reported under separate `hotStream`/`backgroundStream` keys in the JSON report, rather
+than merged. One correctness fix along the way: the background stream indexes its seat list
+by `exec.scenario.iterationInTest`, not `__VU` — k6 draws VU ids for concurrently-running
+scenarios from one shared pool rather than handing each scenario a contiguous block, so
+`__VU`-based indexing (safe for the three earlier, single-scenario patterns) silently
+misassigned seats once two scenarios ran side by side (confirmed by direct experimentation
+during this ticket). The shared dev/test Postgres's `max_connections` and the app's `pool.ts`
+default are both raised (100→600, 50→500, `docker-compose.yml`/`src/db/pool.ts`) so pool/
+connection admission doesn't dominate the isolation signal at 1,000+1,000-request peak
+concurrency — documented inline with the sizing rationale and residual-effect caveat, no new
+ADR, mirroring the `deadlock_timeout` tuning precedent above. One caveat worth carrying into
+Phase 4's actual measurement work (issue #35 and beyond): both streams share the app's one
+pg `Pool`, so under a blocking mechanism (`pessimistic`'s `SELECT ... FOR UPDATE`) pool-
+connection starvation from the hot-seat queue could produce a background-latency spike that
+looks like a genuine NFR2 violation but is actually pool exhaustion, not row-lock contention
+— noted inline in `cross-seat-isolation.k6.js`. issue #33 is foundation only: it does not
+itself produce isolation-degradation numbers or an exhibit document — full test suite passes
+unmodified.
+
+Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
 

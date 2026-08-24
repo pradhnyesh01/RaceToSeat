@@ -4,7 +4,7 @@
 // DELETE /bookings/{id} endpoint (issue #8) rather than raw SQL or
 // reseeding — the harness exercises the same API surface it's evidencing.
 //
-// Three load patterns, selected via --pattern:
+// Four load patterns, selected via --pattern:
 //   hammer-seat (default): all CONCURRENCY requests race one seat
 //     (hammer-seat.k6.js) — the existing double-booking/correctness evidence.
 //   spread-seats: one VU per seat across CONCURRENCY distinct, pre-seeded
@@ -14,8 +14,15 @@
 //     each pair fired concurrently (deadlock-pairs.k6.js) — the adversarial
 //     deadlock harness (issue #25); deadlock rate reads off the same
 //     X-Booking-Retries/retry_exhausted tally the other two patterns report.
+//   isolation: a CONCURRENCY-request hot-seat burst and a CONCURRENCY-seat
+//     background stream fired concurrently in one k6 invocation
+//     (cross-seat-isolation.k6.js) — measures whether contention on the hot
+//     seat degrades unrelated seats' latency/throughput (issue #33,
+//     Phase 4). --background-only drops the hot-seat stream, producing the
+//     matched no-contention baseline. Each stream's metrics are reported
+//     separately, not merged.
 //
-// Usage: tsx load-harness/run.ts [--concurrency 1000] [--repeat 2] [--base-url http://localhost:3000] [--pattern hammer-seat|spread-seats|deadlock-pairs]
+// Usage: tsx load-harness/run.ts [--concurrency 1000] [--repeat 2] [--base-url http://localhost:3000] [--pattern hammer-seat|spread-seats|deadlock-pairs|isolation] [--background-only]
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
@@ -23,16 +30,22 @@ import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { pool } from "../src/db/pool.js";
 
-type Pattern = "hammer-seat" | "spread-seats" | "deadlock-pairs";
+type Pattern = "hammer-seat" | "spread-seats" | "deadlock-pairs" | "isolation";
 
 interface Args {
   // hammer-seat: number of concurrent requests racing the one target seat.
   // spread-seats: number of distinct seats seeded, one VU each.
   // deadlock-pairs: number of disjoint 2-seat pairs seeded (2x seats, 2x VUs).
+  // isolation: both the hot-seat burst size and the background stream's
+  // distinct-seat count (see --background-only below).
   concurrency: number;
   baseUrl: string;
   repeat: number;
   pattern: Pattern;
+  // isolation only: drop the hot-seat stream, seeding/firing only the
+  // background stream — the matched no-contention baseline used to compute
+  // degradation. Ignored by every other pattern.
+  backgroundOnly: boolean;
 }
 
 function parsePositiveInt(flag: string, value: string | undefined): number {
@@ -44,21 +57,28 @@ function parsePositiveInt(flag: string, value: string | undefined): number {
 }
 
 function parsePattern(value: string | undefined): Pattern {
-  if (value !== "hammer-seat" && value !== "spread-seats" && value !== "deadlock-pairs") {
+  if (value !== "hammer-seat" && value !== "spread-seats" && value !== "deadlock-pairs" && value !== "isolation") {
     throw new Error(
-      `--pattern must be "hammer-seat", "spread-seats", or "deadlock-pairs", got ${JSON.stringify(value)}`,
+      `--pattern must be "hammer-seat", "spread-seats", "deadlock-pairs", or "isolation", got ${JSON.stringify(value)}`,
     );
   }
   return value;
 }
 
 function parseArgs(argv: string[]): Args {
-  const args: Args = { concurrency: 1000, baseUrl: "http://localhost:3000", repeat: 1, pattern: "hammer-seat" };
+  const args: Args = {
+    concurrency: 1000,
+    baseUrl: "http://localhost:3000",
+    repeat: 1,
+    pattern: "hammer-seat",
+    backgroundOnly: false,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     if (argv[i] === "--concurrency") args.concurrency = parsePositiveInt("--concurrency", argv[++i]);
     if (argv[i] === "--base-url") args.baseUrl = String(argv[++i]);
     if (argv[i] === "--repeat") args.repeat = parsePositiveInt("--repeat", argv[++i]);
     if (argv[i] === "--pattern") args.pattern = parsePattern(argv[++i]);
+    if (argv[i] === "--background-only") args.backgroundOnly = true;
   }
   return args;
 }
@@ -139,6 +159,21 @@ function metricCount(summary: K6Summary, name: string): number {
 // throughput/latency columns.
 function metricStat(summary: K6Summary, name: string, field: string): number {
   return summary.metrics[name]?.[field] ?? 0;
+}
+
+// Shared by every pattern that seeds more than one seat and needs to know
+// how many distinct bookings actually claimed each one (spread-seats,
+// deadlock-pairs, isolation's background stream) — ground truth read
+// straight from booking_seats rows, not from HTTP responses.
+function tallyPerSeatWinners(
+  rows: { seat_id: string }[],
+): { winnersPerSeat: Map<string, number>; seatsDoubleBooked: number } {
+  const winnersPerSeat = new Map<string, number>();
+  for (const row of rows) {
+    winnersPerSeat.set(row.seat_id, (winnersPerSeat.get(row.seat_id) ?? 0) + 1);
+  }
+  const seatsDoubleBooked = [...winnersPerSeat.values()].filter((count) => count > 1).length;
+  return { winnersPerSeat, seatsDoubleBooked };
 }
 
 interface HttpStatusTally {
@@ -291,6 +326,8 @@ async function run() {
     await runSpreadPattern(args);
   } else if (args.pattern === "deadlock-pairs") {
     await runDeadlockPairsPattern(args);
+  } else if (args.pattern === "isolation") {
+    await runIsolationPattern(args);
   } else {
     await runHammerPattern(args);
   }
@@ -402,11 +439,7 @@ async function runSpreadSeatsOnce(args: Args, seatIds: string[], attempt: number
     [seatIds],
   );
 
-  const winnersPerSeat = new Map<string, number>();
-  for (const row of winningBookings) {
-    winnersPerSeat.set(row.seat_id, (winnersPerSeat.get(row.seat_id) ?? 0) + 1);
-  }
-  const seatsDoubleBooked = [...winnersPerSeat.values()].filter((count) => count > 1).length;
+  const { winnersPerSeat, seatsDoubleBooked } = tallyPerSeatWinners(winningBookings);
 
   const report: SpreadRunReport = {
     attempt,
@@ -556,11 +589,7 @@ async function runDeadlockPairsOnce(
     [seatIds],
   );
 
-  const winnersPerSeat = new Map<string, number>();
-  for (const row of winningBookings) {
-    winnersPerSeat.set(row.seat_id, (winnersPerSeat.get(row.seat_id) ?? 0) + 1);
-  }
-  const seatsDoubleBooked = [...winnersPerSeat.values()].filter((count) => count > 1).length;
+  const { winnersPerSeat, seatsDoubleBooked } = tallyPerSeatWinners(winningBookings);
 
   const report: DeadlockPairsRunReport = {
     attempt,
@@ -643,6 +672,252 @@ async function runDeadlockPairsPattern(args: Args) {
 
       const outPath = new URL(
         `../docs/evidence/${strategy}-deadlock-pairs-load-run-${runs[0]!.ranAt.replace(/[:.]/g, "-")}.json`,
+        import.meta.url,
+      );
+      await writeFile(outPath, JSON.stringify(combined, null, 2));
+      console.log(`\nReport written to ${outPath.pathname}`);
+
+      if (combined.anyDoubleBooked) {
+        process.exitCode = 1;
+      }
+    }
+  }
+}
+
+// Same shape as RunReport/SpreadRunReport respectively, minus the per-
+// attempt fields (attempt/ranAt/durationMs live on IsolationRunReport
+// itself, once, since both streams share one k6 invocation's timing) — kept
+// as type aliases rather than hand-retyped interfaces so a field added to
+// either pre-existing report shape doesn't silently go undeclared here.
+type HotStreamStats = Omit<RunReport, "attempt" | "ranAt" | "durationMs" | "winningUserIds">;
+type BackgroundStreamStats = Omit<SpreadRunReport, "attempt" | "ranAt" | "durationMs">;
+
+// Reads the status/retry/latency/throughput fields common to both streams
+// off one k6 summary, keyed by the stream's metric-name prefix
+// (cross-seat-isolation.k6.js's hot_*/bg_* Counters and Trends) — the
+// seat-specific ground-truth fields (winningBookingIds, doubleBooked, ...)
+// are layered on by each of runIsolationOnce's two call sites below, since
+// those differ in shape between the one-seat hot stream and the many-seat
+// background stream.
+function buildStreamStats(
+  summary: K6Summary,
+  prefix: "hot" | "bg",
+): Pick<HotStreamStats, "httpStatusTally" | "retriesTotal" | "latency" | "throughputRps"> {
+  return {
+    httpStatusTally: {
+      201: metricCount(summary, `${prefix}_booking_created`),
+      409: metricCount(summary, `${prefix}_booking_conflict`),
+      503: metricCount(summary, `${prefix}_booking_retry_exhausted`),
+      other: metricCount(summary, `${prefix}_booking_other_status`),
+    },
+    retriesTotal: metricCount(summary, `${prefix}_booking_retries`),
+    latency: {
+      p50Ms: metricStat(summary, `${prefix}_req_duration`, "med"),
+      p99Ms: metricStat(summary, `${prefix}_req_duration`, "p(99)"),
+    },
+    throughputRps: metricStat(summary, `${prefix}_requests`, "rate"),
+  };
+}
+
+interface IsolationRunReport {
+  attempt: number;
+  ranAt: string;
+  durationMs: number;
+  // null for a --background-only run: no hot-seat stream fired at all,
+  // rather than a hot stream that fired zero requests.
+  hotStream: HotStreamStats | null;
+  backgroundStream: BackgroundStreamStats;
+}
+
+async function runIsolationOnce(
+  args: Args,
+  hotSeatId: string | null,
+  backgroundSeatIds: string[],
+  backgroundSeatIdsJson: string,
+  attempt: number,
+): Promise<IsolationRunReport> {
+  const runId = randomUUID();
+  const scriptPath = fileURLToPath(new URL("./cross-seat-isolation.k6.js", import.meta.url));
+  const summaryPath = fileURLToPath(new URL(`../docs/evidence/.k6-summary-${runId}.json`, import.meta.url));
+  await mkdir(new URL("../docs/evidence/", import.meta.url), { recursive: true });
+
+  console.log(
+    hotSeatId
+      ? `Firing ${args.concurrency} concurrent requests at hot seat ${hotSeatId} alongside 1 request each at ${backgroundSeatIds.length} background seats via k6...`
+      : `Firing 1 request each at ${backgroundSeatIds.length} background seats via k6 (--background-only, no hot-seat stream)...`,
+  );
+  const startedAt = new Date();
+  const k6Result = spawnSync(
+    "k6",
+    ["run", `--summary-export=${summaryPath}`, scriptPath],
+    {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        BASE_URL: args.baseUrl,
+        RUN_ID: runId,
+        BACKGROUND_SEAT_IDS: backgroundSeatIdsJson,
+        // Set explicitly (not just conditionally added) even for
+        // --background-only, so a HOT_SEAT_ID/HOT_CONCURRENCY left over in
+        // the ambient shell environment (e.g. from manually invoking
+        // cross-seat-isolation.k6.js directly while debugging) can't leak
+        // through the `...process.env` spread above and fire an unwanted
+        // hot-seat stream against a seat never seeded in this run.
+        // cross-seat-isolation.k6.js treats "" as unset (`__ENV.HOT_SEAT_ID
+        // || undefined`, `Number(__ENV.HOT_CONCURRENCY || 0)`).
+        HOT_SEAT_ID: hotSeatId ?? "",
+        HOT_CONCURRENCY: hotSeatId ? String(args.concurrency) : "",
+      },
+    },
+  );
+  const finishedAt = new Date();
+
+  if (k6Result.error) {
+    throw new Error(
+      `Failed to run k6 (is it installed? \`brew install k6\`): ${k6Result.error.message}`,
+    );
+  }
+  if (k6Result.status !== 0) {
+    throw new Error(`k6 exited with status ${k6Result.status}`);
+  }
+
+  const summary: K6Summary = JSON.parse(await readFile(summaryPath, "utf8"));
+  await rm(summaryPath);
+
+  // Ground truth for both streams, read straight from booking_seats rather
+  // than trusting HTTP responses — two independent queries over disjoint
+  // seat sets, fired concurrently rather than one after the other (the hot
+  // query resolves to [] immediately for a --background-only run, matching
+  // hammer-seat's single-seat invariant check when it does run).
+  const [hotWinners, bgWinners] = await Promise.all([
+    hotSeatId
+      ? pool
+          .query<{ booking_id: string }>(
+            `SELECT bs.booking_id FROM booking_seats bs WHERE bs.seat_id = $1`,
+            [hotSeatId],
+          )
+          .then((res) => res.rows)
+      : Promise.resolve<{ booking_id: string }[]>([]),
+    pool
+      .query<{ seat_id: string; booking_id: string }>(
+        `SELECT bs.seat_id, bs.booking_id FROM booking_seats bs WHERE bs.seat_id = ANY($1)`,
+        [backgroundSeatIds],
+      )
+      .then((res) => res.rows),
+  ]);
+
+  const hotStream: HotStreamStats | null = hotSeatId
+    ? {
+        ...buildStreamStats(summary, "hot"),
+        winningBookingIds: hotWinners.map((r) => r.booking_id),
+        winningBookingCount: hotWinners.length,
+        doubleBooked: hotWinners.length > 1,
+      }
+    : null;
+
+  const { winnersPerSeat: bgWinnersPerSeat, seatsDoubleBooked: bgSeatsDoubleBooked } =
+    tallyPerSeatWinners(bgWinners);
+
+  const backgroundStream: BackgroundStreamStats = {
+    ...buildStreamStats(summary, "bg"),
+    seatCount: backgroundSeatIds.length,
+    seatsWithWinner: bgWinnersPerSeat.size,
+    seatsDoubleBooked: bgSeatsDoubleBooked,
+    winningBookingIds: bgWinners.map((r) => r.booking_id),
+    anyDoubleBooked: bgSeatsDoubleBooked > 0,
+  };
+
+  const report: IsolationRunReport = {
+    attempt,
+    ranAt: startedAt.toISOString(),
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    hotStream,
+    backgroundStream,
+  };
+
+  console.log(JSON.stringify(report, null, 2));
+  const anyDoubleBooked = (hotStream?.doubleBooked ?? false) || backgroundStream.anyDoubleBooked;
+  if (anyDoubleBooked) {
+    console.error(`\n*** DOUBLE-BOOKING CONFIRMED in isolation pattern run ${attempt}. ***`);
+  } else if (hotStream) {
+    console.log(
+      `\nHot seat had exactly ${hotStream.winningBookingCount} winner(s); background: ` +
+        `${backgroundStream.seatsWithWinner}/${backgroundStream.seatCount} seats had exactly one winner.`,
+    );
+  } else {
+    console.log(
+      `\nBackground-only baseline: ${backgroundStream.seatsWithWinner}/${backgroundStream.seatCount} seats had exactly one winner.`,
+    );
+  }
+
+  return report;
+}
+
+async function runIsolationPattern(args: Args) {
+  const strategy = process.env.BOOKING_STRATEGY ?? "naive";
+
+  console.log(
+    args.backgroundOnly
+      ? `Seeding ${args.concurrency} distinct background seats (--background-only, no hot seat)...`
+      : `Seeding ${args.concurrency} distinct background seats + 1 hot seat...`,
+  );
+  const { eventId: backgroundEventId, seatIds: backgroundSeatIds } = await seedSpreadSeats(args.concurrency);
+  // Computed once here rather than inside runIsolationOnce: backgroundSeatIds
+  // never changes across a pattern run's --repeat attempts, so there's no
+  // reason to re-JSON.stringify the same ~1000-element array on every one.
+  const backgroundSeatIdsJson = JSON.stringify(backgroundSeatIds);
+  let hotEventId: string | null = null;
+  let hotSeatId: string | null = null;
+  if (!args.backgroundOnly) {
+    const hot = await seedTargetSeat();
+    hotEventId = hot.eventId;
+    hotSeatId = hot.seatId;
+  }
+
+  const runs: IsolationRunReport[] = [];
+  try {
+    for (let attempt = 1; attempt <= args.repeat; attempt += 1) {
+      console.log(
+        `\n=== Run ${attempt}/${args.repeat} (strategy=${strategy}, pattern=isolation` +
+          `${args.backgroundOnly ? ", background-only" : ""}) ===`,
+      );
+      const report = await runIsolationOnce(args, hotSeatId, backgroundSeatIds, backgroundSeatIdsJson, attempt);
+      runs.push(report);
+
+      if (attempt < args.repeat) {
+        const idsToReset = [
+          ...(report.hotStream?.winningBookingIds ?? []),
+          ...report.backgroundStream.winningBookingIds,
+        ];
+        if (idsToReset.length > 0) {
+          console.log(`Resetting ${idsToReset.length} booking(s) via DELETE /bookings/{id} before the next run...`);
+          await resetSeatViaApi(args.baseUrl, idsToReset);
+        }
+      }
+    }
+  } finally {
+    // Write whatever repeats completed even if a later one throws — mirrors
+    // the other three patterns' already-verified-repeats-shouldn't-be-lost
+    // handling.
+    if (runs.length > 0) {
+      const combined = {
+        strategy,
+        pattern: args.pattern,
+        concurrency: args.concurrency,
+        backgroundOnly: args.backgroundOnly,
+        hotEventId,
+        hotSeatId,
+        backgroundEventId,
+        backgroundSeatIds,
+        runs,
+        anyDoubleBooked: runs.some(
+          (r) => (r.hotStream?.doubleBooked ?? false) || r.backgroundStream.anyDoubleBooked,
+        ),
+      };
+
+      const suffix = args.backgroundOnly ? "isolation-baseline" : "isolation";
+      const outPath = new URL(
+        `../docs/evidence/${strategy}-${suffix}-load-run-${runs[0]!.ranAt.replace(/[:.]/g, "-")}.json`,
         import.meta.url,
       );
       await writeFile(outPath, JSON.stringify(combined, null, 2));

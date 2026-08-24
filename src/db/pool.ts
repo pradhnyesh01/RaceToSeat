@@ -6,9 +6,24 @@ import { isDeadlockDetected, isSerializationFailure } from "./pgErrors.js";
 // Default pg pool max (10) would serialize most of a 1,000-concurrent-request
 // load test behind pool.connect() queuing rather than real DB concurrency —
 // raised here so the Phase 0 harness exercises genuine concurrent access.
+// Raised again from 50 to 500 (issue #33) for the cross-seat-isolation
+// pattern, which fires a 1,000-request hot-seat burst and a 1,000-seat
+// background stream concurrently in one run: 50 would queue most of both
+// streams behind pool.connect() before a single query runs, which would
+// swamp the very degradation signal that pattern exists to measure. 500 (not
+// the shared dev/test Postgres's max_connections=600 ceiling, see
+// docker-compose.yml) leaves headroom for that container's own internal
+// connections without paying the memory cost (~5-10MB per idle Postgres
+// backend) of pushing all the way to it. Caveat: some residual pool-queuing
+// effect may still remain at peak concurrency, since 500 pooled connections
+// still isn't one-per-request at 1,000+ concurrent VUs — and this headroom
+// figure is for one Pool instance; load-harness/run.ts's own process
+// constructs a second, independent one from this same module for its
+// seeding/verification queries, so real concurrent connections against the
+// 600 ceiling can run higher than 500 alone would suggest.
 export const pool = new Pool({
   connectionString: config.databaseUrl,
-  max: Number(process.env.PG_POOL_MAX ?? 50),
+  max: Number(process.env.PG_POOL_MAX ?? 500),
 });
 
 // Shared BEGIN/COMMIT/ROLLBACK shape for every caller that needs a
