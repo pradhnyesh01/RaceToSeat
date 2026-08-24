@@ -26,7 +26,23 @@ exercised by `npm test`. See
 (Phase 1, the first two new mechanisms hold under load), and
 [docs/evidence/exhibit-c-phase2-comparison.md](docs/evidence/exhibit-c-phase2-comparison.md)
 (Phase 2, all six mechanisms benchmarked against each other) for the before/after evidence.
-Phases 3+ are not yet implemented. Before extending the implementation,
+
+Phase 3 (multi-seat transactions + deadlock freedom) is underway. `POST /bookings` accepts
+multi-seat `seat_ids` across all six mechanisms (issue #24). A third k6 load pattern,
+`deadlock-pairs.k6.js` (issue #25), seeds disjoint 2-seat pairs and fires both lock
+orderings of each pair concurrently to adversarially trigger deadlocks; test/dev Postgres's
+`deadlock_timeout` is tuned to 100ms (`docker-compose.yml`) so a genuine deadlock's
+detect-and-abort cycle stays inside NFR3's latency budget. `naive`'s multi-seat path now
+sorts `seat_ids` before writing and wraps its transactional attempt in `withDeadlockRetry`
+(`src/db/pool.ts`, ADR-0014) — see
+[docs/evidence/exhibit-d-naive-multiseat-deadlock.md](docs/evidence/exhibit-d-naive-multiseat-deadlock.md)
+(issue #26) for measured before/after deadlock rates. `unique_constraint`, `optimistic`, and
+`serializable` still need the same deadlock-safety fix (issues #27–#29) — each performs a
+blocking multi-row write vulnerable to the same class of wait-for cycle Exhibit D found.
+`pessimistic` and `advisory` need no such fix (ADR-0006's non-blocking lock acquisition
+already can't deadlock) but still get a consistency pass sorting `seat_ids` for uniformity
+with the other four (issue #30). Phase 3 isn't complete until all of #27–#30 land. Before
+extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
 

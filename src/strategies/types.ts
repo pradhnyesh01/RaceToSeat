@@ -1,7 +1,9 @@
 // `retries` counts internal retry attempts a mechanism made before reaching
-// this result. Optional and near-universally 0 today: naive, unique_constraint,
+// this result. Optional and near-universally 0 today: unique_constraint,
 // pessimistic, and advisory never retry, so they simply omit it (the route
 // layer defaults a missing value to 0 for the X-Booking-Retries header).
+// naive can retry too (issue #26's withDeadlockRetry, ADR-0014) but only for
+// a multi-seat deadlock abort — a single-seat naive request never retries.
 // retry_exhausted (ADR-0012) is the one kind where it's always meaningful, so
 // it's required there.
 export type BookSeatResult =

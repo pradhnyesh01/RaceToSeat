@@ -27,8 +27,11 @@ export function runBookingContractTests(strategyLabel: string, createApp: () => 
 
       expect(res.statusCode).toBe(201);
       expect(body.id).toBeTypeOf("string");
-      // Every mechanism carries this header (ADR-0012); naive, unique_constraint,
-      // pessimistic, and advisory never retry, so it must always read "0" for them.
+      // Every mechanism carries this header (ADR-0012); unique_constraint,
+      // pessimistic, and advisory never retry, so it must always read "0" for
+      // them. naive can retry too now (issue #26's withDeadlockRetry, for a
+      // multi-seat deadlock abort) but never for this single-seat request —
+      // that class of deadlock needs at least two seats to form a cycle.
       expect(res.headers["x-booking-retries"]).toBe("0");
 
       const seatRes = await pool.query("SELECT status, booked_by, version FROM seats WHERE id = $1", [
