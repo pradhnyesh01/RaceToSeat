@@ -119,6 +119,29 @@ hold function differing — consolidated into a new `runCrossSeatIsolationContra
 `runBookingConcurrencyContractTest` sharing convention. No production code changed; the full
 test suite passes (118 tests, up from 112) and `npm run typecheck` is clean.
 
+Issue #35 closes out Phase 4 with the actual measurement: `load-harness/aggregate.ts` gains a
+second mode, `--exhibit e` (default remains `--exhibit c`, unchanged), reading the `isolation`-
+pattern reports issue #33's harness writes rather than building a separate generation path —
+same "most-recent-report-wins" dedup and Markdown-table-rendering conventions as Exhibit C, but
+keyed by `(strategy, backgroundOnly)` and reading each run's *background-stream* p99 (NFR2 asks
+whether the hot seat degrades *other* seats, not its own latency). All six mechanisms were run
+at the widened connection configuration (issue #33): background-only baseline and combined
+(hot + background) variants, each `--repeat 2`, one degradation percentage computed per
+mechanism from the two repeat-averaged p99s. Two mechanisms exceed NFR2's 10% threshold —
+`pessimistic` (+37.5%) and `optimistic` (+14.4%) — reported as findings in the new
+[docs/evidence/exhibit-e-phase4-isolation.md](docs/evidence/exhibit-e-phase4-isolation.md),
+not treated as a blocker (this project's single hard gate is zero double-booking, not NFR2;
+per issue #35's scope, investigating/fixing the degradation is its own follow-up ticket). A
+negative control — `pessimistic`'s combined variant run once against Postgres reconfigured to
+the project's prior, un-widened `max_connections=100`/`PG_POOL_MAX=50` (container stopped,
+recreated with the old flags against the same named volume, then restored via `docker compose
+up -d` afterward) — measured +405.6% degradation, confirming the harness can actually detect a
+real violation before six results that are mostly expected to pass. That negative-control run's
+report is marked with a `negative-control` filename suffix so `aggregate.ts`'s per-strategy
+dedup doesn't confuse it with `pessimistic`'s real matrix cell. Zero double-booking across all
+six mechanisms and both configurations throughout. Phase 4 (todo.md) is complete; full test
+suite passes unmodified (118 tests) and `npm run typecheck` is clean.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
