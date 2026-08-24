@@ -181,6 +181,35 @@ updated throughout to reflect all of this. Phase 4 and its NFR2 follow-up work a
 fully closed out (issues #32-#36 all closed); full test suite passes unmodified (118 tests) and
 `npm run typecheck` is clean.
 
+Phase 5 (realistic hold → confirm → expire booking flow, stretch) has begun, scoped down to
+`pessimistic` only rather than all six mechanisms (ADR-0017) — a design decision reached
+through a structured grilling session and recorded across four ADRs (0017-0020) and two
+`CONTEXT.md` glossary entries (`Confirm`, `Reaper`) before implementation started, then broken
+into four tracer-bullet tickets (issues #38-#41, `1 → {2, 3} → 4`). Issue #38 ships the first:
+hold creation. New `holds`/`hold_seats` tables (`db/schema.sql`) mirror `bookings`/
+`booking_seats`, activating the `seats.held_until`/`booked_by` columns reserved since Phase 0.
+`POST /holds` is implemented in `src/strategies/pessimisticHold.ts`, mirroring
+`bookSeatPessimistic`'s `FOR UPDATE NOWAIT` acquisition/fallback-existence-check shape exactly
+— same "exactly one winner" guarantee a booking gets, same all-or-nothing multi-seat atomicity,
+same `holds.idempotency_key UNIQUE` dedupe pattern as `bookings.idempotency_key` (new helpers in
+`src/strategies/idempotency.ts`: `findExistingHoldByIdempotencyKey`, `resolveHoldIdempotencyKeyRace`,
+`runTransactionalHold`). The route (`src/routes/holds.ts`) and its not-yet-built confirm sibling
+are gated by `BOOKING_STRATEGY=pessimistic` at the `createApp()` composition root (ADR-0019) —
+the first strategy-gated routes in the app, 404 under any other configured mechanism. TTL is a
+fixed server-side constant (`config.holdTtlSeconds`, default 300s, `HOLD_TTL_SECONDS` env
+override only — never a per-request field). A code-review pass on this ticket caught and fixed
+one real bug before merge: `HOLD_TTL_SECONDS` had no positivity check, so a zero/negative
+override silently produced a hold whose `held_until` was already in the past — `config.ts`'s
+`intEnv` now takes an optional `min` bound, `holdTtlSeconds` passes `{ min: 1 }`, and the failure
+is now a startup-time throw instead of a dead-on-arrival hold (regression-tested in
+`test/config.test.ts`). The same pass also deduplicated the request-body validation shared
+between `POST /bookings` and `POST /holds` into `src/routes/validation.ts`, and the `FOR UPDATE`
+test helper shared between `pessimistic.test.ts` and the new `pessimisticHold.test.ts` into
+`test/testDb.ts`. Confirm (issue #39) and the reaper (issue #40) are not yet implemented — a
+seat that enters `'held'` via this ticket currently has no path back to `'available'` or forward
+to `'booked'`, expected and tracked, not a defect in this ticket's own scope. Full test suite
+passes (134 tests, up from 118) and `npm run typecheck` is clean.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

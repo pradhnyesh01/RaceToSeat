@@ -3,7 +3,7 @@ import type { PoolClient } from "pg";
 import { pool } from "../src/db/pool.js";
 
 export async function resetDb(): Promise<void> {
-  await pool.query("TRUNCATE booking_seats, bookings, seats, events RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE hold_seats, holds, booking_seats, bookings, seats, events RESTART IDENTITY CASCADE");
 }
 
 export async function seedEventWithSeats(seatLabels: string[]): Promise<{ eventId: string; seatIdsByLabel: Record<string, string> }> {
@@ -62,6 +62,27 @@ export async function commitBookingOnClient(client: PoolClient, seatId: string, 
     "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = $2",
     [userId, seatId],
   );
+}
+
+// Holds a real FOR UPDATE row lock on `lockSeatId` in an uncommitted
+// transaction on a separate connection while `fn` runs, standing in for
+// "another in-flight pessimistic-strategy request currently holds this
+// seat's lock" — unlike an already-committed conflict, this exercises the
+// NOWAIT failure path itself. Shared by pessimistic.ts's booking path and
+// pessimisticHold.ts's hold path (both use identical FOR UPDATE NOWAIT
+// acquisition), so pessimistic.test.ts and pessimisticHold.test.ts both
+// import this rather than each defining their own copy of the same
+// technique against the same mechanism.
+export async function withHeldRowLock<T>(lockSeatId: string, fn: () => Promise<T>): Promise<T> {
+  const lockClient = await pool.connect();
+  await lockClient.query("BEGIN");
+  await lockClient.query("SELECT 1 FROM seats WHERE id = $1 FOR UPDATE", [lockSeatId]);
+  try {
+    return await fn();
+  } finally {
+    await lockClient.query("COMMIT");
+    lockClient.release();
+  }
 }
 
 // Stages a deterministic race against a mechanism under test by intercepting

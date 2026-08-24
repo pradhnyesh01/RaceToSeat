@@ -18,3 +18,19 @@ export interface BookSeatInput {
   userId: string;
   idempotencyKey: string;
 }
+
+// Hold has no retry_exhausted kind and no `retries` field at all: unlike
+// booking, hold-acquisition is pessimistic-only (ADR-0017) and never wraps
+// withDeadlockRetry (sorted seat_ids alone is enough — NOWAIT can't deadlock,
+// ADR-0006), so there is no retry count to ever report.
+export type HoldSeatsResult =
+  | { kind: "created"; holdId: string; seatIds: string[]; heldUntil: Date }
+  | { kind: "idempotent_replay"; holdId: string; seatIds: string[]; heldUntil: Date }
+  | { kind: "conflict" }
+  | { kind: "not_found" };
+
+export interface HoldSeatsInput {
+  seatIds: string[];
+  userId: string;
+  idempotencyKey: string;
+}

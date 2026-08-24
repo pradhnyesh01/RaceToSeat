@@ -9,7 +9,7 @@ const {
   runCrossSeatIsolationContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
-const { resetDb, seedEventWithSeats } = await import("../testDb.js");
+const { resetDb, seedEventWithSeats, withHeldRowLock } = await import("../testDb.js");
 
 const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
 
@@ -18,24 +18,6 @@ afterAll(() => pool.end());
 runBookingContractTests("pessimistic", createApp);
 runBookingConcurrencyContractTest("pessimistic", createApp);
 runMultiSeatBookingContractTests("pessimistic", createApp);
-
-// Holds a real FOR UPDATE row lock on `lockSeatId` in an uncommitted
-// transaction on a separate connection while `fn` runs, standing in for
-// "another in-flight booking currently holds this seat's lock" — unlike an
-// already-committed conflict (covered by runMultiSeatBookingContractTests),
-// this exercises the NOWAIT failure path itself.
-async function withHeldRowLock<T>(lockSeatId: string, fn: () => Promise<T>): Promise<T> {
-  const lockClient = await pool.connect();
-  await lockClient.query("BEGIN");
-  await lockClient.query("SELECT 1 FROM seats WHERE id = $1 FOR UPDATE", [lockSeatId]);
-  try {
-    return await fn();
-  } finally {
-    await lockClient.query("COMMIT");
-    lockClient.release();
-  }
-}
-
 runCrossSeatIsolationContractTest("pessimistic", createApp, withHeldRowLock);
 
 describe("POST /bookings (pessimistic strategy) — multi-seat NOWAIT precedence", () => {

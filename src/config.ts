@@ -8,7 +8,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function intEnv(name: string, defaultValue: number): number {
+function intEnv(name: string, defaultValue: number, options: { min?: number } = {}): number {
   const raw = process.env[name];
   if (raw === undefined) {
     return defaultValue;
@@ -16,6 +16,9 @@ function intEnv(name: string, defaultValue: number): number {
   const parsed = Number(raw);
   if (!Number.isInteger(parsed)) {
     throw new Error(`Invalid ${name}: expected an integer, got "${raw}"`);
+  }
+  if (options.min !== undefined && parsed < options.min) {
+    throw new Error(`Invalid ${name}: expected an integer >= ${options.min}, got "${raw}"`);
   }
   return parsed;
 }
@@ -39,4 +42,15 @@ export const config = {
   // tuning rationale as serializableMaxRetries: a deadlock under adversarial
   // multi-seat load scales with concurrency, not a narrow rare race.
   deadlockMaxRetries: intEnv("DEADLOCK_MAX_RETRIES", 5),
+  // A Hold's TTL is fixed and server-controlled, never a per-request client
+  // field (ADR-0017/Phase 5 spec) — this is the only place it's configurable,
+  // and only at deploy time. Default matches FR4's own example ("e.g. 5
+  // minutes"); the load-test harness overrides it to a short value so
+  // Phase 5's expiry evidence run doesn't need to wait out a real 5-minute
+  // TTL. min: 1 rejects zero/negative overrides at startup — unlike the
+  // retry-count configs above, 0 has no valid meaning here: a hold with a
+  // non-positive TTL is expired before its own creation response is sent,
+  // and (with no reaper yet, issue #40) the seat it claimed would be stuck
+  // 'held' with no path back to 'available'.
+  holdTtlSeconds: intEnv("HOLD_TTL_SECONDS", 300, { min: 1 }),
 };

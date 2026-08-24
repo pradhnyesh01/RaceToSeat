@@ -13,7 +13,7 @@ A specific physical seat for one specific Event. Seat 14B at the 7pm showing and
 _Avoid_: Venue seat, seat assignment
 
 **Idempotency Key**:
-A client-generated token, globally unique across all users, attached to one booking attempt. Two requests carrying the same key represent the same attempt regardless of who submitted them, and must never produce two bookings.
+A client-generated token, globally unique across all users, attached to one attempt to claim Seats — either a Booking directly or a Hold. Two requests carrying the same key represent the same attempt regardless of who submitted them, and must never produce two Bookings or two Holds.
 _Avoid_: Request ID, dedupe key
 
 **Booking**:
@@ -27,4 +27,12 @@ _Avoid_: Reservation, lock (a lock is an implementation mechanism, not this doma
 **Cancel**:
 Deleting a Booking, releasing every Seat it claimed back to `available`. Not ownership-gated — any caller holding a valid Booking id can cancel it, matching the project's minimal-identifier stance (no full auth system). Distinct from a Hold's expiry, which also returns a Seat to `available` but happens automatically via TTL, not by request.
 _Avoid_: Reservation, un-book, refund (no payment concept exists in this domain)
+
+**Confirm**:
+Converting a Hold into a Booking, before the Hold's TTL elapses. Not ownership-gated, matching Cancel's precedent — any caller holding a valid Hold id can confirm it. Distinct from booking directly (`POST /bookings`), which claims Seats immediately with no prior Hold involved.
+_Avoid_: Complete, finalize
+
+**Reaper**:
+The process responsible for returning an expired Hold's Seats to `available`. Runs continuously and automatically; never invoked per-request.
+_Avoid_: Cleanup job, garbage collector (those imply removing data broadly, not this domain-specific TTL-expiry role)
 

@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { DeadlockRetriesExhaustedError, withDeadlockRetry, withTransaction } from "../db/pool.js";
 import { isUniqueViolation } from "../db/pgErrors.js";
-import type { BookSeatResult } from "./types.js";
+import type { BookSeatResult, HoldSeatsResult } from "./types.js";
 
 // Lowercased once, then a plain default sort — not localeCompare, whose
 // collation depends on the runtime's default locale/ICU build and so isn't
@@ -101,5 +101,70 @@ export async function runDeadlockRetryBooking(
       return { kind: "retry_exhausted", retries: err.retries };
     }
     return await resolveIdempotencyKeyRace(client, idempotencyKey, err);
+  }
+}
+
+export interface ExistingHold {
+  id: string;
+  seatIds: string[];
+  heldUntil: Date;
+}
+
+// Hold's counterpart to findExistingBookingByIdempotencyKey. Unlike a
+// booking, a hold has no data of its own worth returning beyond its id — the
+// seat set and expiry both live on other tables (hold_seats, seats — ADR-
+// 0018/0020) — so this joins across both rather than reading the `holds` row
+// alone. held_until is identical across every seat in the same hold (all
+// updated from one `now() + interval` evaluated once per acquisition
+// transaction), so MIN(s.held_until) is just "the value," not an aggregate
+// choice among differing ones.
+export async function findExistingHoldByIdempotencyKey(
+  client: PoolClient,
+  idempotencyKey: string,
+): Promise<ExistingHold | undefined> {
+  const res = await client.query<{ id: string; seat_ids: string[]; held_until: Date }>(
+    `SELECT h.id, array_agg(hs.seat_id ORDER BY hs.seat_id) AS seat_ids, MIN(s.held_until) AS held_until
+     FROM holds h
+     JOIN hold_seats hs ON hs.hold_id = h.id
+     JOIN seats s ON s.id = hs.seat_id
+     WHERE h.idempotency_key = $1
+     GROUP BY h.id`,
+    [idempotencyKey],
+  );
+  const row = res.rows[0];
+  return row ? { id: row.id, seatIds: row.seat_ids, heldUntil: row.held_until } : undefined;
+}
+
+// Hold's counterpart to resolveIdempotencyKeyRace, against holds' own unique
+// constraint rather than bookings'.
+export async function resolveHoldIdempotencyKeyRace(
+  client: PoolClient,
+  idempotencyKey: string,
+  err: unknown,
+): Promise<HoldSeatsResult> {
+  if (!isUniqueViolation(err, "holds_idempotency_key_key")) {
+    throw err;
+  }
+  const existing = await findExistingHoldByIdempotencyKey(client, idempotencyKey);
+  if (!existing) {
+    throw new Error(`Expected a hold with idempotency_key "${idempotencyKey}" after a unique-violation, found none`);
+  }
+  return { kind: "idempotent_replay", holdId: existing.id, seatIds: existing.seatIds, heldUntil: existing.heldUntil };
+}
+
+// Hold's counterpart to runTransactionalBooking. No deadlock-retry variant
+// exists for holds (ADR-0017/issue #38's scope): pessimistic's NOWAIT
+// acquisition can't deadlock (ADR-0006), and sorting seat_ids once before
+// acquisition (done by every hold caller, mirroring the other mechanisms'
+// consistency-only sort) is enough on its own.
+export async function runTransactionalHold(
+  client: PoolClient,
+  idempotencyKey: string,
+  work: (client: PoolClient) => Promise<HoldSeatsResult>,
+): Promise<HoldSeatsResult> {
+  try {
+    return await withTransaction(client, work, (result) => result.kind === "created");
+  } catch (err) {
+    return await resolveHoldIdempotencyKeyRace(client, idempotencyKey, err);
   }
 }
