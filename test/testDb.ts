@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { FastifyInstance } from "fastify";
 import type { PoolClient } from "pg";
 import { pool } from "../src/db/pool.js";
 
@@ -83,6 +84,33 @@ export async function withHeldRowLock<T>(lockSeatId: string, fn: () => Promise<T
     await lockClient.query("COMMIT");
     lockClient.release();
   }
+}
+
+// Creates a hold via the real HTTP flow (not a raw DB insert), used by every
+// test that needs a live hold to act on — confirm it, expire it, sweep it.
+// Shared rather than each caller (confirm's own contract tests, the
+// reaper's) defining its own copy of the identical POST /holds request
+// shape (found duplicated in code review).
+export async function createHold(
+  app: FastifyInstance,
+  seatIds: string[],
+  userId = "user-1",
+): Promise<{ id: string; seatIds: string[]; heldUntil: string }> {
+  const res = await app.inject({
+    method: "POST",
+    url: "/holds",
+    payload: { seat_ids: seatIds, user_id: userId, idempotency_key: randomUUID() },
+  });
+  const body = res.json() as { id: string; seat_ids: string[]; held_until: string };
+  return { id: body.id, seatIds: body.seat_ids, heldUntil: body.held_until };
+}
+
+// Backdates held_until directly against the DB — the deterministic way to
+// force an already-expired hold without a real wait. Shared by every test
+// that needs one (confirm's 410 test, the reaper's sweep tests) rather than
+// each repeating the same raw SQL (found duplicated in code review).
+export async function expireHold(seatIds: string[]): Promise<void> {
+  await pool.query("UPDATE seats SET held_until = now() - interval '1 second' WHERE id = ANY($1)", [seatIds]);
 }
 
 // Stages a deterministic race against a mechanism under test by intercepting

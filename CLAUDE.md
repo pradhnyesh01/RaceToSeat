@@ -240,9 +240,40 @@ stranding the real held seats; fixed by prefixing the synthesized key, proven by
 test that seeds a colliding direct booking first. The same pass also combined two sequential
 `DELETE`s into one CTE, removed a redundant per-seat `held_until` re-check (it's hold-uniform,
 same as `booked_by`), and dropped an unneeded `normalizeSeatIds` call on already-normalized
-values. Full test suite passes (144 tests, up from 134) and `npm run typecheck` is clean. The
-reaper (issue #40) remains the only unimplemented piece — a hold's seat still has no automatic
-path back to `'available'` if it's never confirmed.
+values. Full test suite passes (144 tests, up from 134) and `npm run typecheck` is clean.
+
+Issue #40 ships the reaper, closing out Phase 5's `1 → {2, 3} → 4` tracer-bullet sequence's last
+gap: a seat whose hold expires without ever being confirmed now has an automatic path back to
+`'available'`. `src/reaper.ts` exports `runReaperSweep(pool)` — one atomic, chained-CTE SQL
+statement (reset expired seats → delete their `hold_seats` rows → delete the now-empty `holds`
+rows), deliberately not three separate statements: each CTE's own `WHERE`/join is the actual
+check, so Postgres's normal EvalPlanQual re-check semantics protect it from the "precomputed stale
+id list" trap a naive read-then-write split would fall into under concurrent access from a racing
+`confirm` — and `startReaper(pool, intervalMs)`, a thin `setInterval` wrapper with a `stop()`
+handle, wired into `src/server.ts` only (not `createApp()`, which the test suite calls repeatedly
+and would otherwise leak real timers across files) and started only after `app.listen` confirms
+its port bind succeeded. Postgres-only, no Redis, per ADR-0018. A code-review pass caught and
+fixed six things before merge, none of them correctness-critical on their own (the cross-file
+tracer angle worked the reaper/confirm race by hand and confirmed no double-write is reachable)
+but each worth closing: (1) no index backed the sweep's `WHERE status = 'held' AND held_until <
+now()`, so every 5-second tick did a full `seats` table scan — fixed with a partial index,
+`seats_held_expiry_idx`, that only covers the currently-held subset; (2) `server.ts`'s shutdown
+handler stopped the reaper but exited immediately without draining in-flight requests or closing
+the pool, found independently by four review angles — fixed by awaiting `app.close()` then
+`pool.end()` before exit, re-verified with a manual SIGTERM smoke test; (3) the
+`BOOKING_STRATEGY=pessimistic` gate was duplicated as a literal comparison in both `app.ts` and
+`server.ts` — extracted into one `strategySupportsHolds()` predicate in `config.ts`; (4) the
+reaper was started before `app.listen`'s callback confirmed a successful port bind — moved inside
+it; (5) `createHold`/`expireHold` test helpers were duplicated between `reaper.test.ts` and
+`holdContract.ts` (the same duplication-at-two-occurrences pattern already fixed once for
+`withHeldRowLock` in issue #38's review) — extracted into `test/testDb.ts`, used by both; (6) no
+test covered `REAPER_INTERVAL_MS`'s `min: 1` validation the way `HOLD_TTL_SECONDS`'s already was —
+added, which surfaced a real gotcha along the way: a second dynamic `import("../src/config.js")`
+in the same test file replays Node's cached rejection from the first import rather than
+re-evaluating against the new env var, fixed with `vi.resetModules()`. Full test suite passes (150
+tests, up from 144) and `npm run typecheck` is clean. Phase 5's foundation (issues #38-#40) is now
+complete; issue #41 (the load-harness evidence run proving "no double-confirm, no permanently
+stuck seats" under adversarial timing) is the last piece.
 
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance

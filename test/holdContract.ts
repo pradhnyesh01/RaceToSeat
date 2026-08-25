@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.js";
-import { resetDb, seedEventWithSeats } from "./testDb.js";
+import { createHold, expireHold, resetDb, seedEventWithSeats } from "./testDb.js";
 
 // Shared behavioural contract for hold creation, mirroring bookingContract.ts's
 // runBookingContractTests shape and seam (HTTP in, HTTP + DB state out) —
@@ -276,15 +276,6 @@ export function runHoldConfirmContractTests(strategyLabel: string, createApp: ()
   describe(`POST /holds/:id/confirm (${strategyLabel} strategy)`, () => {
     beforeEach(resetDb);
 
-    async function createHold(app: FastifyInstance, seatIds: string[], userId = "user-1") {
-      const res = await app.inject({
-        method: "POST",
-        url: "/holds",
-        payload: { seat_ids: seatIds, user_id: userId, idempotency_key: randomUUID() },
-      });
-      return res.json() as { id: string; seat_ids: string[]; held_until: string };
-    }
-
     it("confirms a live hold into a booking", async () => {
       const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
       const app = createApp();
@@ -354,11 +345,9 @@ export function runHoldConfirmContractTests(strategyLabel: string, createApp: ()
       const hold = await createHold(app, [seatIdsByLabel.A1!]);
 
       // Seeded directly, not via a real wait — this doesn't require the
-      // reaper (issue #40) to exist, since confirm's own lazy check is what
-      // enforces expiry (ADR-0018).
-      await pool.query("UPDATE seats SET held_until = now() - interval '1 second' WHERE id = $1", [
-        seatIdsByLabel.A1,
-      ]);
+      // reaper to exist, since confirm's own lazy check is what enforces
+      // expiry (ADR-0018).
+      await expireHold([seatIdsByLabel.A1!]);
 
       const res = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
       expect(res.statusCode).toBe(410);

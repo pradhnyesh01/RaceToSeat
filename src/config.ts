@@ -53,4 +53,22 @@ export const config = {
   // and (with no reaper yet, issue #40) the seat it claimed would be stuck
   // 'held' with no path back to 'available'.
   holdTtlSeconds: intEnv("HOLD_TTL_SECONDS", 300, { min: 1 }),
+  // How often the reaper sweeps for expired holds. Env-overridable so the
+  // load-test harness can use a short interval to keep its expiry-evidence
+  // run fast, matching holdTtlSeconds' identical rationale. Only read by
+  // server.ts's process-lifecycle wiring, not by the sweep function itself
+  // (runReaperSweep takes its pool as a plain argument, no config coupling)
+  // — so this has no effect on tests, which call the sweep directly rather
+  // than waiting on the interval.
+  reaperIntervalMs: intEnv("REAPER_INTERVAL_MS", 5000, { min: 1 }),
 };
+
+// Single source of truth for "does this process's configured mechanism
+// support the hold flow" (ADR-0017/0019) — both app.ts (gating the hold
+// routes) and server.ts (gating the reaper) call this rather than each
+// independently comparing config.bookingStrategy to the literal string, so
+// the two can't drift out of sync with each other (found duplicated in code
+// review).
+export function strategySupportsHolds(): boolean {
+  return config.bookingStrategy === "pessimistic";
+}

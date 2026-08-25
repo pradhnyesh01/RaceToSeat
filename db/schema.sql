@@ -26,6 +26,15 @@ CREATE TABLE seats (
     UNIQUE (event_id, label)
 );
 
+-- Partial index for the reaper's driving predicate (issue #40,
+-- `WHERE status = 'held' AND held_until < now()`), found missing in code
+-- review: without it, every sweep — on a timer for the life of the process
+-- — does a full sequential scan of `seats`, most of which will never be
+-- `held` at any given moment. Partial (not a plain composite index) so it
+-- only indexes the small, currently-held subset instead of growing with the
+-- table's total historical seat count.
+CREATE INDEX seats_held_expiry_idx ON seats (held_until) WHERE status = 'held';
+
 CREATE TABLE bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT NOT NULL,

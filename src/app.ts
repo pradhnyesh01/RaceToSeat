@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { config } from "./config.js";
+import { strategySupportsHolds } from "./config.js";
 import { registerBookingsRoutes } from "./routes/bookings.js";
 import { registerHoldsRoutes } from "./routes/holds.js";
 import { registerSeatsRoutes } from "./routes/seats.js";
@@ -19,7 +19,7 @@ export function createApp() {
   // routes simply don't exist — a plain 404 — under any other
   // BOOKING_STRATEGY, keeping that env var the single honest source of truth
   // for which mechanism a running process actually executes (ADR-0019).
-  if (config.bookingStrategy === "pessimistic") {
+  if (strategySupportsHolds()) {
     registerHoldsRoutes(app);
   }
 
