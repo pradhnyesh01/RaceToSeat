@@ -13,7 +13,12 @@ export type { ConfirmHoldResult };
 // hijack that hold's later confirm into replaying an unrelated booking,
 // leaving the real seats stuck 'held' with no path back — caught in review,
 // closed here rather than relying on holds' ids being hard to guess).
-function confirmIdempotencyKey(holdId: string): string {
+// Exported so the load harness's hold-expiry pattern (issue #41) can compute
+// the identical key for its own ground-truth "did a confirm succeed"
+// query, instead of duplicating this string template — a drift between the
+// two would silently defeat that check (an unmatched key just returns zero
+// rows, not an error).
+export function confirmIdempotencyKey(holdId: string): string {
   return `hold-confirm:${holdId}`;
 }
 

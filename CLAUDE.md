@@ -275,6 +275,73 @@ tests, up from 144) and `npm run typecheck` is clean. Phase 5's foundation (issu
 complete; issue #41 (the load-harness evidence run proving "no double-confirm, no permanently
 stuck seats" under adversarial timing) is the last piece.
 
+Issue #41 closes out Phase 5 with a fifth k6 load pattern, `hold-expiry-race.k6.js`
+(`run.ts --pattern hold-expiry`), and a sixth exhibit doc. Unlike the other four patterns, it
+seeds via the real HTTP API rather than raw SQL: it seeds `--concurrency` distinct seats, holds
+every one of them through an actual `POST /holds` call (not a synthetic stand-in — the hold
+flow's response shape only exists behind the HTTP API), waits until every seeded hold's own
+`held_until` has passed, then fires two concurrent k6 scenarios at each one — 5 one-shot
+`POST /holds/{id}/confirm` attempts per hold (one-shot deliberately: the claim under test is that
+confirm *never* succeeds post-expiry, so retrying it would prove nothing extra), and 5 fresh
+`POST /holds` attempts per seat, each retrying on `409` with a short sleep (a real client that
+knows a hold is past TTL but still sees `409` would legitimately retry, since the only thing
+standing between "expired" and "available" is the reaper's own sweep timer, not a permanent
+condition). `--repeat` reseeds fresh seats/holds each attempt rather than resetting via an API
+call, unlike the other four patterns — there's no hold-cancellation endpoint to reset an
+already-raced seat back through, only confirm and reaper-driven expiry ever resolve a hold.
+`aggregate.ts` gains a third `--exhibit` mode, `f`, reading these reports into
+[docs/evidence/exhibit-f-phase5-hold-expiry.md](docs/evidence/exhibit-f-phase5-hold-expiry.md);
+unlike Exhibit C/E's per-strategy matrices, this reads a single most-recent report, since only
+`pessimistic` ever produces this pattern's reports (ADR-0017). Two ground-truth checks (not HTTP
+status codes) drive the exhibit's pass/fail: zero bookings created via the synthesized
+`hold-confirm:<id>` idempotency key for any hold this run seeded ("no late-succeeding confirms"),
+and zero seats still `status = 'held'` with an expired `held_until` well after the run finished
+("no permanently stuck seats") — both zero across 3 repeats × 200 seats in the measured run.
+Getting a clean measurement took two rounds of self-correction, both caught by directly probing
+the running server rather than trusting the first plausible-looking numbers: (1) the confirm
+route is bodyless and the k6 script's first draft still sent a JSON `Content-Type` header with a
+null body, which Fastify's parser rejects (`FST_ERR_CTP_EMPTY_JSON_BODY`) — every confirm attempt
+came back as an uncategorized "other" status until the header was dropped; (2) an initial
+timing choice (`FRESH_HOLD_MAX_ATTEMPTS` retry budget longer than `HOLD_TTL_SECONDS`) let a
+winning fresh hold expire and get re-won by a still-retrying straggler before the k6 run ended,
+producing a confusing second "winner" for a seat that was never actually double-held at any
+single instant (not a correctness bug — `hold_seats.seat_id UNIQUE` and each acquisition's own
+`FOR UPDATE NOWAIT` make concurrent double-holding structurally impossible — but noisy,
+sequential-generations evidence); fixed by keeping three budgets cleanly nested,
+`REAPER_INTERVAL_MS` < the fresh-hold retry budget < `HOLD_TTL_SECONDS` (measured run:
+1000ms / ~3s / 8s), documented inline in both the k6 script and the exhibit's Method section.
+
+A full 8-angle code-review pass (3 correctness + 3 cleanup + altitude + conventions, each
+independently verified) confirmed 9 findings, all fixed before merge: (1) the "hold-confirm:<id>"
+idempotency-key template the ground-truth "late confirm" query relies on was hand-copied into
+`run.ts` instead of imported — `pessimisticConfirm.ts` now exports `confirmIdempotencyKey` for the
+harness to reuse, so a future format change there can't silently desync the check into a false
+PASS; (2) seeding N holds in sequential 50-at-a-time batches (`RESET_BATCH_SIZE`, tuned for
+`resetSeatViaApi`'s DELETE reset, not for this timing-sensitive pattern) staggered their expiry
+enough that the harness's own committed evidence showed 2 of 3 repeats' confirm attempts always
+hitting an already-reaped hold (404), never a live-but-expired one (410) — the intended
+"confirm races a still-present, expired hold" scenario was going untested in most repeats; fixed
+with a dedicated, larger `HOLD_SEED_BATCH_SIZE` sized to fit this pattern's recommended
+concurrency (≤200) in one batch; (3) the ground-truth "stuck seat" and "fresh-hold winner" queries
+ran immediately after k6 exited, with no buffer against the independently-ticking reaper — a hold
+expiring in the race's final moments could read as a false-positive stuck seat or an undercounted
+winner purely from checking too early; fixed with a short grace sleep before both queries; (4) the
+`BOOKING_STRATEGY=pessimistic` gate was reimplemented inline instead of reusing `strategySupportsHolds()`
+from `config.ts` (extracted in issue #40's own review pass specifically so `app.ts`/`server.ts`
+couldn't drift out of sync) — now a third call site of the same helper; (5) the harness's own
+`FRESH_HOLD_RETRY_BUDGET_MS`/`HOLD_TTL_SECONDS` nesting requirement (finding 2 above) was asserted
+only in comments/prose with nothing enforcing it — `runHoldExpiryPattern` now validates the
+observed TTL against the retry budget before ever firing k6, turning that whole failure class into
+a clear startup error instead of confusing evidence; (6)-(7) two stale doc comments (a "Four load
+patterns" header left at four after this ticket added a fifth, and `Args.concurrency`'s per-pattern
+doc comment missing a hold-expiry bullet) fixed, the latter also now noting hold-expiry's 10x
+VU-per-seat multiplier (steeper than every other pattern's, previously undocumented); (8) a
+`seeds` field written into every report but never read by `aggregate.ts`'s Exhibit F removed as
+dead output; (9) CLAUDE.md declared issues #37/#41 complete while they were still open on
+GitHub — closed to match. The measurement was re-run after all fixes landed; the exhibit's numbers
+above are the post-fix run. Full test suite passes unmodified (150 tests) and `npm run typecheck`
+is clean. Phase 5 (todo.md, issues #37-#41) is now complete.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

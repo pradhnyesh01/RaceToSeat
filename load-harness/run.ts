@@ -4,7 +4,7 @@
 // DELETE /bookings/{id} endpoint (issue #8) rather than raw SQL or
 // reseeding — the harness exercises the same API surface it's evidencing.
 //
-// Four load patterns, selected via --pattern:
+// Five load patterns, selected via --pattern:
 //   hammer-seat (default): all CONCURRENCY requests race one seat
 //     (hammer-seat.k6.js) — the existing double-booking/correctness evidence.
 //   spread-seats: one VU per seat across CONCURRENCY distinct, pre-seeded
@@ -21,16 +21,36 @@
 //     Phase 4). --background-only drops the hot-seat stream, producing the
 //     matched no-contention baseline. Each stream's metrics are reported
 //     separately, not merged.
+//   hold-expiry: seeds CONCURRENCY distinct seats, holds all of them via the
+//     real POST /holds (pessimistic only, ADR-0017), waits past every
+//     hold's TTL, then fires concurrent POST /holds/{id}/confirm attempts
+//     and fresh POST /holds attempts at each one (hold-expiry-race.k6.js) —
+//     Phase 5's "expire under load" race (issue #41): no confirm should
+//     ever succeed on an already-expired hold, and every seat should
+//     eventually be re-claimable once the reaper releases it. Unlike the
+//     other four patterns, --repeat reseeds fresh seats/holds each attempt
+//     rather than resetting via an API call — there's no hold-cancellation
+//     endpoint to reset one through (only confirm and reaper-driven expiry
+//     ever resolve a hold), so reseeding is the only option. CONCURRENCY
+//     means "distinct seats seeded" here, same as spread-seats, but each
+//     seat gets 5 concurrent confirm attempts *and* 5 concurrent fresh-hold
+//     attempts (hold-expiry-race.k6.js's ATTEMPTS_PER_SEAT) — 10x
+//     CONCURRENCY total k6 VUs, a steeper multiplier than any other pattern
+//     (deadlock-pairs' own 2x is the next-highest). Keep CONCURRENCY modest
+//     for this pattern (the measured exhibit uses 200, not the 1000
+//     default) or the VU count can climb into the tens of thousands.
 //
-// Usage: tsx load-harness/run.ts [--concurrency 1000] [--repeat 2] [--base-url http://localhost:3000] [--pattern hammer-seat|spread-seats|deadlock-pairs|isolation] [--background-only]
+// Usage: tsx load-harness/run.ts [--concurrency 1000] [--repeat 2] [--base-url http://localhost:3000] [--pattern hammer-seat|spread-seats|deadlock-pairs|isolation|hold-expiry] [--background-only]
 import { randomUUID } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
+import { config, strategySupportsHolds } from "../src/config.js";
 import { pool } from "../src/db/pool.js";
+import { confirmIdempotencyKey } from "../src/strategies/pessimisticConfirm.js";
 
-type Pattern = "hammer-seat" | "spread-seats" | "deadlock-pairs" | "isolation";
+type Pattern = "hammer-seat" | "spread-seats" | "deadlock-pairs" | "isolation" | "hold-expiry";
 
 interface Args {
   // hammer-seat: number of concurrent requests racing the one target seat.
@@ -38,6 +58,11 @@ interface Args {
   // deadlock-pairs: number of disjoint 2-seat pairs seeded (2x seats, 2x VUs).
   // isolation: both the hot-seat burst size and the background stream's
   // distinct-seat count (see --background-only below).
+  // hold-expiry: number of distinct seats seeded and held — 10x VUs total
+  // (5 concurrent confirm attempts + 5 concurrent fresh-hold attempts per
+  // seat, hold-expiry-race.k6.js's ATTEMPTS_PER_SEAT), the steepest
+  // multiplier of any pattern here — keep this modest (the measured
+  // exhibit uses 200).
   concurrency: number;
   baseUrl: string;
   repeat: number;
@@ -57,9 +82,15 @@ function parsePositiveInt(flag: string, value: string | undefined): number {
 }
 
 function parsePattern(value: string | undefined): Pattern {
-  if (value !== "hammer-seat" && value !== "spread-seats" && value !== "deadlock-pairs" && value !== "isolation") {
+  if (
+    value !== "hammer-seat" &&
+    value !== "spread-seats" &&
+    value !== "deadlock-pairs" &&
+    value !== "isolation" &&
+    value !== "hold-expiry"
+  ) {
     throw new Error(
-      `--pattern must be "hammer-seat", "spread-seats", "deadlock-pairs", or "isolation", got ${JSON.stringify(value)}`,
+      `--pattern must be "hammer-seat", "spread-seats", "deadlock-pairs", "isolation", or "hold-expiry", got ${JSON.stringify(value)}`,
     );
   }
   return value;
@@ -139,6 +170,71 @@ async function seedDeadlockPairs(n: number): Promise<{ eventId: string; pairs: [
     pairs.push([seatIds[i]!, seatIds[i + 1]!]);
   }
   return { eventId, pairs };
+}
+
+// Sized well above the concurrency this pattern is documented to run at
+// (≤200, see Args.concurrency's hold-expiry note) so seeding fits in one
+// batch rather than several sequential ones — unlike resetSeatViaApi's
+// DELETE reset below (not timing-sensitive), this pattern's evidence
+// depends on every seeded hold expiring close together: the harness waits
+// for only the *last*-seeded hold's TTL before firing the race (see
+// runHoldExpiryPattern), so an earlier-seeded hold sits expired for longer
+// and gives the independently-ticking reaper more chances to sweep it
+// first — collapsing the intended "confirm races a still-present, expired
+// hold" scenario into "confirm hits an already-404 hold" for that seat.
+// Chunking at all (rather than one unbounded Promise.all) still guards
+// against a much larger, undocumented --concurrency opening too many
+// sockets at once.
+const HOLD_SEED_BATCH_SIZE = 250;
+
+// Seeds N distinct seats, then holds every one of them via a real
+// POST /holds call (not raw SQL) — the hold flow's TTL/response shape only
+// exist behind the HTTP API, so this is the only way to seed a genuinely
+// expired hold rather than a synthetic stand-in for one. Requires
+// BOOKING_STRATEGY=pessimistic on the running server (ADR-0017) — checked
+// by the caller, not here.
+async function seedHoldExpirySeats(
+  baseUrl: string,
+  n: number,
+): Promise<{ eventId: string; seatIds: string[]; holdIds: string[]; heldUntils: Date[]; seedStartedAt: Date }> {
+  const seedStartedAt = new Date();
+  const { eventId, seatIds } = await seedSpreadSeats(n);
+
+  const holdIds: string[] = new Array<string>(n);
+  const heldUntils: Date[] = new Array<Date>(n);
+  const runId = randomUUID();
+  for (let i = 0; i < seatIds.length; i += HOLD_SEED_BATCH_SIZE) {
+    const batch = seatIds.slice(i, i + HOLD_SEED_BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (seatId, offsetInBatch) => {
+        const index = i + offsetInBatch;
+        const res = await fetch(`${baseUrl}/holds`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            seat_ids: [seatId],
+            user_id: `load-harness-seed-${index}`,
+            idempotency_key: `${runId}-seed-hold-${index}`,
+          }),
+        });
+        if (res.status !== 201) {
+          throw new Error(
+            `Failed to seed hold: POST /holds for seat ${seatId} returned ${res.status}. ` +
+              `Is the server running with BOOKING_STRATEGY=pessimistic?`,
+          );
+        }
+        const body = (await res.json()) as { id: string; held_until: string };
+        holdIds[index] = body.id;
+        heldUntils[index] = new Date(body.held_until);
+      }),
+    );
+  }
+
+  return { eventId, seatIds, holdIds, heldUntils, seedStartedAt };
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 interface K6Summary {
@@ -308,6 +404,260 @@ async function resetSeatViaApi(baseUrl: string, bookingIds: string[]): Promise<v
   }
 }
 
+// --- hold-expiry pattern (issue #41) ---
+
+interface ConfirmTally {
+  created: number;
+  expired: number;
+  conflict: number;
+  notFound: number;
+  other: number;
+}
+
+interface FreshHoldTally {
+  created: number;
+  conflict: number;
+  notFound: number;
+  other: number;
+}
+
+interface HoldExpiryRunReport {
+  attempt: number;
+  ranAt: string;
+  durationMs: number;
+  seatCount: number;
+  confirmTally: ConfirmTally;
+  freshHoldTally: FreshHoldTally;
+  // Ground truth, not read off HTTP responses (see runHoldExpiryRace):
+  // bookings created by a confirm on an already-expired hold. The single
+  // hard correctness claim this pattern exists to test — should always be 0.
+  lateConfirmCount: number;
+  // A seat still 'held' past its own held_until, well after the race fired
+  // — neither confirmed nor reaped. Should always be 0.
+  stuckSeatCount: number;
+  // A seat whose current live hold_seats row belongs to a hold id this run
+  // did NOT seed — i.e. a fresh POST /holds attempt won it back after
+  // release.
+  freshHoldWinnerCount: number;
+  anyLateConfirm: boolean;
+  anyStuckSeat: boolean;
+}
+
+async function runHoldExpiryRace(
+  args: Args,
+  seatIds: string[],
+  holdIds: string[],
+  attempt: number,
+): Promise<HoldExpiryRunReport> {
+  const runId = randomUUID();
+  const scriptPath = fileURLToPath(new URL("./hold-expiry-race.k6.js", import.meta.url));
+  const summaryPath = fileURLToPath(new URL(`../docs/evidence/.k6-summary-${runId}.json`, import.meta.url));
+  await mkdir(new URL("../docs/evidence/", import.meta.url), { recursive: true });
+
+  console.log(
+    `Firing concurrent confirm + fresh-hold attempts at ${holdIds.length} already-expired hold(s) via k6...`,
+  );
+  const startedAt = new Date();
+  const k6Result = spawnSync(
+    "k6",
+    ["run", `--summary-export=${summaryPath}`, scriptPath],
+    {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        BASE_URL: args.baseUrl,
+        RUN_ID: runId,
+        HOLD_IDS: JSON.stringify(holdIds),
+        SEAT_IDS: JSON.stringify(seatIds),
+      },
+    },
+  );
+  const finishedAt = new Date();
+
+  if (k6Result.error) {
+    throw new Error(
+      `Failed to run k6 (is it installed? \`brew install k6\`): ${k6Result.error.message}`,
+    );
+  }
+  if (k6Result.status !== 0) {
+    throw new Error(`k6 exited with status ${k6Result.status}`);
+  }
+
+  const summary: K6Summary = JSON.parse(await readFile(summaryPath, "utf8"));
+  await rm(summaryPath);
+
+  // A grace pause before either ground-truth query below: the reaper ticks
+  // on its own fixed interval, independent of when k6 happened to finish,
+  // so a hold whose TTL elapsed in the race's final moments (a losing
+  // fresh-hold VU still mid-retry, or a just-won fresh hold) could
+  // legitimately be un-swept for a moment after k6 exits — without this,
+  // that reads as a false "stuck seat" or an undercounted fresh-hold
+  // winner rather than what it actually is, a timing artifact of checking
+  // too early.
+  await sleep(1500);
+
+  const confirmTally: ConfirmTally = {
+    created: metricCount(summary, "confirm_created"),
+    expired: metricCount(summary, "confirm_expired"),
+    conflict: metricCount(summary, "confirm_conflict"),
+    notFound: metricCount(summary, "confirm_not_found"),
+    other: metricCount(summary, "confirm_other_status"),
+  };
+  const freshHoldTally: FreshHoldTally = {
+    created: metricCount(summary, "freshhold_created"),
+    conflict: metricCount(summary, "freshhold_conflict"),
+    notFound: metricCount(summary, "freshhold_not_found"),
+    other: metricCount(summary, "freshhold_other_status"),
+  };
+
+  // Ground truth for "no late-succeeding confirms / no double-confirms":
+  // read straight from bookings via the synthesized idempotency key
+  // pessimisticConfirm.ts's own confirmIdempotencyKey produces (imported,
+  // not re-derived here — a hand-copied string template would silently
+  // stop matching, and thus silently stop catching anything, if that
+  // format ever changed), not from HTTP responses — even a single row here
+  // means a confirm succeeded on a hold this run only ever fired at after
+  // its TTL had already passed.
+  const confirmIdempotencyKeys = holdIds.map((id) => confirmIdempotencyKey(id));
+  const { rows: lateConfirms } = await pool.query<{ id: string }>(
+    `SELECT id FROM bookings WHERE idempotency_key = ANY($1)`,
+    [confirmIdempotencyKeys],
+  );
+
+  // Ground truth for "no permanently stuck seats": a seat still 'held' past
+  // its own held_until, this long after the race fired and the k6 run
+  // finished, means neither a confirm nor the reaper ever resolved it.
+  const { rows: seatRows } = await pool.query<{ id: string; status: string; held_until: string | null }>(
+    `SELECT id, status, held_until FROM seats WHERE id = ANY($1)`,
+    [seatIds],
+  );
+  const stuckSeats = seatRows.filter(
+    (seat) => seat.status === "held" && seat.held_until !== null && new Date(seat.held_until).getTime() < Date.now(),
+  );
+
+  // Ground truth for "a fresh hold succeeds once the seat is released": a
+  // seat's current hold_seats row (if any) whose hold_id is NOT one of the
+  // original (now-expired) holds this run seeded means a fresh POST /holds
+  // attempt won it back.
+  const { rows: currentHoldRows } = await pool.query<{ seat_id: string; hold_id: string }>(
+    `SELECT seat_id, hold_id FROM hold_seats WHERE seat_id = ANY($1)`,
+    [seatIds],
+  );
+  const originalHoldIds = new Set(holdIds);
+  const freshHoldWinners = currentHoldRows.filter((row) => !originalHoldIds.has(row.hold_id));
+
+  const report: HoldExpiryRunReport = {
+    attempt,
+    ranAt: startedAt.toISOString(),
+    durationMs: finishedAt.getTime() - startedAt.getTime(),
+    seatCount: seatIds.length,
+    confirmTally,
+    freshHoldTally,
+    lateConfirmCount: lateConfirms.length,
+    stuckSeatCount: stuckSeats.length,
+    freshHoldWinnerCount: freshHoldWinners.length,
+    anyLateConfirm: lateConfirms.length > 0,
+    anyStuckSeat: stuckSeats.length > 0,
+  };
+
+  console.log(JSON.stringify(report, null, 2));
+  if (report.anyLateConfirm) {
+    console.error(
+      `\n*** LATE CONFIRM SUCCEEDED on an already-expired hold: ${lateConfirms.length} booking(s). ***`,
+    );
+  }
+  if (report.anyStuckSeat) {
+    console.error(`\n*** ${stuckSeats.length} seat(s) permanently stuck 'held' past their own expiry. ***`);
+  }
+  if (!report.anyLateConfirm && !report.anyStuckSeat) {
+    console.log(
+      `\nNo late-succeeding confirms; ${freshHoldWinners.length}/${seatIds.length} seat(s) already re-claimed by a fresh hold.`,
+    );
+  }
+
+  return report;
+}
+
+// Mirrors hold-expiry-race.k6.js's own FRESH_HOLD_MAX_ATTEMPTS /
+// FRESH_HOLD_RETRY_SLEEP_SECONDS — duplicated rather than threaded through
+// as env vars because run.ts needs the *number* pre-flight (see the
+// validation below), before k6 ever runs. Keep in sync with the k6 script
+// if either changes.
+const FRESH_HOLD_RETRY_BUDGET_MS = 10 * 0.3 * 1000;
+
+async function runHoldExpiryPattern(args: Args) {
+  if (!strategySupportsHolds()) {
+    throw new Error(
+      `--pattern hold-expiry requires BOOKING_STRATEGY=pessimistic on the running server ` +
+        `(the only mechanism the hold flow exists for, ADR-0017), got ${JSON.stringify(config.bookingStrategy)}`,
+    );
+  }
+  const strategy = config.bookingStrategy;
+
+  const runs: HoldExpiryRunReport[] = [];
+  // Unlike the other four patterns' single seed-once-then-reset loop, each
+  // attempt here reseeds fresh seats/holds — see the pattern-summary
+  // comment at the top of this file for why (no hold-cancellation endpoint
+  // exists to reset an already-raced seat back through).
+  for (let attempt = 1; attempt <= args.repeat; attempt += 1) {
+    console.log(`\n=== Run ${attempt}/${args.repeat} (strategy=${strategy}, pattern=hold-expiry) ===`);
+
+    console.log(`Seeding ${args.concurrency} distinct seats and holding all of them via POST /holds...`);
+    const { seatIds, holdIds, heldUntils, seedStartedAt } = await seedHoldExpirySeats(args.baseUrl, args.concurrency);
+
+    // The earliest-seeded hold's own TTL (its held_until minus roughly when
+    // seeding started) is the tightest budget any fresh-hold VU actually
+    // gets: a fresh hold created near the start of the race shares the same
+    // server-configured HOLD_TTL_SECONDS, and if the retry loop's own
+    // budget isn't safely under that, a winning VU's brand-new hold can
+    // itself expire and get re-won by a still-retrying straggler before the
+    // k6 run ends — not a correctness bug (each acquisition is still
+    // legitimately sequential, not concurrent), but confusing,
+    // multiple-"winner" evidence for a seat that was never actually
+    // double-held at any single instant. Caught by hand during this
+    // pattern's own development; enforced here so it can't recur silently.
+    const earliestExpiryMs = Math.min(...heldUntils.map((d) => d.getTime()));
+    const observedTtlMs = earliestExpiryMs - seedStartedAt.getTime();
+    if (FRESH_HOLD_RETRY_BUDGET_MS >= observedTtlMs) {
+      throw new Error(
+        `hold-expiry's fresh-hold retry budget (~${FRESH_HOLD_RETRY_BUDGET_MS}ms) is not safely under the ` +
+          `observed HOLD_TTL_SECONDS (~${observedTtlMs}ms) — a winning fresh hold could expire and get re-won ` +
+          `before the run ends. Start the server with a larger HOLD_TTL_SECONDS.`,
+      );
+    }
+
+    const latestExpiry = Math.max(...heldUntils.map((d) => d.getTime()));
+    const waitMs = Math.max(0, latestExpiry - Date.now()) + 250;
+    console.log(`Waiting ${waitMs}ms for every seeded hold to pass its TTL...`);
+    await sleep(waitMs);
+
+    const report = await runHoldExpiryRace(args, seatIds, holdIds, attempt);
+    runs.push(report);
+  }
+
+  if (runs.length > 0) {
+    const combined = {
+      strategy,
+      pattern: args.pattern,
+      concurrency: args.concurrency,
+      runs,
+      anyLateConfirm: runs.some((r) => r.anyLateConfirm),
+      anyStuckSeat: runs.some((r) => r.anyStuckSeat),
+    };
+
+    const outPath = new URL(
+      `../docs/evidence/${strategy}-hold-expiry-load-run-${runs[0]!.ranAt.replace(/[:.]/g, "-")}.json`,
+      import.meta.url,
+    );
+    await writeFile(outPath, JSON.stringify(combined, null, 2));
+    console.log(`\nReport written to ${outPath.pathname}`);
+
+    if (combined.anyLateConfirm || combined.anyStuckSeat) {
+      process.exitCode = 1;
+    }
+  }
+}
+
 async function main() {
   try {
     await run();
@@ -328,6 +678,8 @@ async function run() {
     await runDeadlockPairsPattern(args);
   } else if (args.pattern === "isolation") {
     await runIsolationPattern(args);
+  } else if (args.pattern === "hold-expiry") {
+    await runHoldExpiryPattern(args);
   } else {
     await runHammerPattern(args);
   }
