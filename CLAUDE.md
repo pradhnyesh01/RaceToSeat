@@ -210,6 +210,40 @@ seat that enters `'held'` via this ticket currently has no path back to `'availa
 to `'booked'`, expected and tracked, not a defect in this ticket's own scope. Full test suite
 passes (134 tests, up from 118) and `npm run typecheck` is clean.
 
+Issue #39 ships confirm: `POST /holds/{id}/confirm` converts a live hold into a real booking. It's
+bodyless — the hold id in the URL path is the sole capability, no ownership check, mirroring
+`DELETE /bookings/{id}`'s existing precedent — and reuses a new shared booking-creation-tail
+helper, `insertBookingForSeats` (`src/strategies/idempotency.ts`), factored out of
+`pessimistic.ts`'s existing `POST /bookings` write path rather than duplicated (that refactor is
+behavior-preserving: same three statements, same columns, only addition is an unconditional
+`held_until = NULL`, a no-op for the booking path but load-bearing for confirm's). Implemented in
+`src/strategies/pessimisticConfirm.ts`: `hold_seats` and `seats` are read and locked in one atomic
+`JOIN ... FOR UPDATE OF s NOWAIT` statement (not two separate queries — see below for why that
+matters), `bookings.idempotency_key` for the resulting row is synthesized from the hold's id
+(prefixed `hold-confirm:<id>`, not the raw id — see below), and the result maps to `201`
+(created/idempotent-replay), `410` (expired — checked by confirm itself as a lazy backstop
+independent of the not-yet-built reaper, ADR-0018), `409` (lost the row lock to a genuinely
+concurrent confirm, reusing `pessimistic.ts`'s NOWAIT-conflict translation), or `404`
+(unknown/malformed/already-resolved hold id, matching `DELETE /bookings/{id}`'s malformed-id
+handling). A code-review pass caught two real bugs before merge, both found independently by two
+of the eight review angles each: (1) the original design read `hold_seats` and locked `seats` as
+two separate round-trip queries, leaving a real gap for a concurrent confirm on the same hold to
+fully commit in between — the loser's now-uncontested `NOWAIT` lock would then succeed and read
+the seat as already `'booked'`, misreporting `410 Gone` instead of replaying the winner's booking;
+fixed at the root by combining both reads into one atomic statement (a defensive
+status-isn't-`'held'` fallback stayed in as extra insurance) rather than patching around it. (2)
+The synthesized idempotency key was the hold's raw id with no namespace, sharing one flat
+`TEXT` column with whatever arbitrary string a client passes to `POST /bookings` directly (no
+format validation exists) — a client setting `idempotency_key` to another user's outstanding hold
+id could hijack that hold's later confirm into replaying an unrelated booking, permanently
+stranding the real held seats; fixed by prefixing the synthesized key, proven by a new regression
+test that seeds a colliding direct booking first. The same pass also combined two sequential
+`DELETE`s into one CTE, removed a redundant per-seat `held_until` re-check (it's hold-uniform,
+same as `booked_by`), and dropped an unneeded `normalizeSeatIds` call on already-normalized
+values. Full test suite passes (144 tests, up from 134) and `npm run typecheck` is clean. The
+reaper (issue #40) remains the only unimplemented piece — a hold's seat still has no automatic
+path back to `'available'` if it's never confirmed.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

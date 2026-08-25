@@ -1,4 +1,6 @@
 import type { FastifyInstance } from "fastify";
+import { isInvalidTextRepresentation } from "../db/pgErrors.js";
+import { confirmHoldPessimistic } from "../strategies/pessimisticConfirm.js";
 import { holdSeatsPessimistic } from "../strategies/pessimisticHold.js";
 import { validateSeatClaimBody } from "./validation.js";
 
@@ -30,6 +32,47 @@ export function registerHoldsRoutes(app: FastifyInstance): void {
         return;
       case "not_found":
         reply.status(404).send({ error: "Seat not found" });
+        return;
+    }
+  });
+
+  // Bodyless: confirm is identified entirely by the hold id in the path, no
+  // ownership check (mirrors DELETE /bookings/{id}'s precedent — the id
+  // alone is the capability).
+  app.post("/holds/:id/confirm", async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    let result;
+    try {
+      result = await confirmHoldPessimistic(id);
+    } catch (err) {
+      // Same rationale as DELETE /bookings/{id}: a malformed (non-UUID) id
+      // throws 22P02 from the first UUID-typed column comparison, caught
+      // here rather than surfacing as a 500.
+      if (isInvalidTextRepresentation(err)) {
+        reply.status(404).send({ error: "Hold not found" });
+        return;
+      }
+      throw err;
+    }
+
+    // Every mechanism's booking-creating endpoint carries this header
+    // (ADR-0012) — always "0" here, since pessimistic never retries.
+    reply.header("X-Booking-Retries", "0");
+
+    switch (result.kind) {
+      case "created":
+      case "idempotent_replay":
+        reply.status(201).send({ id: result.bookingId, created_at: result.createdAt });
+        return;
+      case "expired":
+        reply.status(410).send({ error: "Hold has expired" });
+        return;
+      case "conflict":
+        reply.status(409).send({ error: "Hold is being confirmed by another request" });
+        return;
+      case "not_found":
+        reply.status(404).send({ error: "Hold not found" });
         return;
     }
   });

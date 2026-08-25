@@ -168,3 +168,37 @@ export async function runTransactionalHold(
     return await resolveHoldIdempotencyKeyRace(client, idempotencyKey, err);
   }
 }
+
+// Shared booking-creation tail (issue #39's acceptance criterion): insert
+// bookings + booking_seats, then flip every named seat to 'booked'. Used by
+// a direct booking (pessimistic.ts, seats start 'available') and by
+// confirming a hold (pessimisticConfirm.ts, seats start 'held') alike — the
+// only difference between those two callers is what state seatIds started
+// in, already checked before either one calls this. `held_until = NULL` is
+// unconditional rather than confirm-only: a no-op for the already-NULL
+// direct-booking case, but it keeps "status = 'booked' implies held_until IS
+// NULL" a mechanism-wide invariant instead of something only confirm's
+// caller has to remember to clear.
+export async function insertBookingForSeats(
+  txClient: PoolClient,
+  seatIds: string[],
+  userId: string,
+  idempotencyKey: string,
+): Promise<{ bookingId: string; createdAt: Date }> {
+  const bookingRes = await txClient.query<{ id: string; created_at: Date }>(
+    "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id, created_at",
+    [userId, idempotencyKey],
+  );
+  const booking = bookingRes.rows[0]!;
+
+  await txClient.query("INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])", [
+    booking.id,
+    seatIds,
+  ]);
+  await txClient.query(
+    "UPDATE seats SET status = 'booked', booked_by = $1, held_until = NULL, version = version + 1 WHERE id = ANY($2)",
+    [userId, seatIds],
+  );
+
+  return { bookingId: booking.id, createdAt: booking.created_at };
+}

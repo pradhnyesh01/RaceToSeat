@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
 import { isLockNotAvailable } from "../db/pgErrors.js";
-import { findExistingBookingByIdempotencyKey, runTransactionalBooking } from "./idempotency.js";
+import { findExistingBookingByIdempotencyKey, insertBookingForSeats, runTransactionalBooking } from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -70,22 +70,8 @@ export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSea
         return { kind: "conflict" };
       }
 
-      const bookingRes = await txClient.query<{ id: string; created_at: Date }>(
-        "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id, created_at",
-        [input.userId, input.idempotencyKey],
-      );
-      const booking = bookingRes.rows[0]!;
-
-      await txClient.query(
-        "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
-        [booking.id, seatIds],
-      );
-      await txClient.query(
-        "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
-        [input.userId, seatIds],
-      );
-
-      return { kind: "created", bookingId: booking.id, createdAt: booking.created_at };
+      const { bookingId, createdAt } = await insertBookingForSeats(txClient, seatIds, input.userId, input.idempotencyKey);
+      return { kind: "created", bookingId, createdAt };
     });
   } finally {
     client.release();

@@ -34,3 +34,16 @@ export interface HoldSeatsInput {
   userId: string;
   idempotencyKey: string;
 }
+
+// Confirm has no retry_exhausted/retries either, same reasoning as
+// HoldSeatsResult: pessimistic-only, no retry loop. `expired` is the one
+// outcome unique to confirm — a hold whose seat row(s) were locked
+// successfully but whose TTL had already elapsed by the time this
+// transaction observed it, whether or not the reaper has physically swept
+// it yet (ADR-0018's lazy-backstop design).
+export type ConfirmHoldResult =
+  | { kind: "created"; bookingId: string; createdAt: Date }
+  | { kind: "idempotent_replay"; bookingId: string; createdAt: Date }
+  | { kind: "expired" }
+  | { kind: "conflict" }
+  | { kind: "not_found" };

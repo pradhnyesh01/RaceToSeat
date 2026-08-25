@@ -32,4 +32,15 @@ describe("POST /holds — strategy gating", () => {
 
     expect(res.statusCode).toBe(404);
   });
+
+  it("404s POST /holds/:id/confirm too, when BOOKING_STRATEGY is not pessimistic", async () => {
+    const app = createApp();
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/holds/00000000-0000-0000-0000-000000000000/confirm",
+    });
+
+    expect(res.statusCode).toBe(404);
+  });
 });

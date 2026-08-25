@@ -265,6 +265,173 @@ export function runMultiSeatHoldContractTests(strategyLabel: string, createApp: 
   });
 }
 
+// Shared behavioural contract for hold confirmation (issue #39), mirroring
+// runHoldContractTests' seam/calling convention: HTTP in, HTTP + DB state
+// out, called from exactly one strategy file since confirm is pessimistic-
+// only (ADR-0017). The 409 (lost the row lock to a genuinely concurrent
+// confirm) case lives in pessimisticHold.test.ts instead, alongside that
+// file's own NOWAIT-conflict tests, since it needs withHeldRowLock (a
+// pessimistic-specific technique) rather than anything shared here.
+export function runHoldConfirmContractTests(strategyLabel: string, createApp: () => FastifyInstance): void {
+  describe(`POST /holds/:id/confirm (${strategyLabel} strategy)`, () => {
+    beforeEach(resetDb);
+
+    async function createHold(app: FastifyInstance, seatIds: string[], userId = "user-1") {
+      const res = await app.inject({
+        method: "POST",
+        url: "/holds",
+        payload: { seat_ids: seatIds, user_id: userId, idempotency_key: randomUUID() },
+      });
+      return res.json() as { id: string; seat_ids: string[]; held_until: string };
+    }
+
+    it("confirms a live hold into a booking", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const hold = await createHold(app, [seatIdsByLabel.A1!], "user-1");
+
+      const res = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
+      const body = res.json() as { id: string; created_at: string };
+
+      expect(res.statusCode).toBe(201);
+      expect(body.id).toBeTypeOf("string");
+      expect(res.headers["x-booking-retries"]).toBe("0");
+
+      const seatRes = await pool.query("SELECT status, booked_by, held_until, version FROM seats WHERE id = $1", [
+        seatIdsByLabel.A1,
+      ]);
+      expect(seatRes.rows[0]).toMatchObject({ status: "booked", booked_by: "user-1", held_until: null, version: 2 });
+
+      const bookingSeatsRes = await pool.query("SELECT booking_id FROM booking_seats WHERE seat_id = $1", [
+        seatIdsByLabel.A1,
+      ]);
+      expect(bookingSeatsRes.rows).toHaveLength(1);
+      expect(bookingSeatsRes.rows[0].booking_id).toBe(body.id);
+
+      const holdSeatsRes = await pool.query("SELECT 1 FROM hold_seats WHERE hold_id = $1", [hold.id]);
+      expect(holdSeatsRes.rows).toHaveLength(0);
+      const holdsRes = await pool.query("SELECT 1 FROM holds WHERE id = $1", [hold.id]);
+      expect(holdsRes.rows).toHaveLength(0);
+    });
+
+    it("confirms every seat in a multi-seat hold atomically", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2"]);
+      const app = createApp();
+      const hold = await createHold(app, [seatIdsByLabel.A1!, seatIdsByLabel.A2!]);
+
+      const res = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
+      const body = res.json() as { id: string };
+
+      expect(res.statusCode).toBe(201);
+
+      const seatRes = await pool.query("SELECT status FROM seats WHERE id = ANY($1)", [
+        [seatIdsByLabel.A1, seatIdsByLabel.A2],
+      ]);
+      expect(seatRes.rows.every((row) => row.status === "booked")).toBe(true);
+
+      const bookingSeatsRes = await pool.query("SELECT seat_id FROM booking_seats WHERE booking_id = $1", [
+        body.id,
+      ]);
+      expect(bookingSeatsRes.rows).toHaveLength(2);
+    });
+
+    it("has no ownership check — any caller with a valid hold id can confirm it", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const hold = await createHold(app, [seatIdsByLabel.A1!], "owner");
+
+      // No user_id / auth sent with the confirm at all — it's bodyless.
+      const res = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
+      expect(res.statusCode).toBe(201);
+
+      const seatRes = await pool.query("SELECT booked_by FROM seats WHERE id = $1", [seatIdsByLabel.A1]);
+      expect(seatRes.rows[0].booked_by).toBe("owner");
+    });
+
+    it("410s when the hold has already expired", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const hold = await createHold(app, [seatIdsByLabel.A1!]);
+
+      // Seeded directly, not via a real wait — this doesn't require the
+      // reaper (issue #40) to exist, since confirm's own lazy check is what
+      // enforces expiry (ADR-0018).
+      await pool.query("UPDATE seats SET held_until = now() - interval '1 second' WHERE id = $1", [
+        seatIdsByLabel.A1,
+      ]);
+
+      const res = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
+      expect(res.statusCode).toBe(410);
+
+      const seatRes = await pool.query("SELECT status FROM seats WHERE id = $1", [seatIdsByLabel.A1]);
+      expect(seatRes.rows[0].status).toBe("held");
+    });
+
+    it("404s for an unknown hold id", async () => {
+      const app = createApp();
+      const res = await app.inject({
+        method: "POST",
+        url: "/holds/00000000-0000-0000-0000-000000000000/confirm",
+      });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("404s (not 500) for a malformed hold id", async () => {
+      const app = createApp();
+      const res = await app.inject({ method: "POST", url: "/holds/not-a-uuid/confirm" });
+      expect(res.statusCode).toBe(404);
+    });
+
+    it("replays the same booking, not a duplicate, when confirm is retried on an already-confirmed hold", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const hold = await createHold(app, [seatIdsByLabel.A1!]);
+
+      const first = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
+      const second = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
+
+      const firstBody = first.json() as { id: string };
+      const secondBody = second.json() as { id: string };
+
+      expect(first.statusCode).toBe(201);
+      expect(second.statusCode).toBe(201);
+      expect(secondBody.id).toBe(firstBody.id);
+
+      const countRes = await pool.query("SELECT count(*)::int AS count FROM bookings");
+      expect(countRes.rows[0].count).toBe(1);
+    });
+
+    it("confirms its own hold correctly even if a direct booking was made with idempotency_key equal to this hold's raw id", async () => {
+      // Regression test (caught in code review): confirm synthesizes
+      // bookings.idempotency_key from the hold's own id. If that synthesized
+      // key weren't namespaced, a client-supplied idempotency_key on a
+      // direct POST /bookings equal to some other hold's raw id would
+      // collide with it — this proves confirm still finds/creates its own
+      // booking rather than replaying the unrelated one.
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2"]);
+      const app = createApp();
+      const hold = await createHold(app, [seatIdsByLabel.A1!], "holder");
+
+      const collidingBooking = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: { seat_ids: [seatIdsByLabel.A2], user_id: "other-user", idempotency_key: hold.id },
+      });
+      expect(collidingBooking.statusCode).toBe(201);
+      const collidingBody = collidingBooking.json() as { id: string };
+
+      const res = await app.inject({ method: "POST", url: `/holds/${hold.id}/confirm` });
+      const body = res.json() as { id: string };
+
+      expect(res.statusCode).toBe(201);
+      expect(body.id).not.toBe(collidingBody.id);
+
+      const seatA1 = await pool.query("SELECT status, booked_by FROM seats WHERE id = $1", [seatIdsByLabel.A1]);
+      expect(seatA1.rows[0]).toMatchObject({ status: "booked", booked_by: "holder" });
+    });
+  });
+}
+
 // Every mechanism's central claim, applied to holds: under real concurrency
 // at one seat, exactly one hold request wins. Mirrors
 // runBookingConcurrencyContractTest's shape.
