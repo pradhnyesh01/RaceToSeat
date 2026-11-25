@@ -1,0 +1,151 @@
+{
+  "label": "r3-after-kill-rep4",
+  "ranAt": "2026-11-25T10:48:32.437Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 60,
+    "fault": "backend-kill",
+    "killScope": "in-transaction",
+    "surviveUncaught": true,
+    "killIntervalMs": 40,
+    "killFraction": 0.3,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r3-after-kill-rep4",
+    "appPort": 3310,
+    "proxyPort": 5460,
+    "toxiproxyApi": "http://localhost:8477",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 60000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "84697c58-5bac-40de-bac6-5893efb6ffaf",
+  "requestsIssued": 120,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.3,
+    "stats": {
+      "sweeps": 12,
+      "terminated": 20,
+      "terminatedByState": {
+        "idle in transaction": 20
+      }
+    }
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 10,
+    "peakOpenTx": 33,
+    "peakIdleInTx": 31,
+    "peakLockHolders": 30,
+    "maxOpenTxAgeMs": 49,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 4,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 57,
+    "bookingsAnsweredWith201": 57,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 60000,
+  "appName": "c2-app-aabe4f7a",
+  "k6": {
+    "statusTally": {
+      "201": 57,
+      "409": 45,
+      "502": 18
+    },
+    "transportErrors": {},
+    "durationMs": 475,
+    "maxRequestMs": 147,
+    "p50RequestMs": 137,
+    "p95RequestMs": 147,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "[chaos preload] swallowed uncaughtException: terminating connection due to administrator command": 19,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: (no error; a designed no-commit result)": 2,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Client has encountered a connection error and is not query": 17,
+      "Error: Client has encountered a connection error and is not queryable": 17,
+      "[chaos preload] swallowed uncaughtException: Connection terminated unexpectedly": 1,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: terminating connection due to administrator command": 1,
+      "error: terminating connection due to administrator command": 1,
+      "severity: 'FATAL',": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 60,
+      "409": 60
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "infrastructure-failures-classified",
+      "detail": "18 request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)"
+    }
+  ]
+}

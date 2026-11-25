@@ -1,0 +1,138 @@
+{
+  "label": "r3-after-hold-confirm-oneshot-rep7",
+  "ranAt": "2026-11-25T10:53:32.639Z",
+  "args": {
+    "mode": "hold-confirm",
+    "concurrency": 100,
+    "fault": "backend-kill",
+    "surviveUncaught": true,
+    "killIntervalMs": 10,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 0,
+    "attemptsPerHold": 1,
+    "holdTtlSeconds": 120,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 0,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "r3-after-hold-confirm-oneshot-rep7",
+    "appPort": 3312
+  },
+  "scratchDatabase": "racetoseat_chaos_ae3b0a34",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "15c26136-95c6-4cbb-96d6-534b1cfd6210",
+  "holdsSeeded": 100,
+  "reaperStallSeats": 0,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 10,
+    "fraction": 0.5,
+    "postLoadFaultMs": 0,
+    "onlyApplicationName": "racetoseat-c3-app",
+    "stats": {
+      "sweeps": 31,
+      "terminated": 47,
+      "terminatedByState": {
+        "idle in transaction": 36,
+        "active": 11
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "201": 54,
+      "502": 46
+    },
+    "transportErrors": {},
+    "durationMs": 376,
+    "maxRequestMs": 67
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {
+      "[chaos preload] swallowed uncaughtException: Connection terminated unexpectedly": 45,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: terminating connection due to administrator command": 45,
+      "error: terminating connection due to administrator command": 45,
+      "severity: 'FATAL',": 45,
+      "[chaos preload] swallowed uncaughtException: terminating connection due to administrator command": 2,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Client has encountered a connection error and is not query": 1,
+      "Error: Client has encountered a connection error and is not queryable": 1
+    }
+  },
+  "confirmRetry": {
+    "tally": {
+      "201": 100
+    },
+    "bookedBeforeRetry": 54,
+    "createdByRetry": 46,
+    "unanswered": 0,
+    "heldLiveAtAnswer": 100
+  },
+  "seatStatusAtHeal": {
+    "held": 46,
+    "booked": 54
+  },
+  "finalState": {
+    "seats": {
+      "booked": 100
+    },
+    "confirmKeyBookings": 100,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "infrastructure-failures-classified",
+      "detail": "46 request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)"
+    },
+    {
+      "id": "uncaught-exceptions-swallowed-by-scaffold",
+      "detail": "47 uncaught exception(s) swallowed by --survive-uncaught (each would have crashed the unmodified app)"
+    }
+  ]
+}

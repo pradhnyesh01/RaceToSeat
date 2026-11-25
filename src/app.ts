@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { strategySupportsHolds } from "./config.js";
+import { isInfrastructureFailure } from "./db/pgErrors.js";
 import { registerBookingsRoutes } from "./routes/bookings.js";
 import { registerHoldsRoutes } from "./routes/holds.js";
 import { registerSeatsRoutes } from "./routes/seats.js";
@@ -9,6 +10,21 @@ export function createApp() {
 
   app.setErrorHandler((err, _request, reply) => {
     console.error(err);
+    // The database could not be reached or went away mid-request (ADR-0025):
+    // not a bug in this request (500), not a lost race (409), and deliberately
+    // not 503, which is retry_exhausted's alone (ADR-0012/0015). The request's
+    // outcome is unknown — a COMMIT may or may not have landed — so retrying
+    // with the same idempotency key is the safe way to find out.
+    if (isInfrastructureFailure(err)) {
+      reply
+        .header("Retry-After", "1")
+        .status(502)
+        .send({
+          error: "Database unavailable; the request's outcome is unknown. Retry with the same idempotency key.",
+          outcome: "infrastructure_failure",
+        });
+      return;
+    }
     reply.status(500).send({ error: "Internal server error" });
   });
 

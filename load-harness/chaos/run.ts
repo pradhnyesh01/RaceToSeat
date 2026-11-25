@@ -564,11 +564,22 @@ export function deriveRobustnessObservations(
       detail: `the app process exited ${app.exits.length} time(s) during the run (${app.exits.map((e) => `code=${e.code} signal=${e.signal}`).join("; ")})`,
     });
   }
-  const serverErrors = Object.entries(k6.statusTally).filter(([s]) => s.startsWith("5") && s !== "503");
+  // 502 is the designed infrastructure-failure outcome since #55 / ADR-0025
+  // ("the database was unreachable, outcome unknown, retry with the same key"):
+  // reported on its own, so it is neither hidden nor counted as an unclassified
+  // 500. Runs recorded before that fix have none.
+  const serverErrors = Object.entries(k6.statusTally).filter(([s]) => s.startsWith("5") && s !== "503" && s !== "502");
   if (serverErrors.length > 0) {
     found.push({
       id: "unclassified-server-errors",
-      detail: `requests answered with ${serverErrors.map(([s, n]) => `${n}x HTTP ${s}`).join(", ")} (not a designed outcome — only 201/409/404/503 are)`,
+      detail: `requests answered with ${serverErrors.map(([s, n]) => `${n}x HTTP ${s}`).join(", ")} (not a designed outcome — only 201/409/404/502/503 are)`,
+    });
+  }
+  const infraFailures = k6.statusTally["502"] ?? 0;
+  if (infraFailures > 0) {
+    found.push({
+      id: "infrastructure-failures-classified",
+      detail: `${infraFailures} request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)`,
     });
   }
   const noAnswer = k6.statusTally["0"] ?? 0;
