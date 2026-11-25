@@ -1,0 +1,81 @@
+{
+  "strategy": "pessimistic",
+  "pattern": "hold-expiry",
+  "concurrency": 200,
+  "runs": [
+    {
+      "attempt": 1,
+      "ranAt": "2026-08-25T08:48:13.427Z",
+      "durationMs": 4340,
+      "seatCount": 200,
+      "confirmTally": {
+        "created": 0,
+        "expired": 0,
+        "conflict": 0,
+        "notFound": 1000,
+        "other": 0
+      },
+      "freshHoldTally": {
+        "created": 200,
+        "conflict": 800,
+        "notFound": 0,
+        "other": 0
+      },
+      "lateConfirmCount": 0,
+      "stuckSeatCount": 0,
+      "freshHoldWinnerCount": 200,
+      "anyLateConfirm": false,
+      "anyStuckSeat": false
+    },
+    {
+      "attempt": 2,
+      "ranAt": "2026-08-25T08:48:27.636Z",
+      "durationMs": 5643,
+      "seatCount": 200,
+      "confirmTally": {
+        "created": 0,
+        "expired": 0,
+        "conflict": 0,
+        "notFound": 1000,
+        "other": 0
+      },
+      "freshHoldTally": {
+        "created": 200,
+        "conflict": 800,
+        "notFound": 0,
+        "other": 0
+      },
+      "lateConfirmCount": 0,
+      "stuckSeatCount": 0,
+      "freshHoldWinnerCount": 200,
+      "anyLateConfirm": false,
+      "anyStuckSeat": false
+    },
+    {
+      "attempt": 3,
+      "ranAt": "2026-08-25T08:48:43.130Z",
+      "durationMs": 4198,
+      "seatCount": 200,
+      "confirmTally": {
+        "created": 0,
+        "expired": 668,
+        "conflict": 332,
+        "notFound": 0,
+        "other": 0
+      },
+      "freshHoldTally": {
+        "created": 200,
+        "conflict": 800,
+        "notFound": 0,
+        "other": 0
+      },
+      "lateConfirmCount": 0,
+      "stuckSeatCount": 0,
+      "freshHoldWinnerCount": 200,
+      "anyLateConfirm": false,
+      "anyStuckSeat": false
+    }
+  ],
+  "anyLateConfirm": false,
+  "anyStuckSeat": false
+}

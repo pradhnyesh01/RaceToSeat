@@ -1,0 +1,173 @@
+{
+  "label": "c2ctl-app-sigkill-naive-no-unique-rep2",
+  "ranAt": "2026-11-25T06:09:05.225Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "app-sigkill",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": true,
+    "label": "c2ctl-app-sigkill-naive-no-unique-rep2",
+    "appPort": 3201,
+    "proxyPort": 5441,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 150,
+    "partitionMs": 8000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "becfa34f-d993-47e6-93be-f0cf91d3f2fd",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "app-sigkill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "appKill": {
+    "kills": 1,
+    "killedAtMs": [
+      320
+    ],
+    "restartMs": [
+      654
+    ],
+    "openTxAtKill": [
+      60
+    ]
+  },
+  "stall": {
+    "samples": 19,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 60,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 2,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-4fdf8a68",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "EOF": 60
+    },
+    "durationMs": 627,
+    "maxRequestMs": 291,
+    "p50RequestMs": 290,
+    "p95RequestMs": 291,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [
+      {
+        "at": "2026-11-25T06:09:05.550Z",
+        "code": null,
+        "signal": "SIGKILL"
+      }
+    ],
+    "restarts": 1,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 10,
+      "409": 50
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 250f1a32-8152-44b4-a8bd-490f541e3b78 is claimed by 10 bookings",
+          "seatIds": [
+            "250f1a32-8152-44b4-a8bd-490f541e3b78"
+          ],
+          "bookingIds": [
+            "0167020e-c5a7-4a57-94b7-40b75f252323",
+            "0a91af78-56a5-4cc5-8b87-804e5d712beb",
+            "2ca435cc-e4b5-4b3a-a15f-1015be55aaa5",
+            "2e21570d-ae18-4f30-82fe-1eacb1d5c63b",
+            "56238989-397a-43e3-881d-01c4a2191018",
+            "5f13592c-1161-4f64-9ab9-d80596c3259f",
+            "69ad4529-8b9c-4801-822c-3adf0e39cbb2",
+            "70029919-64d7-43b4-b41f-5951e2e3a05f",
+            "b40db197-f261-470d-9535-5d4e87c035ea",
+            "b9abb285-7b6b-4166-b19c-8772f1612603"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": [
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

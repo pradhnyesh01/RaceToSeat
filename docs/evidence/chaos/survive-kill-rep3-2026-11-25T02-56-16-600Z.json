@@ -1,0 +1,104 @@
+{
+  "label": "survive-kill-rep3",
+  "ranAt": "2026-11-25T02:56:16.600Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 60,
+    "fault": "backend-kill",
+    "killScope": "in-transaction",
+    "surviveUncaught": true,
+    "killIntervalMs": 40,
+    "killFraction": 0.3,
+    "db": "shared",
+    "expectViolations": false,
+    "label": "survive-kill-rep3",
+    "appPort": 3100,
+    "proxyPort": 5434
+  },
+  "eventId": "d43cb9c8-6582-4baa-85bd-44d118bc595a",
+  "requestsIssued": 120,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.3,
+    "stats": {
+      "sweeps": 11,
+      "terminated": 11,
+      "terminatedByState": {
+        "active": 5,
+        "idle in transaction": 6
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "201": 59,
+      "409": 52,
+      "500": 9
+    },
+    "transportErrors": {},
+    "durationMs": 437,
+    "maxRequestMs": 118
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "[chaos preload] swallowed uncaughtException: terminating connection due to administrator command": 9,
+      "Error: Client has encountered a connection error and is not queryable": 6,
+      "error: terminating connection due to administrator command": 1,
+      "severity: 'FATAL',": 1,
+      "[chaos preload] swallowed uncaughtException: Connection terminated unexpectedly": 2,
+      "Error: Connection terminated unexpectedly": 2
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 60,
+      "409": 60
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 9x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    }
+  ]
+}

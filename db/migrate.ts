@@ -10,7 +10,7 @@ const client = new Client({ connectionString: process.env.DATABASE_URL });
 
 await client.connect();
 try {
-  await client.query("DROP TABLE IF EXISTS booking_seats, bookings, seats, events CASCADE");
+  await client.query("DROP TABLE IF EXISTS hold_seats, holds, booking_seats, bookings, seats, events CASCADE");
   await client.query("DROP TYPE IF EXISTS seat_status");
   await client.query(schema);
   console.log("Migration applied.");

@@ -27,10 +27,10 @@ export type { BookSeatResult };
 //
 // Multi-seat (Phase 3, issue #24): one SELECT ... WHERE id = ANY($1) locks
 // (or observes the taken lock for) every requested row in a single
-// statement. seat_ids is not sorted here — like pessimistic, pg_try_advisory_
-// xact_lock's non-blocking acquisition can't enter a wait-for cycle
-// (ADR-0006/ADR-0016); ordering for behavioral consistency is this
-// mechanism's own follow-up ticket's job.
+// statement. Like pessimistic, pg_try_advisory_xact_lock's non-blocking
+// acquisition can't enter a wait-for cycle (ADR-0006), so sorting seat_ids
+// here is not load-bearing for correctness — it's done purely for
+// behavioral consistency across mechanisms (issue #30).
 export async function bookSeatAdvisory(input: BookSeatInput): Promise<BookSeatResult> {
   const client: PoolClient = await pool.connect();
   try {
@@ -39,16 +39,20 @@ export async function bookSeatAdvisory(input: BookSeatInput): Promise<BookSeatRe
       return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
     }
 
+    // Lowercased once, then a plain default sort — see naive.ts for why this
+    // (not localeCompare) is the collation-safe choice for UUID strings.
+    const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
+
     return await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
       const seatRes = await txClient.query<{ id: string; status: string; acquired: boolean }>(
         "SELECT id, status, pg_try_advisory_xact_lock(hashtext(id::text)) AS acquired FROM seats WHERE id = ANY($1)",
-        [input.seatIds],
+        [seatIds],
       );
 
       // A seat missing from the result set is unknown — checked before the
       // lock/availability checks below, so it takes precedence over any
       // other seat in the same request already being booked.
-      if (seatRes.rows.length !== input.seatIds.length) {
+      if (seatRes.rows.length !== seatIds.length) {
         return { kind: "not_found" };
       }
       if (seatRes.rows.some((seat) => !seat.acquired)) {
@@ -66,11 +70,11 @@ export async function bookSeatAdvisory(input: BookSeatInput): Promise<BookSeatRe
 
       await txClient.query(
         "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
-        [booking.id, input.seatIds],
+        [booking.id, seatIds],
       );
       await txClient.query(
         "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
-        [input.userId, input.seatIds],
+        [input.userId, seatIds],
       );
 
       return { kind: "created", bookingId: booking.id, createdAt: booking.created_at };

@@ -1,0 +1,160 @@
+{
+  "label": "c2-app-sigkill-unique_constraint-deadlock-pairs-rep3",
+  "ranAt": "2026-11-25T06:06:58.562Z",
+  "args": {
+    "strategy": "unique_constraint",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "app-sigkill",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "c2-app-sigkill-unique_constraint-deadlock-pairs-rep3",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 250,
+    "partitionMs": 8000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "e16b8781-3847-4f11-862e-676e46f48b79",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "app-sigkill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "appKill": {
+    "kills": 1,
+    "killedAtMs": [
+      511
+    ],
+    "restartMs": [
+      654
+    ],
+    "openTxAtKill": [
+      30
+    ]
+  },
+  "stall": {
+    "samples": 22,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 217,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1019,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 2,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 30,
+    "bookingsCommittedBeforeReplay": 30,
+    "bookingsAnsweredWith201": 30,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-b09447dc",
+  "k6": {
+    "statusTally": {
+      "0": 30,
+      "201": 30
+    },
+    "transportErrors": {
+      "EOF": 30
+    },
+    "durationMs": 824,
+    "maxRequestMs": 487,
+    "p50RequestMs": 485,
+    "p95RequestMs": 486,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [
+      {
+        "at": "2026-11-25T06:06:59.078Z",
+        "code": null,
+        "signal": "SIGKILL"
+      }
+    ],
+    "restarts": 1,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 30,
+      "409": 30
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "requests-without-answer",
+      "detail": "30 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

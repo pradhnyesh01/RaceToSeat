@@ -2,6 +2,35 @@ services:
   postgres:
     image: postgres:17
     container_name: racetoseat-postgres
+    # Default deadlock_timeout (1s) leaves too little room under NFR3's p99 <
+    # 1s budget for a genuine deadlock's detect-then-abort-then-retry cycle
+    # (issue #25) — this is the only Postgres this project runs, dev and
+    # test alike, so tuning it here scopes the change to that environment
+    # without touching any production config. It is a server-wide setting,
+    # not scoped to the deadlock-pairs pattern alone: it also lowers the
+    # deadlock-check interval for any ordinary blocking lock wait under
+    # hammer-seat/spread-seats (e.g. naive/unique_constraint/optimistic/
+    # serializable's blocking UPDATE under contention) — a re-run of
+    # Exhibits A-C's benchmarks against this container won't reproduce their
+    # published numbers under the prior 1s setting. pessimistic and advisory
+    # never block on a lock (ADR-0006), so this doesn't affect them.
+    # max_connections raised from Postgres's default (100) to 600 (issue
+    # #33): the cross-seat-isolation pattern seeds a hot-seat burst (1,000
+    # concurrent requests) alongside a background stream (1,000 distinct
+    # seats) in one k6 invocation, and the app pool below is raised to match
+    # (500) — 100 would queue most of that behind connection admission
+    # before a single query runs, swamping the isolation signal this pattern
+    # exists to measure. 600 (not Postgres's ~2-5k practical ceiling) is
+    # comfortably above this test's peak demand (pool max 500 + this
+    # container's own internal connections) without paying the per-connection
+    # memory cost (~5-10MB each) of pushing toward that ceiling — this is the
+    # only Postgres this project runs, dev and test alike, so as with
+    # deadlock_timeout below, tuning it here scopes the change to that
+    # environment without touching any production config. Caveat: some
+    # residual pool-queuing effect may still remain at peak concurrency,
+    # since 500 pooled connections still isn't one-per-request at 1,000
+    # concurrent VUs.
+    command: ["postgres", "-c", "deadlock_timeout=100ms", "-c", "max_connections=600"]
     environment:
       POSTGRES_USER: racetoseat
       POSTGRES_PASSWORD: racetoseat
@@ -14,6 +43,31 @@ services:
       # directory — `db:migrate` remains the way to reapply the schema
       # against an existing volume (e.g. after a schema change).
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+
+  # Chaos-testing network fault injector (Phase 6, issue #44). Behind the
+  # `chaos` compose profile, so a plain `docker compose up` neither pulls nor
+  # starts it — the dev/test/benchmark environment is unchanged. Start it with
+  # `docker compose --profile chaos up -d`. The app under chaos is pointed at
+  # this proxy (localhost:5434 -> postgres:5432) instead of at Postgres
+  # directly; the chaos harness's own oracle/driver connections go straight to
+  # Postgres on 5433 so a Fault on the app's path never blinds the checker.
+  # The proxy is pre-provisioned from toxiproxy.json; toxics (latency,
+  # partition, reset_peer, ...) are added at runtime through its HTTP API on
+  # :8474 by the later chaos tickets (C2+) — C1's backend-kill Fault doesn't
+  # need one, but routing through the proxy now means the tracer exercises the
+  # same connection path the network Faults will.
+  toxiproxy:
+    profiles: ["chaos"]
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    container_name: racetoseat-toxiproxy
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    depends_on:
+      - postgres
+    ports:
+      - "5434:5434"
+      - "8474:8474"
+    volumes:
+      - ./load-harness/chaos/toxiproxy.json:/config/toxiproxy.json:ro
 
 volumes:
   racetoseat-pgdata:

@@ -1,0 +1,100 @@
+{
+  "label": "negctl-naive-scratch-rep2",
+  "ranAt": "2026-11-25T02:56:55.989Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "none",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": true,
+    "label": "negctl-naive-scratch-rep2",
+    "appPort": 3100,
+    "proxyPort": 5434
+  },
+  "eventId": "953333bf-547b-40de-b131-f535b1c25d4f",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "k6": {
+    "statusTally": {
+      "201": 7,
+      "409": 53
+    },
+    "transportErrors": {},
+    "durationMs": 388,
+    "maxRequestMs": 58
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 7,
+      "409": 53
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat d260ec0c-0b6a-4ae0-867b-01d874a03b14 is claimed by 7 bookings",
+          "seatIds": [
+            "d260ec0c-0b6a-4ae0-867b-01d874a03b14"
+          ],
+          "bookingIds": [
+            "57c8adb6-6a7a-47ab-8b9e-28fac2222c5d",
+            "86b95194-db32-49b7-aca0-132eedae9cf1",
+            "9ddf1b72-3440-403b-a4ed-09a35e604cc7",
+            "cb786125-3ad3-4722-b1ce-c9b26a888c42",
+            "d73e9ee8-5b98-4330-9c3c-5b7fdfcb7f98",
+            "e7df0c49-5d14-4469-b707-51f729748b00",
+            "eb964039-0937-4fcd-95d2-019e88517b0b"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

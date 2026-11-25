@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
+import type { FastifyInstance } from "fastify";
 import type { PoolClient } from "pg";
 import { pool } from "../src/db/pool.js";
 
 export async function resetDb(): Promise<void> {
-  await pool.query("TRUNCATE booking_seats, bookings, seats, events RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE hold_seats, holds, booking_seats, bookings, seats, events RESTART IDENTITY CASCADE");
 }
 
 export async function seedEventWithSeats(seatLabels: string[]): Promise<{ eventId: string; seatIdsByLabel: Record<string, string> }> {
@@ -62,6 +63,54 @@ export async function commitBookingOnClient(client: PoolClient, seatId: string, 
     "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = $2",
     [userId, seatId],
   );
+}
+
+// Holds a real FOR UPDATE row lock on `lockSeatId` in an uncommitted
+// transaction on a separate connection while `fn` runs, standing in for
+// "another in-flight pessimistic-strategy request currently holds this
+// seat's lock" — unlike an already-committed conflict, this exercises the
+// NOWAIT failure path itself. Shared by pessimistic.ts's booking path and
+// pessimisticHold.ts's hold path (both use identical FOR UPDATE NOWAIT
+// acquisition), so pessimistic.test.ts and pessimisticHold.test.ts both
+// import this rather than each defining their own copy of the same
+// technique against the same mechanism.
+export async function withHeldRowLock<T>(lockSeatId: string, fn: () => Promise<T>): Promise<T> {
+  const lockClient = await pool.connect();
+  await lockClient.query("BEGIN");
+  await lockClient.query("SELECT 1 FROM seats WHERE id = $1 FOR UPDATE", [lockSeatId]);
+  try {
+    return await fn();
+  } finally {
+    await lockClient.query("COMMIT");
+    lockClient.release();
+  }
+}
+
+// Creates a hold via the real HTTP flow (not a raw DB insert), used by every
+// test that needs a live hold to act on — confirm it, expire it, sweep it.
+// Shared rather than each caller (confirm's own contract tests, the
+// reaper's) defining its own copy of the identical POST /holds request
+// shape (found duplicated in code review).
+export async function createHold(
+  app: FastifyInstance,
+  seatIds: string[],
+  userId = "user-1",
+): Promise<{ id: string; seatIds: string[]; heldUntil: string }> {
+  const res = await app.inject({
+    method: "POST",
+    url: "/holds",
+    payload: { seat_ids: seatIds, user_id: userId, idempotency_key: randomUUID() },
+  });
+  const body = res.json() as { id: string; seat_ids: string[]; held_until: string };
+  return { id: body.id, seatIds: body.seat_ids, heldUntil: body.held_until };
+}
+
+// Backdates held_until directly against the DB — the deterministic way to
+// force an already-expired hold without a real wait. Shared by every test
+// that needs one (confirm's 410 test, the reaper's sweep tests) rather than
+// each repeating the same raw SQL (found duplicated in code review).
+export async function expireHold(seatIds: string[]): Promise<void> {
+  await pool.query("UPDATE seats SET held_until = now() - interval '1 second' WHERE id = ANY($1)", [seatIds]);
 }
 
 // Stages a deterministic race against a mechanism under test by intercepting

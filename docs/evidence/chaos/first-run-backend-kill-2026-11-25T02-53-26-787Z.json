@@ -1,0 +1,117 @@
+{
+  "label": "first-run-backend-kill",
+  "ranAt": "2026-11-25T02:53:26.787Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 150,
+    "fault": "backend-kill",
+    "killScope": "in-transaction",
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "shared",
+    "expectViolations": false,
+    "label": "first-run-backend-kill",
+    "appPort": 3100,
+    "proxyPort": 5434
+  },
+  "eventId": "ab8fcd0b-8238-4d3a-9435-0d5b578d446a",
+  "requestsIssued": 300,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "stats": {
+      "sweeps": 10,
+      "terminated": 1,
+      "terminatedByState": {
+        "active": 1
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "0": 299,
+      "500": 1
+    },
+    "transportErrors": {
+      "read: connection reset by peer": 192,
+      "EOF": 107
+    },
+    "durationMs": 426,
+    "maxRequestMs": 54
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T02:53:26.906Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "restarts": 1,
+    "errorSignatures": {
+      "error: terminating connection due to administrator command": 1,
+      "severity: 'FATAL',": 1,
+      "throw er; // Unhandled 'error' event": 1,
+      "Error: Connection terminated unexpectedly": 1,
+      "Emitted 'error' event on Client instance at:": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 150,
+      "409": 150
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 1x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "299 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

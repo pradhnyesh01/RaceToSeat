@@ -1,0 +1,101 @@
+{
+  "label": "survive-kill-rep4",
+  "ranAt": "2026-11-25T02:56:19.883Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 60,
+    "fault": "backend-kill",
+    "killScope": "in-transaction",
+    "surviveUncaught": true,
+    "killIntervalMs": 40,
+    "killFraction": 0.3,
+    "db": "shared",
+    "expectViolations": false,
+    "label": "survive-kill-rep4",
+    "appPort": 3100,
+    "proxyPort": 5434
+  },
+  "eventId": "b61eae87-1f93-49d2-a7d9-19c94b80360c",
+  "requestsIssued": 120,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.3,
+    "stats": {
+      "sweeps": 11,
+      "terminated": 9,
+      "terminatedByState": {
+        "idle in transaction": 9
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "201": 57,
+      "409": 54,
+      "500": 9
+    },
+    "transportErrors": {},
+    "durationMs": 439,
+    "maxRequestMs": 114
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "[chaos preload] swallowed uncaughtException: terminating connection due to administrator command": 7,
+      "Error: Client has encountered a connection error and is not queryable": 7,
+      "[chaos preload] swallowed uncaughtException: Connection terminated unexpectedly": 2,
+      "Error: Connection terminated unexpectedly": 2
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 60,
+      "409": 60
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 9x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    }
+  ]
+}

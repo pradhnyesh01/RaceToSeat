@@ -3,8 +3,12 @@ process.env.BOOKING_STRATEGY = "serializable";
 const { randomUUID } = await import("node:crypto");
 const { createApp } = await import("../../src/app.js");
 const { pool } = await import("../../src/db/pool.js");
-const { runBookingConcurrencyContractTest, runBookingContractTests, runMultiSeatBookingContractTests } =
-  await import("../bookingContract.js");
+const {
+  runBookingConcurrencyContractTest,
+  runBookingContractTests,
+  runCrossSeatIsolationContractTest,
+  runMultiSeatBookingContractTests,
+} = await import("../bookingContract.js");
 const { commitBookingOnClient, interceptQuery, resetDb, seedEventWithSeats } = await import("../testDb.js");
 
 const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
@@ -32,6 +36,41 @@ runBookingConcurrencyContractTest("serializable", createApp, {
   checkZeroRetries: false,
   acceptableLoserStatuses: [409, 503],
 });
+
+// Holds this mechanism's own distinguishing shape — a real SERIALIZABLE
+// transaction that reads and then writes `lockSeatId`, exactly like
+// withSerializableTransaction's own read-then-write body — open and
+// uncommitted on a separate connection, standing in for another in-flight
+// serializable booking mid-transaction. This is the one mechanism where
+// cross-seat isolation isn't just about row locks: SSI's predicate locks can
+// span a page (or, under a seq-scan plan, a whole relation), so it's worth
+// proving directly rather than assuming it's identical to the row-lock
+// mechanisms. Rolled back, not committed — a rolled-back transaction can
+// never participate in an SSI conflict cycle, so this only tests for
+// unwanted blocking/latency, not for a spurious 40001 on the concurrent
+// request (that "legitimately nonzero" retry rate is covered above, ADR-0013).
+async function withOpenSerializableUpdate<T>(lockSeatId: string, fn: () => Promise<T>): Promise<T> {
+  const lockClient = await pool.connect();
+  await lockClient.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
+  await lockClient.query("SELECT id, status FROM seats WHERE id = ANY($1)", [[lockSeatId]]);
+  await lockClient.query(
+    "UPDATE seats SET status = 'booked', booked_by = 'lock-holder', version = version + 1 WHERE id = $1",
+    [lockSeatId],
+  );
+  try {
+    return await fn();
+  } finally {
+    await lockClient.query("ROLLBACK");
+    lockClient.release();
+  }
+}
+
+// checkZeroRetries/acceptableLoserStatuses don't apply here — this test
+// doesn't race for the same seat, so there's no loser to make assertions
+// about — but the same "unwanted blocking/latency, not a spurious 40001" note
+// from the doc comment above applies: withOpenSerializableUpdate rolls back
+// rather than commits, so it can never participate in an SSI conflict cycle.
+runCrossSeatIsolationContractTest("serializable", createApp, withOpenSerializableUpdate);
 
 describe("POST /bookings (serializable strategy) — ordinary conflict via the unique-constraint backstop", () => {
   beforeEach(resetDb);

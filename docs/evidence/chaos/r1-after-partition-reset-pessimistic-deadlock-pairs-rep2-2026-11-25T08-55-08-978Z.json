@@ -1,0 +1,189 @@
+{
+  "label": "r1-after-partition-reset-pessimistic-deadlock-pairs-rep2",
+  "ranAt": "2026-11-25T08:55:08.978Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "partition-reset",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r1-after-partition-reset-pessimistic-deadlock-pairs-rep2",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "c397919e-9571-4f5f-aa82-ffc37e2d7605",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-reset",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-reset",
+    "appliedAtMs": 465,
+    "healedAtMs": 7476,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 0
+  },
+  "stall": {
+    "samples": 138,
+    "peakOpenTx": 59,
+    "peakIdleInTx": 59,
+    "peakLockHolders": 30,
+    "maxOpenTxAgeMs": 203,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1018,
+        0,
+        0,
+        0
+      ],
+      [
+        2003,
+        0,
+        0,
+        0
+      ],
+      [
+        3047,
+        0,
+        0,
+        0
+      ],
+      [
+        4022,
+        0,
+        0,
+        0
+      ],
+      [
+        5050,
+        0,
+        0,
+        0
+      ],
+      [
+        6025,
+        0,
+        0,
+        0
+      ],
+      [
+        7051,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 3,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 30,
+    "bookingsAnsweredWith201": 30,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-9b77cee8",
+  "k6": {
+    "statusTally": {
+      "201": 30,
+      "500": 30
+    },
+    "transportErrors": {},
+    "durationMs": 800,
+    "maxRequestMs": 470,
+    "p50RequestMs": 437,
+    "p95RequestMs": 469,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 48,
+      "Error: Client has encountered a connection error and is not queryable": 13,
+      "Error: Connection terminated unexpectedly": 17,
+      "Reaper sweep failed: Error: Connection terminated unexpectedly": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 30,
+      "409": 30
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 30x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    }
+  ]
+}

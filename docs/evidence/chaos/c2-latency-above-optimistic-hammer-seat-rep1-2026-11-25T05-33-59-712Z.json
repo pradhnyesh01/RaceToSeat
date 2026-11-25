@@ -1,0 +1,175 @@
+{
+  "label": "c2-latency-above-optimistic-hammer-seat-rep1",
+  "ranAt": "2026-11-25T05:33:59.712Z",
+  "args": {
+    "strategy": "optimistic",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "latency-above",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "c2-latency-above-optimistic-hammer-seat-rep1",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 800,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "61684324-16fc-43a4-bc47-ca140cd593ea",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "latency-above",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "networkFault": {
+    "kind": "latency-above",
+    "appliedAtMs": 2,
+    "healedAtMs": 5357,
+    "latencyMs": 800
+  },
+  "stall": {
+    "samples": 100,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 57,
+    "maxOpenTxAgeMs": 2087,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1042,
+        0,
+        0,
+        0
+      ],
+      [
+        2029,
+        0,
+        0,
+        0
+      ],
+      [
+        3019,
+        0,
+        0,
+        0
+      ],
+      [
+        4045,
+        60,
+        0,
+        756
+      ],
+      [
+        5036,
+        60,
+        0,
+        1748
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 109,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 1,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 1
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-0c018dcb",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "request timeout": 60
+    },
+    "durationMs": 5343,
+    "maxRequestMs": 5001,
+    "p50RequestMs": 5000,
+    "p95RequestMs": 5001,
+    "clientTimeouts": 60
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "client-timeouts",
+      "detail": "60 request(s) hit the client request timeout (5000ms)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

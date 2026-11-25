@@ -29,6 +29,53 @@ describe("withSerializableTransaction", () => {
     }
   });
 
+  // Issue #29: a deadlock abort (40P01) is retriable here too, on the same
+  // counter/cap/backoff as a genuine serialization failure — no separate
+  // withDeadlockRetry wrapper (that's naive's/unique_constraint's/
+  // optimistic's shape, ADR-0014; nesting it here would double-BEGIN).
+  it("retries on a synthetic deadlock abort (40P01), same as a serialization failure", async () => {
+    const client = await pool.connect();
+    try {
+      let calls = 0;
+      const failuresBeforeSuccess = 2;
+
+      const result = await withSerializableTransaction(client, async () => {
+        calls++;
+        if (calls <= failuresBeforeSuccess) {
+          throw { code: "40P01" };
+        }
+        return "ok";
+      });
+
+      expect(result).toBe("ok");
+      expect(calls).toBe(failuresBeforeSuccess + 1);
+    } finally {
+      client.release();
+    }
+  });
+
+  it("retries across a mix of 40001 and 40P01 on the same attempt counter", async () => {
+    const client = await pool.connect();
+    try {
+      const codesThrown: string[] = ["40001", "40P01", "40001"];
+      let calls = 0;
+
+      const result = await withSerializableTransaction(client, async () => {
+        const code = codesThrown[calls];
+        calls++;
+        if (code) {
+          throw { code };
+        }
+        return "ok";
+      });
+
+      expect(result).toBe("ok");
+      expect(calls).toBe(codesThrown.length + 1);
+    } finally {
+      client.release();
+    }
+  });
+
   it("passes the current attempt number to work, starting at 0", async () => {
     const client = await pool.connect();
     try {
@@ -120,6 +167,28 @@ describe("withSerializableTransaction", () => {
 
       await expect(rejection).rejects.toThrow(SerializationRetriesExhaustedError);
       // 1 initial attempt + 2 retries = 3 total calls.
+      expect(calls).toBe(3);
+    } finally {
+      client.release();
+    }
+  });
+
+  it("throws SerializationRetriesExhaustedError after exhausting the retry cap on repeated deadlock aborts too", async () => {
+    const client = await pool.connect();
+    try {
+      let calls = 0;
+
+      const rejection = withSerializableTransaction(
+        client,
+        async () => {
+          calls++;
+          throw { code: "40P01" };
+        },
+        () => true,
+        { maxRetries: 2 },
+      );
+
+      await expect(rejection).rejects.toThrow(SerializationRetriesExhaustedError);
       expect(calls).toBe(3);
     } finally {
       client.release();

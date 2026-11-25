@@ -1,0 +1,201 @@
+{
+  "label": "c2-partition-stall-pessimistic-hammer-seat-rep1",
+  "ranAt": "2026-11-25T05:35:54.818Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "c2-partition-stall-pessimistic-hammer-seat-rep1",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "d9893be5-50b1-433c-9969-87703fb89f83",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 569,
+    "healedAtMs": 7597,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 0
+  },
+  "stall": {
+    "samples": 138,
+    "peakOpenTx": 36,
+    "peakIdleInTx": 36,
+    "peakLockHolders": 1,
+    "maxOpenTxAgeMs": 220,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1021,
+        0,
+        0,
+        0
+      ],
+      [
+        2024,
+        0,
+        0,
+        0
+      ],
+      [
+        3028,
+        0,
+        0,
+        0
+      ],
+      [
+        4023,
+        0,
+        0,
+        0
+      ],
+      [
+        5008,
+        0,
+        0,
+        0
+      ],
+      [
+        6010,
+        0,
+        0,
+        0
+      ],
+      [
+        7015,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 1,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 1,
+    "bookingsAnsweredWith201": 1,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-5f9a8272",
+  "k6": {
+    "statusTally": {
+      "201": 1,
+      "409": 59
+    },
+    "transportErrors": {},
+    "durationMs": 849,
+    "maxRequestMs": 516,
+    "p50RequestMs": 506,
+    "p95RequestMs": 516,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T05:36:02.421Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "injectedKills": [],
+    "restarts": 1,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "Error: Connection terminated unexpectedly": 1,
+      "Emitted 'error' event on BoundPool instance at:": 1,
+      "_events: [Object: null prototype] { error: [Function (anonymous)] },": 1,
+      "_connectionError: false,": 1,
+      "error: [Function: bound _handleErrorEvent],": 1,
+      "errorMessage: [Function: bound _handleErrorMessage],": 1,
+      "_hadError: false,": 1,
+      "_closeAfterHandlingError: false,": 1,
+      "error: [Function: reportStreamError],": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    }
+  ]
+}

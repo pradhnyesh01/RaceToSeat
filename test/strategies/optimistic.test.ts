@@ -3,8 +3,12 @@ process.env.BOOKING_STRATEGY = "optimistic";
 const { randomUUID } = await import("node:crypto");
 const { createApp } = await import("../../src/app.js");
 const { pool } = await import("../../src/db/pool.js");
-const { runBookingConcurrencyContractTest, runBookingContractTests, runMultiSeatBookingContractTests } =
-  await import("../bookingContract.js");
+const {
+  runBookingConcurrencyContractTest,
+  runBookingContractTests,
+  runCrossSeatIsolationContractTest,
+  runMultiSeatBookingContractTests,
+} = await import("../bookingContract.js");
 const { interceptQuery, resetDb, seedBooking, seedEventWithSeats } = await import("../testDb.js");
 
 const { afterAll, beforeEach, describe, expect, it } = await import("vitest");
@@ -74,6 +78,29 @@ describe("POST /bookings (optimistic strategy) — concurrent cancellation race"
     expect(seatRow.rows[0]).toMatchObject({ status: "booked", booked_by: "user-2", version: 3 });
   });
 });
+
+// Holds this mechanism's own distinguishing write — the CAS UPDATE ... WHERE
+// id = $2 AND version = $3 AND status = 'available' (version 0, a freshly
+// seeded seat's default) — open and uncommitted against `lockSeatId` on a
+// separate connection, standing in for another in-flight optimistic booking
+// mid-CAS. Rolled back, not committed: a synthetic in-flight writer, not a
+// booking meant to persist.
+async function withOpenCasUpdate<T>(lockSeatId: string, fn: () => Promise<T>): Promise<T> {
+  const lockClient = await pool.connect();
+  await lockClient.query("BEGIN");
+  await lockClient.query(
+    "UPDATE seats SET status = 'booked', booked_by = 'lock-holder', version = version + 1 WHERE id = $1 AND version = 0 AND status = 'available'",
+    [lockSeatId],
+  );
+  try {
+    return await fn();
+  } finally {
+    await lockClient.query("ROLLBACK");
+    lockClient.release();
+  }
+}
+
+runCrossSeatIsolationContractTest("optimistic", createApp, withOpenCasUpdate);
 
 describe("POST /bookings (optimistic strategy) — UUID casing", () => {
   beforeEach(resetDb);

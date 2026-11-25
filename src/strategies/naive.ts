@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
 import { isUniqueViolation } from "../db/pgErrors.js";
-import { findExistingBookingByIdempotencyKey, runTransactionalBooking } from "./idempotency.js";
+import { findExistingBookingByIdempotencyKey, normalizeSeatIds, runDeadlockRetryBooking } from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -15,10 +15,22 @@ export type { BookSeatResult };
 // and is caught below, so naive is safe under concurrency even though its
 // read-then-write shape is unchanged.
 //
-// Multi-seat (Phase 3, issue #24): seat_ids is iterated in request order, not
-// sorted — ADR-0016's deliberate unordered "before" baseline for the
-// deadlock-harness ticket, which fixes this with consistent ordering. No
-// deadlock-retry wiring here either; that's the same follow-up ticket's job.
+// Multi-seat deadlock fix (Phase 3, issue #26; "before" baseline was ADR-0016
+// via issue #24, measured in Exhibit D): seat_ids is sorted once,
+// case-insensitively, before any write. The wait-for cycle Exhibit D actually
+// measured wasn't in the UPDATE below — Postgres's `WHERE id = ANY(...)`
+// plans that as an index/bitmap scan whose row-visitation order is
+// plan-determined, not array-order-determined, so two opposite-order arrays
+// still lock those rows in the same order and can't deadlock there. It was in
+// the booking_seats INSERT: `unnest($ids)` inserts rows in exactly the
+// array's order, so two concurrent opposite-order requests for the same pair
+// of seats really can insert-then-block on each other's uncommitted unique-
+// index entry in a genuine cycle (confirmed via the deadlock-pairs harness,
+// issue #25 — Postgres error 40P01, `while inserting index tuple ... in
+// relation "booking_seats_seat_id_key"`). Sorting first means every request
+// for the same seat set inserts in the same order regardless of how the
+// client listed them, which is the primary fix; withDeadlockRetry (ADR-0014)
+// below is the fallback layer for whatever ordering doesn't cover.
 export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResult> {
   const client: PoolClient = await pool.connect();
   try {
@@ -27,6 +39,8 @@ export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResul
       return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
     }
 
+    const seatIds = normalizeSeatIds(input.seatIds);
+
     // The whole requested set's existence and availability is checked in one
     // query before any per-seat write starts (still racy against a
     // concurrent writer, by design — that's naive's whole point): a seat
@@ -34,44 +48,50 @@ export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResul
     // other seat in the same request already being booked.
     const seatRes = await client.query<{ id: string; status: string }>(
       "SELECT id, status FROM seats WHERE id = ANY($1)",
-      [input.seatIds],
+      [seatIds],
     );
-    if (seatRes.rows.length !== input.seatIds.length) {
+    if (seatRes.rows.length !== seatIds.length) {
       return { kind: "not_found" };
     }
     if (seatRes.rows.some((seat) => seat.status !== "available")) {
       return { kind: "conflict" };
     }
 
-    return await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
-      const bookingRes = await txClient.query<{ id: string; created_at: Date }>(
-        "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id, created_at",
-        [input.userId, input.idempotencyKey],
-      );
-      const booking = bookingRes.rows[0]!;
-
-      // One batched statement, not a per-seat loop: a unique-violation on any
-      // one generated row aborts the whole INSERT (no partial rows), so
-      // all-or-nothing holds without needing to catch and roll back a loop.
-      try {
-        await txClient.query(
-          "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
-          [booking.id, input.seatIds],
+    return await runDeadlockRetryBooking(
+      client,
+      input.idempotencyKey,
+      async (txClient, attempt) => {
+        const bookingRes = await txClient.query<{ id: string; created_at: Date }>(
+          "INSERT INTO bookings (user_id, idempotency_key) VALUES ($1, $2) RETURNING id, created_at",
+          [input.userId, input.idempotencyKey],
         );
-      } catch (err) {
-        if (isUniqueViolation(err, "booking_seats_seat_id_key")) {
-          return { kind: "conflict" };
+        const booking = bookingRes.rows[0]!;
+
+        // One batched statement, not a per-seat loop: a unique-violation on
+        // any one generated row aborts the whole INSERT (no partial rows),
+        // so all-or-nothing holds without needing to catch and roll back a
+        // loop.
+        try {
+          await txClient.query(
+            "INSERT INTO booking_seats (booking_id, seat_id) SELECT $1, unnest($2::uuid[])",
+            [booking.id, seatIds],
+          );
+        } catch (err) {
+          if (isUniqueViolation(err, "booking_seats_seat_id_key")) {
+            return { kind: "conflict", retries: attempt };
+          }
+          throw err;
         }
-        throw err;
-      }
 
-      await txClient.query(
-        "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
-        [input.userId, input.seatIds],
-      );
+        await txClient.query(
+          "UPDATE seats SET status = 'booked', booked_by = $1, version = version + 1 WHERE id = ANY($2)",
+          [input.userId, seatIds],
+        );
 
-      return { kind: "created", bookingId: booking.id, createdAt: booking.created_at };
-    });
+        return { kind: "created", bookingId: booking.id, createdAt: booking.created_at, retries: attempt };
+      },
+      (result) => result.kind === "created",
+    );
   } finally {
     client.release();
   }
