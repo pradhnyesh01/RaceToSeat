@@ -72,7 +72,7 @@ ADRs 0021–0023 are written as the relevant tickets land, not up front.
 - [x] #43 F1 (tracer): core spec — claim + multi-seat Booking, mutual-exclusion & atomicity invariants, Docker TLC runner, naive-claim negative control
 - [x] #45 F2: deadlock A/B — unsorted blocking acquisition yields a TLC counterexample; the fixed protocol is clean
 - [x] #46 F3: lifecycle layer — Hold, Confirm, Expire (monotonic flag), Reaper, Cancel; reaper liveness under weak fairness
-- [ ] #47 F4: crash / ambiguous-commit / idempotent-retry layer
+- [x] #47 F4: crash / ambiguous-commit / idempotent-retry layer
 - [ ] #48 F5: spec-action → SQL (`file:line`) mapping table + Exhibit G
 
 **Chaos track** (Toxiproxy compose profile + scripted `pg_terminate_backend`)
