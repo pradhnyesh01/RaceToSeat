@@ -44,5 +44,30 @@ services:
       # against an existing volume (e.g. after a schema change).
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
 
+  # Chaos-testing network fault injector (Phase 6, issue #44). Behind the
+  # `chaos` compose profile, so a plain `docker compose up` neither pulls nor
+  # starts it — the dev/test/benchmark environment is unchanged. Start it with
+  # `docker compose --profile chaos up -d`. The app under chaos is pointed at
+  # this proxy (localhost:5434 -> postgres:5432) instead of at Postgres
+  # directly; the chaos harness's own oracle/driver connections go straight to
+  # Postgres on 5433 so a Fault on the app's path never blinds the checker.
+  # The proxy is pre-provisioned from toxiproxy.json; toxics (latency,
+  # partition, reset_peer, ...) are added at runtime through its HTTP API on
+  # :8474 by the later chaos tickets (C2+) — C1's backend-kill Fault doesn't
+  # need one, but routing through the proxy now means the tracer exercises the
+  # same connection path the network Faults will.
+  toxiproxy:
+    profiles: ["chaos"]
+    image: ghcr.io/shopify/toxiproxy:2.12.0
+    container_name: racetoseat-toxiproxy
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    depends_on:
+      - postgres
+    ports:
+      - "5434:5434"
+      - "8474:8474"
+    volumes:
+      - ./load-harness/chaos/toxiproxy.json:/config/toxiproxy.json:ro
+
 volumes:
   racetoseat-pgdata:

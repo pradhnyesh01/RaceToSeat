@@ -1,0 +1,113 @@
+{
+  "label": "unmodified-kill-rep1",
+  "ranAt": "2026-11-25T02:55:49.436Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 60,
+    "fault": "backend-kill",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "shared",
+    "expectViolations": false,
+    "label": "unmodified-kill-rep1",
+    "appPort": 3100,
+    "proxyPort": 5434
+  },
+  "eventId": "b3f40db7-7fba-4c25-85b4-e7b4249670a4",
+  "requestsIssued": 120,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "stats": {
+      "sweeps": 12,
+      "terminated": 18,
+      "terminatedByState": {
+        "idle in transaction": 14,
+        "active": 4
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "0": 119,
+      "201": 1
+    },
+    "transportErrors": {
+      "EOF": 119
+    },
+    "durationMs": 490,
+    "maxRequestMs": 96
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T02:55:49.632Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "restarts": 1,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "error: terminating connection due to administrator command": 1,
+      "Emitted 'error' event on Client instance at:": 1,
+      "severity: 'FATAL',": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 60,
+      "409": 60
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "119 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}
