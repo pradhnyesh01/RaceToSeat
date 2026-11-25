@@ -1,0 +1,188 @@
+{
+  "label": "r5-after-partition-stall-advisory-hammer-seat-rep11",
+  "ranAt": "2026-11-25T13:24:53.521Z",
+  "args": {
+    "strategy": "advisory",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r5-after-partition-stall-advisory-hammer-seat-rep11",
+    "appPort": 3211,
+    "proxyPort": 5492,
+    "toxiproxyApi": "http://localhost:8495",
+    "proxyUpstream": "r5-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 120,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "a0647ddf-e1db-47cd-8213-e04d1e7e96a6",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 329,
+    "healedAtMs": 7355,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 1
+  },
+  "stall": {
+    "samples": 135,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 59,
+    "peakLockHolders": 1,
+    "maxOpenTxAgeMs": 1580,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1011,
+        1,
+        1,
+        812
+      ],
+      [
+        2053,
+        0,
+        0,
+        0
+      ],
+      [
+        3040,
+        0,
+        0,
+        0
+      ],
+      [
+        4034,
+        0,
+        0,
+        0
+      ],
+      [
+        5021,
+        0,
+        0,
+        0
+      ],
+      [
+        6021,
+        0,
+        0,
+        0
+      ],
+      [
+        7012,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 2,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-b9882090",
+  "k6": {
+    "statusTally": {
+      "409": 59,
+      "502": 1
+    },
+    "transportErrors": {},
+    "durationMs": 2184,
+    "maxRequestMs": 1863,
+    "p50RequestMs": 307,
+    "p95RequestMs": 308,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 60,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Connection terminated unexpectedly": 1,
+      "Error: Connection terminated unexpectedly": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "infrastructure-failures-classified",
+      "detail": "1 request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)"
+    }
+  ]
+}

@@ -1,0 +1,192 @@
+{
+  "label": "r5-before-partition-stall-advisory-hammer-seat-rep17",
+  "ranAt": "2026-11-25T13:22:32.764Z",
+  "args": {
+    "strategy": "advisory",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r5-before-partition-stall-advisory-hammer-seat-rep17",
+    "appPort": 3210,
+    "proxyPort": 5491,
+    "toxiproxyApi": "http://localhost:8495",
+    "proxyUpstream": "r5-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 120,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "33491171-72d4-4fea-a7ab-3dae84e750b0",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 201,
+    "healedAtMs": 7212,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 0
+  },
+  "stall": {
+    "samples": 134,
+    "peakOpenTx": 16,
+    "peakIdleInTx": 16,
+    "peakLockHolders": 0,
+    "maxOpenTxAgeMs": 1449,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1050,
+        16,
+        0,
+        851
+      ],
+      [
+        2039,
+        0,
+        0,
+        0
+      ],
+      [
+        3016,
+        0,
+        0,
+        0
+      ],
+      [
+        4038,
+        0,
+        0,
+        0
+      ],
+      [
+        5019,
+        0,
+        0,
+        0
+      ],
+      [
+        6049,
+        0,
+        0,
+        0
+      ],
+      [
+        7026,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 2,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-86001471",
+  "k6": {
+    "statusTally": {
+      "502": 16,
+      "504": 44
+    },
+    "transportErrors": {},
+    "durationMs": 2517,
+    "maxRequestMs": 2180,
+    "p50RequestMs": 2173,
+    "p95RequestMs": 2179,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 60,
+      "Error: Connection terminated unexpectedly": 16,
+      "Error: Query read timeout": 44
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "infrastructure-failures-classified",
+      "detail": "16 request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)"
+    },
+    {
+      "id": "timeouts-classified",
+      "detail": "44 request(s) answered HTTP 504 (the designed timeout outcome, ADR-0026: a database bound fired, outcome unknown, retry with the same key)"
+    }
+  ]
+}

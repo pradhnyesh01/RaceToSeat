@@ -897,7 +897,12 @@ async function mainExhibitH(evidenceDir: URL, outPath: string) {
   }
   const unitControls = await countUnitControls(new URL("../test/chaos/", import.meta.url), UNIT_CONTROL_FILES);
   const noRegression = await loadNoRegressionRows(new URL("r4-nofault/", chaosDir), evidenceDir);
-  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression }));
+  // R5 (#58): the same advisory no-Fault runs on the code without and with the fix.
+  const r5NoRegression = {
+    before: await loadNoRegressionRows(new URL("r5-nofault/before/", chaosDir), evidenceDir),
+    after: await loadNoRegressionRows(new URL("r5-nofault/after/", chaosDir), evidenceDir),
+  };
+  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression, r5NoRegression }));
 
   const measured = reports.filter((r) => !r.report.args.expectViolations);
   const violations = measured.filter((r) => r.report.correctnessViolation);
