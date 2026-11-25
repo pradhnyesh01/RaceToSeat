@@ -1,0 +1,207 @@
+{
+  "label": "r2-after-c2-matrix-unique_constraint-deadlock-pairs-rep5",
+  "ranAt": "2026-11-25T09:05:49.315Z",
+  "args": {
+    "strategy": "unique_constraint",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r2-after-c2-matrix-unique_constraint-deadlock-pairs-rep5",
+    "appPort": 3400,
+    "proxyPort": 5446,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "81f45808-9851-410e-b2d9-b64324edd65a",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 276,
+    "healedAtMs": 7309,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 60
+  },
+  "stall": {
+    "samples": 134,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 7034,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1023,
+        60,
+        60,
+        775
+      ],
+      [
+        2012,
+        60,
+        60,
+        1764
+      ],
+      [
+        3052,
+        60,
+        60,
+        2803
+      ],
+      [
+        4040,
+        60,
+        60,
+        3791
+      ],
+      [
+        5031,
+        60,
+        60,
+        4782
+      ],
+      [
+        6015,
+        60,
+        60,
+        5767
+      ],
+      [
+        7011,
+        60,
+        60,
+        6762
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 1,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-b3ac5aae",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "request timeout": 60
+    },
+    "durationMs": 5331,
+    "maxRequestMs": 5001,
+    "p50RequestMs": 5000,
+    "p95RequestMs": 5001,
+    "clientTimeouts": 60
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T09:05:56.625Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "injectedKills": [],
+    "restarts": 1,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "Error: Connection terminated unexpectedly": 1,
+      "Emitted 'error' event on Client instance at:": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 30,
+      "409": 30
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "transaction-outlived-client-timeout",
+      "detail": "a transaction stayed open 7034ms (client request timeout 5000ms): its row locks outlived every client waiting on it"
+    },
+    {
+      "id": "client-timeouts",
+      "detail": "60 request(s) hit the client request timeout (5000ms)"
+    },
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

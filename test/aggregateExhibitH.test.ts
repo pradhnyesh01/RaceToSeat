@@ -95,6 +95,8 @@ describe("classify", () => {
     ["c3-control-reaperstall-nofault", { args: { mode: "hold-expiry", fault: "none", reaperStallSeats: 3 } }, "c3-reaperstall-nofault"],
     ["c3-unmodified-hold-confirm-rep1", { args: { mode: "hold-confirm", fault: "backend-kill" } }, "c3-unmodified"],
     ["c3-survive-hold-confirm-rep1", { args: { mode: "hold-confirm", fault: "backend-kill", surviveUncaught: true } }, "c3-scaffolded"],
+    ["r2-after", { args: { fault: "idle-pool-kill" } }, "r2-after"],
+    ["r2-after-c2-idleonly-advisory-hammer-seat-rep1", {}, "r2-after"],
     ["c3-negctl-late-confirm", { args: { mode: "hold-expiry", fault: "none", expectViolations: true } }, "c3-control"],
     ["r1-after-rep1", { args: { fault: "backend-kill" } }, "r1-after"],
     ["r1-after-partition-stall-naive-hammer-seat-rep1", { args: { fault: "partition-stall" } }, "r1-after"],
