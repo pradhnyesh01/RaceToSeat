@@ -342,6 +342,15 @@ GitHub — closed to match. The measurement was re-run after all fixes landed; t
 above are the post-fix run. Full test suite passes unmodified (150 tests) and `npm run typecheck`
 is clean. Phase 5 (todo.md, issues #37-#41) is now complete.
 
+Phase 6 (formal proof + chaos testing) is scoped but not started: a grilling session settled
+two independent tracks (TLA+ model-checked in Docker; Toxiproxy + scripted-kill chaos harness
+judged by four DB-state Oracles) with negative controls for every checker, a measure-first policy
+on unmodified code, and a Correctness violation / Robustness finding split. Full plan, ticket
+slicing (umbrella #42; F1-F5 = #43,#45-#48; C1-C5 = #44,#49-#52) and cut order are in todo.md Phase 6; new glossary terms are in
+CONTEXT.md. Not-yet-verified hypotheses to confirm in ticket C1, not facts: the app registers no
+`pool.on("error")` handler, sets no statement/lock/idle-in-transaction timeouts, and
+`withTransaction`'s catch-block `ROLLBACK` can mask the original error on a dead connection.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

@@ -62,13 +62,33 @@ phase ends with a working, demonstrable system plus a piece of evidence.
 > + lookup-on-conflict, in place since Phase 0/1 — see RaceToSeat#1.
 
 ## Phase 6 — Formal Rigor: Proof + Chaos Testing (high priority, don't defer)
-- [ ] Write lightweight TLA+ (or Alloy) spec of the seat-acquisition state machine
-- [ ] Model-check mutual exclusion invariant
-- [ ] Model-check deadlock-freedom invariant
-- [ ] Set up fault-injection harness (toxiproxy or scripted connection kills)
-- [ ] Run chaos test: kill DB connections mid-transaction under high concurrency
-- [ ] Run chaos test: inject network latency/partition, verify recovery correctness
-- [ ] **Deliverable:** proof + chaos test report, zero correctness violations
+
+Umbrella: #42. Scope settled via a grilling session (see CONTEXT.md: Fault, Ambiguous outcome, Oracle,
+Correctness violation, Robustness finding). Two independent tracks; do both tracers (F1, C1)
+before deepening either. Dependencies: F1→{F2,F3}→F4→F5, C1→{C2,C3}→C5, C4 off C2.
+ADRs 0021–0023 are written as the relevant tickets land, not up front.
+
+**Formal track** (TLA+, TLC in a pinned Docker image, `npm run formal:check`)
+- [ ] #43 F1 (tracer): core spec — claim + multi-seat Booking, mutual-exclusion & atomicity invariants, Docker TLC runner, naive-claim negative control
+- [ ] #45 F2: deadlock A/B — unsorted blocking acquisition yields a TLC counterexample; the fixed protocol is clean
+- [ ] #46 F3: lifecycle layer — Hold, Confirm, Expire (monotonic flag), Reaper, Cancel; reaper liveness under weak fairness
+- [ ] #47 F4: crash / ambiguous-commit / idempotent-retry layer
+- [ ] #48 F5: spec-action → SQL (`file:line`) mapping table + Exhibit G
+
+**Chaos track** (Toxiproxy compose profile + scripted `pg_terminate_backend`)
+- [ ] #44 C1 (tracer): fault driver, four DB-state oracles + corrupted-state unit tests, scratch-DB (no UNIQUE) negative control; backend-kill vs `pessimistic`, measured on unmodified code
+- [ ] #49 C2: latency, partition+heal, app SIGKILL across all six mechanisms
+- [ ] #50 C3: hold/confirm/reaper under fault (`pessimistic`)
+- [ ] #51 C4 (stretch): Postgres restart under load
+- [ ] #52 C5: Exhibit H; each Robustness finding filed as its own fix ticket with before/after rerun
+
+**Cut order if time runs short** (first dropped first): C4, F4, reaper liveness in F3,
+C2 narrowed to `pessimistic`/`optimistic`/`serializable`, F2. Never cut: F1, C1, the four
+oracles, every negative control.
+
+- [ ] **Deliverable:** Exhibits G and H exist, `npm run formal:check` passes, every negative
+  control is shown to fail, chaos report shows zero Correctness violations, Robustness
+  findings listed with follow-up issue links
 
 ## Phase 7 — Stretch: Scale-Out Angle (optional)
 - [ ] Implement actor-model or per-seat-queue variant (Redis-backed or in-process)
