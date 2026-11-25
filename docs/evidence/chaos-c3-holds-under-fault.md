@@ -1,5 +1,7 @@
 # Chaos C3: hold → confirm → reaper under backend-kill (`pessimistic`), measured on unmodified code
 
+> **Finding numbering (added by C5, #52 — the text below is as written at C3 time).** Exhibit H uses one canonical list, R1–R7. This record's **R1, R3 and R4 keep their numbers**; its **"R5 (new)" — the stalled reaper — is canonically R7**, because C2's record had already used R5 for the `advisory` stale-snapshot 500 (and R6 for retry-loop latency). Wherever this record says "R5" read **R7**. See [Exhibit H](exhibit-h-phase6-chaos.md) and [../phase6-robustness-ticket-drafts.md](../phase6-robustness-ticket-drafts.md).
+
 Issue #50, under umbrella #42. This is the C3 findings record, not Exhibit H (that is C5, #52). Definitions (Fault, Ambiguous outcome, Oracle, Correctness violation, Robustness finding) are in `CONTEXT.md`; reasoning in ADR-0022 (what "correct under chaos" means) and ADR-0023 (negative controls without production toggles). It extends [chaos-c1-tracer-findings.md](chaos-c1-tracer-findings.md) from bookings to the Phase 5 hold lifecycle.
 
 Per-run JSON reports are in `docs/evidence/chaos/c3-*.json` (52 runs; app logs sit beside them locally but are gitignored).

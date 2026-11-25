@@ -1,5 +1,7 @@
 # Chaos C2: latency, partition and app SIGKILL across all six mechanisms, measured on unmodified code
 
+> **Finding numbering (added by C5, #52 — the text below is as written at C2 time).** Exhibit H uses one canonical list, R1–R7. This record's **R1–R6 keep their numbers** (R5 = `advisory` stale-snapshot 500, R6 = retry-loop latency). C3's record also uses "R5", for a different finding (a stalled reaper blocking unrelated Hold/Confirm); that one is canonically **R7**. See [Exhibit H](exhibit-h-phase6-chaos.md) and [../phase6-robustness-ticket-drafts.md](../phase6-robustness-ticket-drafts.md).
+
 Issue #49, under umbrella #42, building on C1 (`chaos-c1-tracer-findings.md`). This is the C2 findings record, kept as found. It is **not** Exhibit H (C5, #52). Definitions (Fault, Ambiguous outcome, Oracle, Correctness violation, Robustness finding) are in `CONTEXT.md`; the reasoning is in ADR-0022 and ADR-0023.
 
 Raw per-run reports are `docs/evidence/chaos/c2-*.json` (one per run; the `.app.log` captures are git-ignored). Regenerate the tables below with `npx tsx load-harness/chaos/summarize.ts`.
