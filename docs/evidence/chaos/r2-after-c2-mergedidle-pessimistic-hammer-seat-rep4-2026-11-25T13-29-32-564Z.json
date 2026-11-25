@@ -1,0 +1,194 @@
+{
+  "label": "r2-after-c2-mergedidle-pessimistic-hammer-seat-rep4",
+  "ranAt": "2026-11-25T13:29:32.564Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r2-after-c2-mergedidle-pessimistic-hammer-seat-rep4",
+    "appPort": 3400,
+    "proxyPort": 5500,
+    "toxiproxyApi": "http://localhost:8497",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 2500,
+    "partitionJitterMs": 120,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "707233b9-a546-4e17-87e2-46e519f311e5",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 2766,
+    "healedAtMs": 9795,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 0
+  },
+  "stall": {
+    "samples": 179,
+    "peakOpenTx": 53,
+    "peakIdleInTx": 46,
+    "peakLockHolders": 1,
+    "maxOpenTxAgeMs": 204,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1017,
+        0,
+        0,
+        0
+      ],
+      [
+        2075,
+        0,
+        0,
+        0
+      ],
+      [
+        3020,
+        0,
+        0,
+        0
+      ],
+      [
+        4005,
+        0,
+        0,
+        0
+      ],
+      [
+        5000,
+        0,
+        0,
+        0
+      ],
+      [
+        6045,
+        0,
+        0,
+        0
+      ],
+      [
+        7031,
+        0,
+        0,
+        0
+      ],
+      [
+        8029,
+        0,
+        0,
+        0
+      ],
+      [
+        9026,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 1,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 1,
+    "bookingsAnsweredWith201": 1,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-ee14b020",
+  "k6": {
+    "statusTally": {
+      "201": 1,
+      "409": 59
+    },
+    "transportErrors": {},
+    "durationMs": 915,
+    "maxRequestMs": 520,
+    "p50RequestMs": 515,
+    "p95RequestMs": 520,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Reaper sweep failed: Error: Query read timeout": 1,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 118
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": []
+}
