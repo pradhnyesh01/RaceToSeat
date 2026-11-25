@@ -405,6 +405,25 @@ retried Confirm still completed exactly once; all Oracles green, negative contro
 Exhibit H gained section F. The other seven Robustness findings stay unfixed (R4-R7, RF1, RF2;
 R2 is its own PR).
 
+Issue #56 (finding R4) is done: every wait on the database is now bounded (ADR-0026). The pool
+(`src/db/poolOptions.ts`, env-overridable in `src/config.ts`, all `{ min: 1 }`) carries server-side
+`statement_timeout` and `idle_in_transaction_session_timeout` (1.5 s each, startup parameters), a client
+`query_timeout` (2 s, must exceed the statement timeout or the process refuses to start) and
+`connectionTimeoutMillis` (2 s). Two non-obvious parts: `lock_timeout` is deliberately NOT set (it raises
+`55P03`, the code `NOWAIT` conflicts use and the strategies translate to 409; `statement_timeout` already
+bounds a lock wait, and `isLockNotAvailable` additionally excludes a lock-timeout message), and pg's
+`query_timeout` rejects only the query, leaving the connection blocked on it so the catch block's `ROLLBACK`
+would queue behind it (4 s instead of 2 s, and a poisoned client back in the pool) — `src/db/queryDeadline.ts`,
+hooked from `pool.on("connect")` at the end of `pool.ts`, destroys the connection when a query times out. A
+bound that fires answers HTTP **504** (`outcome: "timeout"`, `Retry-After: 1`, same retry contract as 502),
+which ADR-0025 had reserved for exactly this. Measured on unmodified code: a 30 s partition now ends every
+transaction in <= 1.6 s (was 30.1 s) and the slowest request is 2.3 s (was 30.3 s), row locks released during
+the partition; 0 of 60 short-partition runs flag a transaction outliving the client's 5 s timeout (was 92 of
+120), longest transaction 2.1 s; no-Fault `hammer-seat` at concurrency 100 shows zero responses from a bound
+firing with p99 within Exhibit C's. Retry loops are unaffected (the bounds are per statement; a timeout is
+not retriable and never `retry_exhausted`). Exhibit H gained section G. The other six Robustness findings stay
+unfixed (R2 is its own PR; R5-R7, RF1, RF2).
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

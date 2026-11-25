@@ -12,8 +12,26 @@ export function isUniqueViolation(err: unknown, constraint: string): boolean {
 
 // Raised by SELECT ... FOR UPDATE NOWAIT when the row is already locked
 // (ADR-0006: the pessimistic strategy never blocks waiting for a lock).
+//
+// 55P03 is ALSO what a `lock_timeout` raises (issue #56, ADR-0026), and the code
+// alone cannot tell the two apart. The app never sets lock_timeout - a blocked
+// statement is bounded by statement_timeout (57014) instead - so in practice this
+// is NOWAIT-only; the message check below is defence in depth for a lock_timeout
+// an operator sets on the role or database, which must never be read as "another
+// request holds this seat" (409). PostgreSQL's message text is stable but can be
+// localised, so this is a backstop, not the primary mechanism.
 export function isLockNotAvailable(err: unknown): boolean {
-  return hasPgErrorCode(err, "55P03");
+  return hasPgErrorCode(err, "55P03") && !isLockTimeout(err);
+}
+
+// A `lock_timeout` firing: 55P03 "canceling statement due to lock timeout".
+export function isLockTimeout(err: unknown): boolean {
+  return hasPgErrorCode(err, "55P03") && /lock timeout/i.test(errorMessage(err));
+}
+
+function errorMessage(err: unknown): string {
+  const message = (err as { message?: unknown } | null)?.message;
+  return typeof message === "string" ? message : "";
 }
 
 // Raised when a UUID-typed column is compared against a malformed string.
@@ -74,6 +92,38 @@ export function isInfrastructureFailure(err: unknown): boolean {
       return true;
     }
     if (typeof message === "string" && INFRASTRUCTURE_MESSAGES.some((m) => message.startsWith(m))) {
+      return true;
+    }
+    current = cause;
+  }
+  return false;
+}
+
+// SQLSTATEs a bound firing produces: 57014 (query_canceled: statement_timeout, or
+// a user cancel), 25P03 (idle_in_transaction_session_timeout) and 25P04
+// (transaction_timeout, PostgreSQL 17+).
+const TIMEOUT_SQLSTATES = new Set(["57014", "25P03", "25P04"]);
+
+// Messages of the client-side bounds, which carry no code: pg's `query_timeout`,
+// pg-pool's `connectionTimeoutMillis` (waiting for a free slot / opening a
+// connection) and pg's own connection-establishment timeout.
+const TIMEOUT_MESSAGES = ["Query read timeout", "timeout exceeded when trying to connect", "Connection terminated due to connection timeout"];
+
+// True when `err` (or anything in its `cause` chain) is one of the bounds from
+// issue #56 firing - a timeout, as opposed to the database being unreachable
+// (`isInfrastructureFailure`) or refusing the request (a conflict). The global
+// error handler answers it with 504; it is checked before the infrastructure
+// class because pg words its connect timeout "Connection terminated ...".
+export function isTimeoutFailure(err: unknown): boolean {
+  for (let current: unknown = err, depth = 0; current && typeof current === "object" && depth < 5; depth++) {
+    const { code, message, cause } = current as { code?: unknown; message?: unknown; cause?: unknown };
+    if (typeof code === "string" && TIMEOUT_SQLSTATES.has(code)) {
+      return true;
+    }
+    if (isLockTimeout(current)) {
+      return true;
+    }
+    if (typeof message === "string" && TIMEOUT_MESSAGES.includes(message)) {
       return true;
     }
     current = cause;
