@@ -1,0 +1,147 @@
+{
+  "label": "r7-negctl-duplicate-confirm",
+  "ranAt": "2026-11-25T14:24:50.834Z",
+  "args": {
+    "mode": "hold-confirm",
+    "concurrency": 40,
+    "fault": "none",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 0,
+    "attemptsPerHold": 3,
+    "holdTtlSeconds": 120,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 0,
+    "sabotage": "duplicate-confirm",
+    "expectViolations": true,
+    "label": "r7-negctl-duplicate-confirm",
+    "appPort": 3380
+  },
+  "scratchDatabase": "racetoseat_chaos_4ce8507d",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "1003171e-3d1a-45f2-80e2-22126b8bda63",
+  "holdsSeeded": 40,
+  "reaperStallSeats": 0,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 0,
+    "onlyApplicationName": "racetoseat-c3-app"
+  },
+  "k6": {
+    "statusTally": {
+      "201": 110,
+      "409": 10
+    },
+    "transportErrors": {},
+    "durationMs": 477,
+    "maxRequestMs": 35
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {}
+  },
+  "confirmRetry": {
+    "tally": {
+      "201": 40
+    },
+    "bookedBeforeRetry": 40,
+    "createdByRetry": 1,
+    "unanswered": 0,
+    "heldLiveAtAnswer": 40
+  },
+  "seatStatusAtHeal": {
+    "booked": 40
+  },
+  "finalState": {
+    "seats": {
+      "booked": 40
+    },
+    "confirmKeyBookings": 41,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": "inserted a second booking under hold-confirm:24405196-29af-4be2-846c-5baf67f03081",
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "booking-missing-requested-seats",
+          "detail": "booking 05b19d5c-b532-4556-867d-65af238beab4 requested 1 seat(s) but holds 0; missing e32e283f-c1ea-438b-adfd-838836ef6fba",
+          "seatIds": [
+            "e32e283f-c1ea-438b-adfd-838836ef6fba"
+          ],
+          "bookingIds": [
+            "05b19d5c-b532-4556-867d-65af238beab4"
+          ],
+          "idempotencyKey": "hold-confirm:24405196-29af-4be2-846c-5baf67f03081"
+        }
+      ]
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "idempotency-key-produced-multiple-bookings",
+          "detail": "key hold-confirm:24405196-29af-4be2-846c-5baf67f03081 has 2 bookings after recovery",
+          "bookingIds": [
+            "05b19d5c-b532-4556-867d-65af238beab4",
+            "2d14cf98-fe6e-4d3d-8d14-1cedd5b52346"
+          ],
+          "idempotencyKey": "hold-confirm:24405196-29af-4be2-846c-5baf67f03081"
+        }
+      ]
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "live-hold-confirm-retry-yielded-multiple-bookings",
+          "detail": "hold 24405196-29af-4be2-846c-5baf67f03081's confirm retry left 2 bookings for key hold-confirm:24405196-29af-4be2-846c-5baf67f03081",
+          "seatIds": [
+            "e32e283f-c1ea-438b-adfd-838836ef6fba"
+          ],
+          "bookingIds": [
+            "2d14cf98-fe6e-4d3d-8d14-1cedd5b52346",
+            "05b19d5c-b532-4556-867d-65af238beab4"
+          ],
+          "idempotencyKey": "hold-confirm:24405196-29af-4be2-846c-5baf67f03081"
+        }
+      ]
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

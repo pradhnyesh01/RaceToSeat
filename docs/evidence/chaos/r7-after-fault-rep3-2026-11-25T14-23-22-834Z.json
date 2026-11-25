@@ -1,0 +1,138 @@
+{
+  "label": "r7-after-fault-rep3",
+  "ranAt": "2026-11-25T14:23:22.834Z",
+  "args": {
+    "mode": "hold-expiry",
+    "concurrency": 12,
+    "fault": "backend-kill",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.3,
+    "postLoadFaultMs": 3000,
+    "attemptsPerHold": 3,
+    "holdTtlSeconds": 8,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 3,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "r7-after-fault-rep3",
+    "appPort": 3380
+  },
+  "scratchDatabase": "racetoseat_chaos_72fbc516",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 2
+  },
+  "eventId": "c666865b-ad17-42ee-8138-e3f14c0dc833",
+  "holdsSeeded": 12,
+  "reaperStallSeats": 3,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.3,
+    "postLoadFaultMs": 3000,
+    "onlyApplicationName": "racetoseat-c3-app",
+    "stats": {
+      "sweeps": 150,
+      "terminated": 25,
+      "terminatedByState": {
+        "active": 3,
+        "idle in transaction": 22
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "201": 12,
+      "409": 451,
+      "410": 34,
+      "502": 19
+    },
+    "transportErrors": {},
+    "durationMs": 3580,
+    "maxRequestMs": 74
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {
+      "ROLLBACK also failed (connection already dead): terminating connection due to administrator command; the error it did not replace: (no error; a designed no-commit result)": 6,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 20,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: terminating connection due to administrator command": 14,
+      "error: terminating connection due to administrator command": 14,
+      "severity: 'FATAL',": 14,
+      "Error: Connection terminated unexpectedly": 3,
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to administrator command": 5,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Client has encountered a connection error and is not query": 2,
+      "Error: Client has encountered a connection error and is not queryable": 2
+    }
+  },
+  "confirmRetry": {
+    "tally": {
+      "404": 12
+    },
+    "bookedBeforeRetry": 0,
+    "createdByRetry": 0,
+    "unanswered": 0,
+    "heldLiveAtAnswer": 0
+  },
+  "seatStatusAtHeal": {
+    "available": 3,
+    "held": 12
+  },
+  "finalState": {
+    "seats": {
+      "available": 15
+    },
+    "confirmKeyBookings": 0,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "infrastructure-failures-classified",
+      "detail": "19 request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)"
+    }
+  ]
+}
