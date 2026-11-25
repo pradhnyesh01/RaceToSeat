@@ -1,0 +1,107 @@
+{
+  "label": "c3-baseline-hold-confirm-nofault",
+  "ranAt": "2026-11-25T05:26:23.234Z",
+  "args": {
+    "mode": "hold-confirm",
+    "concurrency": 40,
+    "fault": "none",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 0,
+    "holdTtlSeconds": 120,
+    "reaperIntervalMs": 1000,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "c3-baseline-hold-confirm-nofault",
+    "appPort": 3300
+  },
+  "scratchDatabase": "racetoseat_chaos_c83a6e45",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "40023178-a6de-48f2-b3a1-1563e78dd641",
+  "holdsSeeded": 40,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 0,
+    "onlyApplicationName": "racetoseat-c3-app"
+  },
+  "k6": {
+    "statusTally": {
+      "201": 84,
+      "409": 36
+    },
+    "transportErrors": {},
+    "durationMs": 554,
+    "maxRequestMs": 107
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {}
+  },
+  "confirmRetry": {
+    "tally": {
+      "201": 40
+    },
+    "unanswered": 0,
+    "heldLiveAtAnswer": 40
+  },
+  "seatStatusAtHeal": {
+    "booked": 40
+  },
+  "finalState": {
+    "seats": {
+      "booked": 40
+    },
+    "confirmKeyBookings": 40,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": []
+}

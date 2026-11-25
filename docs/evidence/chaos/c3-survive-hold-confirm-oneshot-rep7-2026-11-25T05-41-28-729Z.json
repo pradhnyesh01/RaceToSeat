@@ -1,0 +1,137 @@
+{
+  "label": "c3-survive-hold-confirm-oneshot-rep7",
+  "ranAt": "2026-11-25T05:41:28.729Z",
+  "args": {
+    "mode": "hold-confirm",
+    "concurrency": 100,
+    "fault": "backend-kill",
+    "surviveUncaught": true,
+    "killIntervalMs": 10,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 0,
+    "attemptsPerHold": 1,
+    "holdTtlSeconds": 120,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 0,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "c3-survive-hold-confirm-oneshot-rep7",
+    "appPort": 3300
+  },
+  "scratchDatabase": "racetoseat_chaos_ebabfb2d",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "0b26a519-1e39-4285-b956-d610038963c9",
+  "holdsSeeded": 100,
+  "reaperStallSeats": 0,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 10,
+    "fraction": 0.5,
+    "postLoadFaultMs": 0,
+    "onlyApplicationName": "racetoseat-c3-app",
+    "stats": {
+      "sweeps": 32,
+      "terminated": 65,
+      "terminatedByState": {
+        "idle in transaction": 55,
+        "active": 10
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "201": 37,
+      "500": 63
+    },
+    "transportErrors": {},
+    "durationMs": 388,
+    "maxRequestMs": 79
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {
+      "[chaos preload] swallowed uncaughtException: Connection terminated unexpectedly": 24,
+      "Error: Connection terminated unexpectedly": 23,
+      "[chaos preload] swallowed uncaughtException: terminating connection due to administrator command": 41,
+      "Error: Client has encountered a connection error and is not queryable": 38,
+      "error: terminating connection due to administrator command": 2,
+      "severity: 'FATAL',": 2
+    }
+  },
+  "confirmRetry": {
+    "tally": {
+      "201": 100
+    },
+    "bookedBeforeRetry": 37,
+    "createdByRetry": 63,
+    "unanswered": 0,
+    "heldLiveAtAnswer": 100
+  },
+  "seatStatusAtHeal": {
+    "held": 63,
+    "booked": 37
+  },
+  "finalState": {
+    "seats": {
+      "booked": 100
+    },
+    "confirmKeyBookings": 100,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 63x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    },
+    {
+      "id": "uncaught-exceptions-swallowed-by-scaffold",
+      "detail": "65 uncaught exception(s) swallowed by --survive-uncaught (each would have crashed the unmodified app)"
+    }
+  ]
+}

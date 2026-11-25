@@ -1,0 +1,140 @@
+{
+  "label": "c3-unmodified-hold-expiry-rep3",
+  "ranAt": "2026-11-25T05:32:50.838Z",
+  "args": {
+    "mode": "hold-expiry",
+    "concurrency": 12,
+    "fault": "backend-kill",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "holdTtlSeconds": 8,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 0,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "c3-unmodified-hold-expiry-rep3",
+    "appPort": 3300
+  },
+  "scratchDatabase": "racetoseat_chaos_77c8a44b",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "a70d4ce6-9697-4592-8a71-601561a0318f",
+  "holdsSeeded": 12,
+  "reaperStallSeats": 0,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "onlyApplicationName": "racetoseat-c3-app",
+    "stats": {
+      "sweeps": 84,
+      "terminated": 7,
+      "terminatedByState": {
+        "idle in transaction": 7
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "0": 117,
+      "409": 9,
+      "410": 2
+    },
+    "transportErrors": {
+      "EOF": 109,
+      "dial: connection refused": 8
+    },
+    "durationMs": 690,
+    "maxRequestMs": 41
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T05:32:50.948Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "restarts": 1,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "error: terminating connection due to administrator command": 1,
+      "Emitted 'error' event on Client instance at:": 1,
+      "severity: 'FATAL',": 1
+    }
+  },
+  "confirmRetry": {
+    "tally": {
+      "404": 12
+    },
+    "unanswered": 0,
+    "heldLiveAtAnswer": 0
+  },
+  "seatStatusAtHeal": {
+    "available": 12
+  },
+  "finalState": {
+    "seats": {
+      "available": 12
+    },
+    "confirmKeyBookings": 0,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "117 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}
