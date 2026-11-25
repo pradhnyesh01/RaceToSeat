@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # Runs TLC (from a pinned tla2tools.jar, inside a pinned JRE Docker image — no
-# local Java needed) over the SeatBooking model.
+# local Java needed) over the SeatBooking (F1) and DeadlockFreedom (F2) models.
 #
 #   formal/check.sh                     positive checks: every invariant must HOLD
 #   formal/check.sh --negative-control  every checker must be shown to FAIL:
 #                                         NaiveMutualExclusion -> MutualExclusion violated
 #                                         PartialAtomicity     -> Atomicity violated
 #                                         Witness              -> NoContendedOutcome violated (vacuity guard)
+#                                         DeadlockUnsorted     -> NoWaitForCycle violated (F2: unsorted blocking deadlocks)
+#                                         DeadlockUnsortedStuck-> TLC "Deadlock reached" (same, without the cycle checker)
+#                                         DeadlockSortedWitness-> NoHoldAndWait violated (vacuity guard)
+#                                         DeadlockNowaitWitness-> NoConflictAbort violated (vacuity guard)
 #   formal/check.sh --all               both, in that order
 #
 # Exit 0 only if every selected check behaves as expected. A positive check
@@ -24,6 +28,14 @@ JAR="$CACHE/tla2tools.jar"
 POSITIVE=(MutualExclusion Atomicity)
 # name:expected-violated-invariant
 NEGATIVE=(NaiveMutualExclusion:MutualExclusion PartialAtomicity:Atomicity Witness:NoContendedOutcome)
+
+# F2 (DeadlockFreedom.tla): configs named Deadlock*; entries use the same name:expect form.
+# expect "@stuck" means TLC's own deadlock check (exit 11, "Deadlock reached"), not an invariant.
+DL_POSITIVE=(DeadlockSorted DeadlockNowait)
+DL_NEGATIVE=(DeadlockUnsorted:NoWaitForCycle DeadlockUnsortedStuck:@stuck DeadlockSortedWitness:NoHoldAndWait DeadlockNowaitWitness:NoConflictAbort)
+
+# module_of <config-name>: the TLA+ module a config belongs to.
+module_of() { case "$1" in Deadlock*) echo DeadlockFreedom.tla ;; *) echo SeatBooking.tla ;; esac; }
 
 sha256_of() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
@@ -47,7 +59,7 @@ tlc() {
     -v "$JAR:/tla/tla2tools.jar:ro" -v "$HERE:/spec:ro" -w /spec \
     "$JRE_IMAGE" \
     java -XX:+UseParallelGC -cp /tla/tla2tools.jar tlc2.TLC \
-      -nowarning -workers auto -metadir /tmp/tlc-states -config "$1.cfg" SeatBooking.tla 2>&1
+      -nowarning -workers auto -metadir /tmp/tlc-states -config "$1.cfg" "$(module_of "$1")" 2>&1
 }
 
 failures=0
@@ -65,11 +77,13 @@ run_positive() {
 run_negative() {
   local name="${1%%:*}" expect="${1##*:}" out rc
   out="$(tlc "$name")"; rc=$?
-  if [[ $rc -eq 12 ]] && grep -q "Invariant $expect is violated" <<<"$out"; then
-    echo "PASS  $name  (expected violation of $expect found; trace length $(grep -cE '^State [0-9]+:' <<<"$out"))"
+  local want_rc=12 want_text="Invariant $expect is violated"
+  if [[ "$expect" == "@stuck" ]]; then want_rc=11; want_text="Deadlock reached"; fi
+  if [[ $rc -eq $want_rc ]] && grep -q "$want_text" <<<"$out"; then
+    echo "PASS  $name  (expected '$want_text' found; trace length $(grep -cE '^State [0-9]+:' <<<"$out"))"
     [[ -n "${FORMAL_SHOW_TRACE:-}" ]] && echo "$out" | sed 's/^/      /'
   else
-    echo "FAIL  $name  (wanted TLC exit 12 + 'Invariant $expect is violated'; got exit $rc)"; echo "$out" | sed 's/^/      /'
+    echo "FAIL  $name  (wanted TLC exit $want_rc + '$want_text'; got exit $rc)"; echo "$out" | sed 's/^/      /'
     failures=$((failures + 1))
   fi
 }
@@ -85,11 +99,11 @@ fetch_jar
 
 if [[ "$mode" == positive || "$mode" == --positive || "$mode" == --all ]]; then
   echo "== Positive checks: invariants must hold =="
-  for n in "${POSITIVE[@]}"; do run_positive "$n"; done
+  for n in "${POSITIVE[@]}" "${DL_POSITIVE[@]}"; do run_positive "$n"; done
 fi
 if [[ "$mode" == --negative-control || "$mode" == --all ]]; then
   echo "== Negative controls: checkers must be shown to fail =="
-  for n in "${NEGATIVE[@]}"; do run_negative "$n"; done
+  for n in "${NEGATIVE[@]}" "${DL_NEGATIVE[@]}"; do run_negative "$n"; done
 fi
 
 if [[ $failures -ne 0 ]]; then echo "formal:check FAILED ($failures)"; exit 1; fi
