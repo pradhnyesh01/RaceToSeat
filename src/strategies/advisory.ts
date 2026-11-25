@@ -44,21 +44,40 @@ export async function bookSeatAdvisory(input: BookSeatInput): Promise<BookSeatRe
     const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
 
     return await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
-      const seatRes = await txClient.query<{ id: string; status: string; acquired: boolean }>(
-        "SELECT id, status, pg_try_advisory_xact_lock(hashtext(id::text)) AS acquired FROM seats WHERE id = ANY($1)",
+      // Statement 1: take the locks. Existence is judged here (a seat's row is
+      // never deleted, so even a snapshot that predates a concurrent commit
+      // is right about it); availability is deliberately NOT read here — see
+      // the comment on statement 2.
+      const lockRes = await txClient.query<{ id: string; acquired: boolean }>(
+        "SELECT id, pg_try_advisory_xact_lock(hashtext(id::text)) AS acquired FROM seats WHERE id = ANY($1)",
         [seatIds],
       );
 
       // A seat missing from the result set is unknown — checked before the
       // lock/availability checks below, so it takes precedence over any
       // other seat in the same request already being booked.
-      if (seatRes.rows.length !== seatIds.length) {
+      if (lockRes.rows.length !== seatIds.length) {
         return { kind: "not_found" };
       }
-      if (seatRes.rows.some((seat) => !seat.acquired)) {
+      if (lockRes.rows.some((seat) => !seat.acquired)) {
         return { kind: "conflict" };
       }
-      if (seatRes.rows.some((seat) => seat.status !== "available")) {
+
+      // Statement 2: read availability, only now that every lock is held
+      // (R5, ADR-0027). Under READ COMMITTED each statement takes its own
+      // snapshot, so this one is taken after the lock was acquired — and a
+      // winner releases its lock only when it commits, so if we hold the lock
+      // we also see everything that winner wrote. Reading status in the lock
+      // statement itself (the original shape) let a loser's snapshot predate
+      // the winner's commit while its lock call ran after the winner's
+      // release, passing a stale 'available'; the booking_seats UNIQUE
+      // constraint then refused the insert as an unclassified 500. This costs
+      // one extra round trip per attempt that gets this far.
+      const statusRes = await txClient.query<{ status: string }>(
+        "SELECT status FROM seats WHERE id = ANY($1)",
+        [seatIds],
+      );
+      if (statusRes.rows.some((seat) => seat.status !== "available")) {
         return { kind: "conflict" };
       }
 

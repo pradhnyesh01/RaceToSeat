@@ -59,6 +59,7 @@ export interface ChaosReport {
     clientTimeouts?: number;
     maxRequestMs: number;
     p95RequestMs?: number;
+    p50RequestMs?: number;
   };
   app: {
     exits: unknown[];
@@ -102,7 +103,9 @@ export type ChaosGroup =
   | "c3-scaffolded"
   | "c3-control"
   | "r1-after"
-  | "r4-after";
+  | "r4-after"
+  | "r5-before"
+  | "r5-after";
 
 export interface LoadedChaosReport {
   file: string;
@@ -140,6 +143,10 @@ export function classify(report: ChaosReport): ChaosGroup {
   if (l.startsWith("r3-after")) return "r3-after";
   // R4 (#56) reruns run the code *with* the timeouts (ADR-0026): their own group.
   if (l.startsWith("r4-after")) return "r4-after";
+  // R5 (#58): `r5-before` reruns the same cells on the code *without* the fix,
+  // `r5-after` with it (ADR-0027). Neither belongs among the pre-fix aggregates.
+  if (l.startsWith("r5-before")) return "r5-before";
+  if (l.startsWith("r5-after")) return "r5-after";
   if (l.startsWith("r1-after-")) return "r1-after";
   if (report.args.mode) {
     if (report.args.expectViolations) return "c3-control";
@@ -747,7 +754,7 @@ export async function countUnitControls(testDir: URL, files: string[]): Promise<
 // ---------------------------------------------------------------------------
 // Rendering
 
-function renderHeadline(all: LoadedChaosReport[], fileCount: number): string {
+function renderHeadline(all: LoadedChaosReport[], fileCount: number, r5BeforeCount = 0): string {
   const controls = all.filter((x) => x.report.args.expectViolations);
   const measured = all.filter((x) => !x.report.args.expectViolations);
   const withFault = measured.filter((x) => x.report.args.fault !== "none");
@@ -759,12 +766,12 @@ function renderHeadline(all: LoadedChaosReport[], fileCount: number): string {
   return mdTable(
     ["", ""],
     [
-      ["Report files read (`docs/evidence/chaos/*.json`)", `**${fmtInt(fileCount)}** — ${fmtInt(all.length)} pre-fix (everything below except sections E and G), ${fmtInt(fileCount - all.length)} post-fix reruns (\`r1-after-*\`, issue #53, section E; \`r4-after-*\`, issue #56, section G)`],
+      ["Report files read (`docs/evidence/chaos/*.json`)", `**${fmtInt(fileCount)}** — ${fmtInt(all.length)} pre-fix (everything below except sections E, G and H), ${fmtInt(fileCount - all.length - r5BeforeCount)} post-fix reruns (\`r1-after-*\`, issue #53, section E; \`r4-after-*\`, issue #56, section G; \`r5-after-*\`, issue #58, section H) and ${fmtInt(r5BeforeCount)} \`r5-before-*\` reruns of the same cells on the code without #58's fix (section H)`],
       ["Measured runs (every run that is not a negative control)", `**${fmtInt(measured.length)}** — ${fmtInt(withFault.length)} under a Fault (${fmtInt(unmodFault.length)} on unmodified code, ${fmtInt(scaffoldFault.length)} with the \`--survive-uncaught\` scaffold), ${fmtInt(measured.length - withFault.length)} no-Fault baselines/reruns`],
       ["**Correctness violations** in measured runs (any Oracle failing)", `**${violations.length}**${violations.length ? ` (${violations.map((v) => v.report.label).join(", ")})` : ""}`],
       ["Negative controls that went red as required", `**${flagged.length} of ${controls.length}** end-to-end (\`expectViolations\`); the control's control on the real schema stayed green in ${twins.filter((t) => !t.report.correctnessViolation).length} of ${twins.length}`],
-      ["Robustness findings (canonical numbering)", `**${CANONICAL_FINDINGS.length}** chaos-observed (R1–R7) + **${FORMAL_FINDINGS.length}** formal-derived (RF1–RF2, found by model checking, not by a chaos run); R1 fixed by #53 (section E), R3 by #55 (section F), R4 by #56 (section G); the other six are not fixed and filed as fix tickets #54, #57–#61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`)`],
-      ["Production code changed", "None by the chaos tickets themselves (C1–C5: `src/` and `db/schema.sql` untouched, measure-first policy, ADR-0022). The fixes so far change `src/` only — #53 `src/db/pool.ts` (ADR-0024), #55 `src/db/pool.ts`, `src/db/pgErrors.ts`, `src/app.ts` (ADR-0025), #56 adds the timeouts of ADR-0026 (`src/config.ts`, `src/db/poolOptions.ts`, `src/db/queryDeadline.ts`, `src/db/pgErrors.ts`, `src/app.ts`, a hook appended to `src/db/pool.ts`); `db/schema.sql` is still untouched"],
+      ["Robustness findings (canonical numbering)", `**${CANONICAL_FINDINGS.length}** chaos-observed (R1–R7) + **${FORMAL_FINDINGS.length}** formal-derived (RF1–RF2, found by model checking, not by a chaos run); R1 fixed by #53 (section E), R3 by #55 (section F), R4 by #56 (section G), R5 by #58 (section H); the other five are not fixed and filed as fix tickets #54, #57, #59–#61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`)`],
+      ["Production code changed", "None by the chaos tickets themselves (C1–C5: `src/` and `db/schema.sql` untouched, measure-first policy, ADR-0022). The fixes so far change `src/` only — #53 `src/db/pool.ts` (ADR-0024), #55 `src/db/pool.ts`, `src/db/pgErrors.ts`, `src/app.ts` (ADR-0025), #56 adds the timeouts of ADR-0026 (`src/config.ts`, `src/db/poolOptions.ts`, `src/db/queryDeadline.ts`, `src/db/pgErrors.ts`, `src/app.ts`, a hook appended to `src/db/pool.ts`), #58 splits `advisory.ts`'s lock-and-read statement in two (`src/strategies/advisory.ts`, ADR-0027); `db/schema.sql` is still untouched"],
     ],
   );
 }
@@ -1171,9 +1178,12 @@ In the one-shot rows every Confirm that a kill cut was completed exactly once by
 **What did not improve** (measured, not hidden): the HTTP 500 count went *up* — requests that used to vanish with the process now fail individually with an unclassified 500 (R3); \`partition-stall\` still stalls every request for the whole partition (R4); a stalled reaper still blocks Holds/Confirms on its locked seats (R7); and \`partition-reset\` "landed" counts are partial, as before. During development, a first C1 attempt that carried only the per-checkout listener (no \`pool.on("error")\`; not kept as a report) still crashed once in 3 runs, through the idle path: a kill sweep aimed at in-transaction backends lands on a client the request has just released, which is R2's route — so R2's idle-path guard ships in the same change, and ticket #54 keeps its own acceptance criteria (idle-pool-kill rerun, partition-stall heal-only cases, regression test).`;
 }
 
-function renderFindings(ev: FindingEvidence, r1After: { crashed: number; total: number }, all: LoadedChaosReport[], r4After: ChaosReport[] = []): string {
+function renderFindings(ev: FindingEvidence, r1After: { crashed: number; total: number }, all: LoadedChaosReport[], r4After: ChaosReport[] = [], r5After: ChaosReport[] = [], r5Before: ChaosReport[] = []): string {
   const r1Fixed = r1After.total > 0;
   const r4Fixed = r4After.length > 0;
+  const r5Fixed = r5After.length > 0;
+  const r5Stall = (rs: ChaosReport[]) => rs.filter((r) => r.args.fault === "partition-stall");
+  const r5Any500 = (rs: ChaosReport[]) => rs.filter((r) => tallyOf(r, "500") > 0 || replay500(r) > 0).length;
   const head = ["", "Finding", "Class", "Earlier numbering", "Evidence recomputed from the reports"];
   const r6 = ev.r6.filter((r) => r.timeouts > 0 || r.r503 > 0);
   const evidence: Record<string, string> = {
@@ -1181,14 +1191,14 @@ function renderFindings(ev: FindingEvidence, r1After: { crashed: number; total: 
     R2: `Idle-pool kill, no request in flight: ${ev.r2.crashed}/${ev.r2.idlePoolRuns} crashed on \`BoundPool\`. ${ev.r2.partitionStallBoundPoolOnly} \`partition-stall\` runs died *only* via \`BoundPool\` (the heal found nothing but idle pooled connections). C3 did not re-test`,
     R3: `On scaffolded runs ${fmtInt(ev.r3.scaffoldedClientVisible500)} requests were answered an unclassified HTTP 500 to clients, and the app logged ${fmtInt(ev.r3.scaffoldedLoggedDeadConnectionErrors)} dead-connection errors — more than clients saw, because ${fmtInt(ev.r3.scaffoldedStallLogged)} of them were logged during scaffolded \`partition-stall\` runs, where clients had already timed out and saw ${fmtInt(ev.r3.scaffoldedStallClientVisible500)} 5xx. The top frame of the logged error is the catch-block \`ROLLBACK\`/\`BEGIN\` on the dead client (\`pool.ts:47\`/\`:134\`/\`:181\`/\`:187\`/\`:41\`) — **not derivable from the JSON** (see Record consistency check). **Fix ticket [#55](https://github.com/pradhnyesh01/RaceToSeat/issues/55)** (ADR-0025): ${renderR3FixSummary(all)}`,
     R4: `${r4Fixed ? `**Fixed by #56 (ADR-0026; section G): after the fix ${r4After.filter((r) => r.label.startsWith("r4-after-partition-stall-") && outlived(r)).length}/${r4After.filter((r) => r.label.startsWith("r4-after-partition-stall-")).length} short-partition runs flagged a transaction outliving the client timeout, and a 30 s partition ended every transaction in ${fmtInt(maxOf(r4After.filter((r) => LONG_AFTER_LABEL.test(r.label)).map((r) => r.stall?.maxOpenTxAgeMs ?? 0)))} ms at most.** Before the fix: ` : ""}${ev.r4.outlived}/${ev.r4.partitionStallRuns} partition-stall runs flagged a transaction outliving the client timeout; longest app transaction ${fmtSeconds(ev.r4.longestTxMsStall)} under a 7 s partition and ${fmtSeconds(ev.r4.longestTxMsLong)} under a 30 s one; ${ev.r4.leaked} transactions leaked after heal in the 420-run matrix (longest drain ${ev.r4.longestDrainMs} ms). Server settings in every report: \`statement_timeout\`, \`lock_timeout\`, \`idle_in_transaction_session_timeout\`, \`idle_session_timeout\` all 0`,
-    R5: `${ev.r5.matrixHits.length} of ${ev.r5.matrixRuns} matrix runs logged the \`booking_seats_seat_id_key\` violation behind an HTTP 500 (${ev.r5.matrixHits.map((l) => `\`${l}\``).join(", ") || "none"}); ${ev.r5.noFault500} of ${ev.r5.noFaultRuns} dedicated no-Fault advisory reruns answered a 500. Deterministic repro: \`load-harness/chaos/repro-advisory-snapshot-race.ts\` (a \`pg_sleep\` widens the window; not re-run here). Oracles stayed green: the UNIQUE backstop held`,
+    R5: `${r5Fixed ? `**Fixed by #58 (ADR-0027; section H): the deterministic interleaving now answers the loser 409 (was 500) with no booking row left; ${r5Any500(r5Stall(r5After))} of ${r5Stall(r5After).length} \`partition-stall\` reruns and ${r5Any500(r5After.filter((r) => r.args.fault === "none"))} of ${r5After.filter((r) => r.args.fault === "none").length} no-Fault reruns answered any 500 (code without the fix: ${r5Any500(r5Stall(r5Before))} of ${r5Stall(r5Before).length} and ${r5Any500(r5Before.filter((r) => r.args.fault === "none"))} of ${r5Before.filter((r) => r.args.fault === "none").length} — the rare race did not show up on either build, so the deterministic interleaving is the evidence, not these zeros); all four Oracles green in ${r5After.filter((r) => !r.correctnessViolation).length} of ${r5After.length}.** As found: ` : ""}${ev.r5.matrixHits.length} of ${ev.r5.matrixRuns} matrix runs logged the \`booking_seats_seat_id_key\` violation behind an HTTP 500 (${ev.r5.matrixHits.map((l) => `\`${l}\``).join(", ") || "none"}); ${ev.r5.noFault500} of ${ev.r5.noFaultRuns} dedicated no-Fault advisory reruns answered a 500. Deterministic repro: \`load-harness/chaos/repro-advisory-snapshot-race.ts\` (a \`pg_sleep\` widens the window${r5Fixed ? "; re-run before and after the fix in section H" : "; not re-run here"}). Oracles stayed green: the UNIQUE backstop held`,
     R6: `At 100 ms/chunk (below the 5 s timeout) ${r6.map((r) => `\`${r.mech}\` × \`${r.load}\` timed out ${r.timeouts}/${r.of}${r.r503 ? ` and answered ${r.r503}× 503` : ""}`).join("; ")}; every other cell: 0 timeouts`,
     R7: `Reaper stalled on 3 row-locked expired seats, no Fault: ${ev.r7.controlFreshHoldWins} of 12 fresh Hold attempts won (baseline ${ev.r7.baselineFreshHoldWins} of 12), ${ev.r7.control409}×409 (baseline ${ev.r7.baseline409}). Under backend-kill ${ev.r7.sweepsKilledUnmodified + ev.r7.sweepsKilledScaffolded} reaper sweeps were killed mid-flight (${ev.r7.sweepsKilledUnmodified} unmodified, ${ev.r7.sweepsKilledScaffolded} scaffolded); all seats were reaped after heal. The "blocked sweep leaves NOWAIT on 5 other expired seats failing with 55P03" probe was verified directly by C3, not recorded in a report`,
   };
   return mdTable(
     head,
     CANONICAL_FINDINGS.map((f) => [
-      f.id === "R1" && r1Fixed ? "[R1](https://github.com/pradhnyesh01/RaceToSeat/issues/53) (fixed)" : f.id === "R4" ? `[R4](https://github.com/pradhnyesh01/RaceToSeat/issues/56)${r4Fixed ? " (fixed)" : ""}` : f.id,
+      f.id === "R1" && r1Fixed ? "[R1](https://github.com/pradhnyesh01/RaceToSeat/issues/53) (fixed)" : f.id === "R4" ? `[R4](https://github.com/pradhnyesh01/RaceToSeat/issues/56)${r4Fixed ? " (fixed)" : ""}` : f.id === "R5" ? `[R5](https://github.com/pradhnyesh01/RaceToSeat/issues/58)${r5Fixed ? " (fixed)" : ""}` : f.id,
       f.title,
       f.klass,
       f.oldNumbers,
@@ -1353,20 +1363,149 @@ ${renderR4NoRegression(noRegression)}
 \`other\` counts every response that is not 201/409/503, and a \`504\` or \`502\` from a bound firing would land there. **At the acceptance concurrency (100) it is 0 for all six mechanisms, with p99 at or below Exhibit C's committed value for every mechanism** (ranges 25.7–49.1 ms against 43.7–67.8 ms; the committed numbers are one run each from an earlier session, so read "within noise", not "faster"), and the app logged no error line in any of these runs (every fired bound is logged by the error handler). **The nonzero \`other\` at 1,000 concurrent clients is not the bounds firing**: it is k6's own status 0 — connection resets from the load generator exceeding macOS's 128-deep listen backlog (\`kern.ipc.somaxconn\`, see Test environment), the same ceiling that limits every chaos load. Control, same machine and session: \`pessimistic\` and \`naive\` at 1,000 concurrent clients with all four bounds set to 10 minutes (\`docs/evidence/chaos/r4-nofault/unbounded-control/\`) show the same pattern (\`pessimistic\` 420 and 472 \`other\` per run, \`naive\` 304 and 470; with the bounds on, summed over two runs: \`pessimistic\` 548, \`naive\` 944). p99 at 1,000 is higher than Exhibit C's committed numbers for all six mechanisms; it is also higher in the unbounded control (313/90 ms \`pessimistic\`, 308/113 ms \`naive\`), so it is this machine state, not the bounds — but the 1,000-concurrency rows are supplementary and cannot, on this machine, distinguish a bound that rarely fires from none.`;
 }
 
+// Section H: the R5 fix (#58, ADR-0027), before vs after. Both variants are
+// reruns of the same cells on the *current* code (R1, R3 and R4's fixes
+// included) with `advisory.ts` as it was, `r5-before`, and as fixed,
+// `r5-after`; "as found" is the C2 matrix's own advisory cell (pre-R4 code).
+const median = (xs: number[]): number => {
+  if (xs.length === 0) return 0;
+  const sorted = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
+};
+const replay500 = (r: ChaosReport): number => r.replay?.tally?.["500"] ?? 0;
+const loggedUnique = (r: ChaosReport): boolean =>
+  Object.keys(r.app.errorSignatures ?? {}).some((k) => k.includes("booking_seats_seat_id_key") || k.includes("23505"));
+
+function renderR5Row(variant: string, rs: ChaosReport[]): string[] {
+  const statuses = ["201", "409", "500", "502", "504", "0"].map((k) => fmtInt(sum(rs.map((r) => tallyOf(r, k)))));
+  return [
+    variant,
+    String(rs.length),
+    statuses.join(" / "),
+    fmtInt(sum(rs.map(replay500))),
+    `${rs.filter((r) => tallyOf(r, "500") > 0 || replay500(r) > 0).length}`,
+    `${rs.filter(loggedUnique).length}`,
+    fmtInt(sum(rs.map((r) => r.app.exits.length))),
+    `${median(rs.map((r) => r.k6.p50RequestMs ?? 0)).toFixed(0)} / ${median(rs.map((r) => r.k6.p95RequestMs ?? 0)).toFixed(0)} / ${fmtInt(maxOf(rs.map((r) => r.k6.maxRequestMs)))}`,
+    oraclesClean(rs),
+  ];
+}
+
+const R5_HEAD = [
+  "variant",
+  "runs",
+  "answers 201 / 409 / 500 / 502 / 504 / none (k6)",
+  "500s on the replay",
+  "runs answering any 500",
+  "runs logging `booking_seats_seat_id_key`",
+  "app exits",
+  "request ms: median p50 / median p95 / max",
+  "Oracles clean",
+];
+
+function renderR5NoRegression(nr: { before: NoRegressionRow[]; after: NoRegressionRow[] } | undefined): string {
+  if (!nr || (nr.before.length === 0 && nr.after.length === 0)) return "_No `r5-nofault` reports present._";
+  const concurrencies = uniq([...nr.before, ...nr.after].map((r) => r.concurrency)).sort((a, b) => a - b);
+  const rows: string[][] = [];
+  for (const c of concurrencies) {
+    for (const [variant, rs] of [["before (#56 code)", nr.before], ["**after (#58)**", nr.after]] as const) {
+      // One row per report file (several rounds at one concurrency are shown
+      // individually, in the order they ran, so an order effect is visible).
+      for (const r of rs.filter((x) => x.concurrency === c)) rows.push([
+        String(c),
+        variant,
+        String(r.repeats),
+        fmtInt(r.requests),
+        `${r.tally["201"] ?? 0} / ${r.tally["409"] ?? 0} / ${r.tally["503"] ?? 0} / ${r.tally.other ?? 0}`,
+        r.doubleBooked ? "**YES**" : "no",
+        r.p50Ms.toFixed(1),
+        r.p99Ms.toFixed(1),
+        r.throughputRps.toFixed(0),
+        r.exhibitC ? `${r.exhibitC.p99Ms.toFixed(1)} / ${r.exhibitC.throughputRps.toFixed(0)}` : "—",
+      ]);
+    }
+  }
+  return mdTable(
+    ["concurrency", "variant", "repeats", "requests", "201 / 409 / 503 / other", "double-booked?", "p50 (ms)", "p99 (ms)", "throughput (req/s)", "Exhibit C p99 / throughput"],
+    rows,
+  );
+}
+
+function renderR5After(
+  all: LoadedChaosReport[],
+  before: ChaosReport[],
+  after: ChaosReport[],
+  nr: { before: NoRegressionRow[]; after: NoRegressionRow[] } | undefined,
+): string {
+  if (after.length === 0) return "_No `r5-after-*` reports present._";
+  const stall = (rs: ChaosReport[]) => rs.filter((r) => r.args.fault === "partition-stall");
+  const noFault = (rs: ChaosReport[]) => rs.filter((r) => r.args.fault === "none");
+  const asFound = reportsOf(inGroups(all, "c2-unmodified")).filter((r) => r.args.strategy === "advisory" && r.args.load === "hammer-seat" && r.args.fault === "partition-stall");
+  const asFoundNoFault = reportsOf(inGroups(all, "c2-nofault-advisory"));
+  const violations = after.filter((r) => r.correctnessViolation);
+  return `Issue #58 (R5) changed \`advisory.ts\` to take the advisory locks in one statement and read \`status\` in a second one, after every lock is held (ADR-0027) — under READ COMMITTED the second statement's snapshot cannot predate a winner whose lock the first statement just acquired. The \`booking_seats\` UNIQUE constraint is not relied on and its violation is deliberately not translated. The runs below are the issue's own before/after reruns of the *unmodified* app (no \`--survive-uncaught\`), labelled \`r5-before-*\` (current code with the old \`advisory.ts\`, ${before.length} runs) and \`r5-after-*\` (with the fix, ${after.length} runs), both on a Postgres and Toxiproxy of their own and kept in groups of their own so no number above mixes them in. **Correctness violations in the after-runs: ${violations.length}; app exits: ${sum(after.map((r) => r.app.exits.length))}.**
+
+#### H1. The deterministic interleaving (\`load-harness/chaos/repro-advisory-snapshot-race.ts\`, Part 2)
+
+Not derivable from the JSON (the script prints, it writes no report). Same interleaving each time — the loser's lock-acquiring statement paused 600 ms between its snapshot and its lock call, a complete winning booking through the real app while it sleeps — run once against the unmodified \`advisory.ts\` and once against the fix:
+
+${mdTable(
+  ["", "winner answers", "loser answers", "booking rows left by the loser", "script verdict"],
+  [
+    ["before (#56 code)", "201", "**500** (\`23505 booking_seats_seat_id_key\` from the loser's \`INSERT INTO booking_seats\`)", "0 (the transaction rolled back)", "FAIL"],
+    ["**after (#58)**", "201", "**409**", "0", "PASS"],
+  ],
+)}
+
+The new Vitest test (\`test/strategies/advisoryStaleSnapshot.test.ts\`) stages the same interleaving; it fails on the unmodified \`advisory.ts\` (\`expected 500 to be 409\`) and passes with the fix. Part 1 of the script (the same race in raw SQL) is unchanged: it demonstrates the window and that the UNIQUE backstop would still refuse the second booking.
+
+#### H2. C2's cell: \`partition-stall\` × \`hammer-seat\` × \`advisory\`, 60 requests, 7 s partition, client timeout 5 s
+
+${mdTable(R5_HEAD, [
+  renderR5Row("as found (C2 matrix, pre-R1/R3/R4 code)", asFound),
+  renderR5Row("before (#56 code)", stall(before)),
+  renderR5Row("**after (#58)**", stall(after)),
+])}
+
+**Read the zeros with their caveat.** The before-runs do not show the 500 either, so this cell is no evidence that the fix works: the race is a microseconds-wide window (1 hit in the C2 matrix's 70 advisory runs, found in a *replay* hammer), and under a partition (now ended by ADR-0026's bounds) almost every request is answered 502/504 before it reaches the lock at all. What these 20 reps show is **no regression** — zero 500s, zero app exits, all four Oracles clean, same answers and latency shape — not that R5 is gone. The evidence that it is gone is H1 (the same interleaving, deterministic) and the Vitest test.
+
+#### H3. No Fault: the 20-run advisory hammer (\`c2adv-*\` flags), 60 requests
+
+${mdTable(R5_HEAD, [
+  renderR5Row("as found (\`c2adv-*\`, pre-R1/R3/R4 code)", asFoundNoFault),
+  renderR5Row("before (#56 code)", noFault(before)),
+  renderR5Row("**after (#58)**", noFault(after)),
+])}
+
+#### H4. No regression under load (no Fault, \`hammer-seat\`, \`advisory\`)
+
+${renderR5NoRegression(nr)}
+
+**The extra statement costs something measurable at 100 concurrent clients, and the fix does not make \`advisory\` faster anywhere.** In all three before/after pairs at concurrency 100 the fixed build was slower: median p50 +2.5, +2.3 and +0.7 ms over the before-run it was paired with (≈ +3 to +12 %), p99 +3.7, +3.0 and +1.6 ms, throughput −12, −10 and −6 %. The rounds ran in the order before, after (the 5-repeat and 1,000-concurrency pair), then after, before, before, after (the two 10-repeat pairs), so the gap is not an order effect. It is consistent with one extra round trip on every attempt that holds its lock (the winner, and any loser that arrives after the winner's commit; a loser that loses the lock call is unchanged). At 1,000 the fixed build happened to look *faster* (p99 176.9 vs 217.4 ms): with 741–805 of 2,000 requests lost to the load generator's own connection resets that row cannot resolve a ~2 ms effect and is not evidence of a speed-up. Zero double-bookings in every run, both builds, both concurrencies — the project's gate.
+
+"Before" and "after" are the same two builds of the app run on this machine's own Postgres (\`docs/evidence/chaos/r5-nofault/{before,after}/\`, ordinary \`npm run harness\` reports kept out of \`docs/evidence/\` so Exhibit C's aggregation never sees them); "Exhibit C" is its one committed run from an earlier session and machine state, so compare before against after, not either against it. The 1,000-concurrency rows' nonzero \`other\` is the load generator's own connection resets against macOS's 128-deep listen backlog (see Test environment), as in section G.`;
+}
+
 export interface ExhibitHInputs {
   reports: LoadedChaosReport[];
   unitControls: UnitControlCount[] | null;
   // R4 (#56) no-regression rows; see NoRegressionRow. Empty when no r4-nofault reports exist.
   noRegression?: NoRegressionRow[];
+  // R5 (#58) no-regression rows: the same advisory no-Fault hammer-seat runs on
+  // the code without the fix (`before`) and with it (`after`), same session.
+  r5NoRegression?: { before: NoRegressionRow[]; after: NoRegressionRow[] };
 }
 
-export function renderExhibitH({ reports: allReports, unitControls, noRegression = [] }: ExhibitHInputs): string {
+export function renderExhibitH({ reports: allReports, unitControls, noRegression = [], r5NoRegression }: ExhibitHInputs): string {
   // Everything except section E and the headline's file count describes the
   // pre-fix evidence; the post-fix `r1-after` reruns (issue #53) are kept out
   // of it so no earlier number moves.
-  const all = allReports.filter((x) => x.group !== "r1-after" && x.group !== "r4-after");
+  const all = allReports.filter((x) => x.group !== "r1-after" && x.group !== "r4-after" && x.group !== "r5-before" && x.group !== "r5-after");
   const afterReports = reportsOf(inGroups(allReports, "r1-after"));
   const r4AfterReports = reportsOf(inGroups(allReports, "r4-after"));
+  const r5BeforeReports = reportsOf(inGroups(allReports, "r5-before"));
+  const r5AfterReports = reportsOf(inGroups(allReports, "r5-after"));
   const afterCrashed = afterReports.filter(crashed).length;
   const c2u = reportsOf(inGroups(all, "c2-unmodified"));
   const c2s = reportsOf(inGroups(all, "c2-scaffolded"));
@@ -1390,7 +1529,7 @@ Every number below is recomputed from the per-run JSON reports in \`docs/evidenc
 
 ## Headline
 
-${renderHeadline(all, allReports.length)}
+${renderHeadline(all, allReports.length, r5BeforeReports.length)}
 
 **Read the zero with its caveat.** The unmodified application dies on the first torn connection (R1/R2): ${unmodCrashed.length} of ${unmodFaultRuns.length} unmodified runs under a connection-tearing Fault (backend-kill, idle-pool-kill, partition-stall, partition-reset) ended with the process exiting, and in the four C1 unmodified backend-kill runs ${c1Unanswered.map((c) => `${c.unans} of ${c.of}`).join(", ")} requests (respectively) got no answer. In ${unanswered} of ${unmodC2PartitionStall.length} unmodified \`partition-stall\` runs *every* request went unanswered (the partition outlasted the client timeout). So **the unmodified runs mostly judge little**: "all four Oracles pass" is honest there, but largely because almost nothing ran before the process was gone, and the harness's restart plus full key replay then produced a clean state. The meaningful evidence that the Oracles hold *across many Faults and ongoing traffic* is the \`--survive-uncaught\` scaffolded runs — which are reported separately (ADR-0022) and never merged with the unmodified ones. Neither is evidence about a production deployment with a process supervisor: the harness restart is a stand-in for one.
 
@@ -1520,13 +1659,17 @@ On the three C2 \`partition-reset\` cells the same count over the 15 after-runs:
 
 ${renderR4After(all, r4AfterReports, noRegression)}
 
+### H. After the R5 fix (#58) — \`advisory\` reads status only once it holds the lock
+
+${renderR5After(all, r5BeforeReports, r5AfterReports, r5NoRegression)}
+
 ## Robustness findings — canonical numbering (R1–R7)
 
 C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); R1 has since been fixed (#53, section E) and the other six are not, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`).
 
-${renderFindings(ev, { crashed: afterCrashed, total: afterReports.length }, all, r4AfterReports)}
+${renderFindings(ev, { crashed: afterCrashed, total: afterReports.length }, all, r4AfterReports, r5AfterReports, r5BeforeReports)}
 
-Notes: **R1/R2** — a per-checkout \`client.on('error')\` is needed; \`pool.on('error')\` covers R2 only. #53's fix ships both (one hook in \`src/db/pool.ts\`), so R2's idle path is guarded too, though #54's own before/after criteria are still open. **R3** also affects \`withSerializableTransaction\` (\`pool.ts:134\`) and \`withDeadlockRetry\` (\`pool.ts:181\`, \`:187\`), not just \`withTransaction\` (\`pool.ts:47\`); the unclassified 500 is the global error handler (\`src/app.ts:10\`). **R5** is not Fault-dependent and rare; Oracle 1 is a statement about stored state and the \`UNIQUE(seat_id)\` constraint (ADR-0008) kept it correct — what failed was the HTTP answer. It is, though, a mechanism leaning on its backstop while its own check is racy, which ADR-0013 says openly about \`serializable\` and not yet about \`advisory\`. **R6** is a design trade-off of ADR-0009/0011/0013 recorded because it is where "below the timeout" is not below it. **R7** needs a leaked or slow lock (R4) to persist indefinitely.
+Notes: **R1/R2** — a per-checkout \`client.on('error')\` is needed; \`pool.on('error')\` covers R2 only. #53's fix ships both (one hook in \`src/db/pool.ts\`), so R2's idle path is guarded too, though #54's own before/after criteria are still open. **R3** also affects \`withSerializableTransaction\` (\`pool.ts:134\`) and \`withDeadlockRetry\` (\`pool.ts:181\`, \`:187\`), not just \`withTransaction\` (\`pool.ts:47\`); the unclassified 500 is the global error handler (\`src/app.ts:10\`). **R5** is not Fault-dependent and rare; Oracle 1 is a statement about stored state and the \`UNIQUE(seat_id)\` constraint (ADR-0008) kept it correct — what failed was the HTTP answer. It is, though, a mechanism leaning on its backstop while its own check is racy, which ADR-0013 says openly about \`serializable\`; ADR-0027 (#58) fixes the race instead of leaning on the backstop for \`advisory\`. **R6** is a design trade-off of ADR-0009/0011/0013 recorded because it is where "below the timeout" is not below it. **R7** needs a leaked or slow lock (R4) to persist indefinitely.
 
 ### Formal-derived findings (RF1–RF2) — kept apart from R1–R7
 
@@ -1589,6 +1732,14 @@ npx tsx load-harness/chaos/run.ts --strategy pessimistic --load deadlock-pairs -
   --base-latency-ms 40 --partition-ms 30000 --label r4-after-pessimistic                 # + advisory, serializable
 npx tsx load-harness/chaos/matrix.ts --label-prefix r4-after- --faults partition-stall --survive-faults none --reps 5
 BOOKING_STRATEGY=<mechanism> npm run harness -- --pattern hammer-seat --concurrency 100 --repeat 5   # no-regression; move the reports to docs/evidence/chaos/r4-nofault/
+# R5 fix reruns (section H), after #58 (before = the same commands on the parent commit):
+npx tsx load-harness/chaos/run.ts --strategy advisory --load hammer-seat --concurrency 60 --fault partition-stall --db scratch \\
+  --toxiproxy-api http://localhost:8475 --proxy-port 5440 --app-port 3200 --request-timeout-ms 5000 --label r5-after-partition-stall-advisory-hammer-seat-rep1 \\
+  --base-latency-ms 40 --partition-ms 7000 --partition-jitter-ms 120                   # x20 reps; the matrix.ts cell, rep > 3
+npx tsx load-harness/chaos/run.ts --strategy advisory --load hammer-seat --concurrency 60 --fault none --db scratch \\
+  --toxiproxy-api http://localhost:8475 --proxy-port 5441 --app-port 3201 --request-timeout-ms 60000 --label r5-after-nofault-advisory-hammer-rep1   # x20
+npx tsx load-harness/chaos/repro-advisory-snapshot-race.ts                              # H1, both parts
+BOOKING_STRATEGY=advisory npm run harness -- --pattern hammer-seat --concurrency 1000 --repeat 2   # no-regression; move the reports to docs/evidence/chaos/r5-nofault/{before,after}/
 npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json
 npx vitest run test/chaos                              # the unit controls
 \`\`\`
