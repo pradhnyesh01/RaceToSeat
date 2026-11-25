@@ -195,6 +195,104 @@ describe("withSerializableTransaction", () => {
     }
   });
 
+  // Issue #59 (R6, ADR-0028): a total time budget alongside the retry-count cap. Under a slow
+  // link every attempt costs many round trips, so five count-capped retries can outlast the
+  // client's own timeout; the loop therefore also stops starting attempts it predicts would
+  // finish past the budget. The prediction is the last failed attempt's own duration.
+  describe("retry time budget (R6)", () => {
+    const slowAttempt = (calls: { n: number }, ms: number) => async () => {
+      calls.n++;
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      throw { code: "40001" };
+    };
+
+    it("stops starting attempts once another one would overrun the budget, well before the count cap", async () => {
+      const client = await pool.connect();
+      try {
+        const calls = { n: 0 };
+        const started = Date.now();
+
+        const rejection = withSerializableTransaction(client, slowAttempt(calls, 100), () => true, {
+          maxRetries: 50,
+          budgetMs: 250,
+        });
+
+        await expect(rejection).rejects.toThrow(SerializationRetriesExhaustedError);
+        const elapsed = Date.now() - started;
+        // attempt 0 ends ~100 ms (100 + 100 <= 250: retry), attempt 1 ends ~200 ms
+        // (200 + 100 > 250: stop). Two attempts, one retry, bounded by the budget.
+        expect(calls.n).toBe(2);
+        expect(elapsed).toBeLessThan(250 + 150);
+      } finally {
+        client.release();
+      }
+    });
+
+    it("reports the retries actually made, so retry_exhausted still carries a true retry count", async () => {
+      const client = await pool.connect();
+      try {
+        const calls = { n: 0 };
+        const error = await withSerializableTransaction(client, slowAttempt(calls, 100), () => true, {
+          maxRetries: 50,
+          budgetMs: 250,
+        }).catch((err: unknown) => err);
+
+        expect(error).toBeInstanceOf(SerializationRetriesExhaustedError);
+        expect((error as SerializationRetriesExhaustedError).retries).toBe(1);
+      } finally {
+        client.release();
+      }
+    });
+
+    it("always makes the first attempt, even when it alone is longer than the budget", async () => {
+      const client = await pool.connect();
+      try {
+        const calls = { n: 0 };
+        await expect(
+          withSerializableTransaction(client, slowAttempt(calls, 60), () => true, { maxRetries: 5, budgetMs: 1 }),
+        ).rejects.toThrow(SerializationRetriesExhaustedError);
+        expect(calls.n).toBe(1);
+      } finally {
+        client.release();
+      }
+    });
+
+    it("does not interfere when attempts are fast: the count cap still decides", async () => {
+      const client = await pool.connect();
+      try {
+        const calls = { n: 0 };
+        await expect(
+          withSerializableTransaction(client, slowAttempt(calls, 1), () => true, { maxRetries: 4, budgetMs: 60_000 }),
+        ).rejects.toThrow(SerializationRetriesExhaustedError);
+        expect(calls.n).toBe(5);
+      } finally {
+        client.release();
+      }
+    });
+
+    it("a budget never turns a success into a failure: the attempt that fits is allowed to finish", async () => {
+      const client = await pool.connect();
+      try {
+        let calls = 0;
+        const result = await withSerializableTransaction(
+          client,
+          async () => {
+            calls++;
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            if (calls === 1) throw { code: "40001" };
+            return "ok";
+          },
+          () => true,
+          { maxRetries: 5, budgetMs: 1000 },
+        );
+        expect(result).toBe("ok");
+        expect(calls).toBe(2);
+      } finally {
+        client.release();
+      }
+    });
+  });
+
   it("a maxRetries of 0 exhausts immediately, after exactly one attempt", async () => {
     const client = await pool.connect();
     try {

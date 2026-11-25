@@ -92,6 +92,15 @@ B) at 1,000-concurrent/all-same-seat.
   budget within this matrix's load levels. `advisory` blocks on the lock
   rather than retrying, and `naive`/`unique_constraint`/`pessimistic`
   never retry at all, so `0.0%` is definitional for all four.
+  **That zero is a property of a fast link, not of the mechanisms.** Under
+  100 ms of added latency per protocol chunk (Exhibit H, section J; ADR-0028),
+  `serializable`'s retries re-collide in lockstep (a 1-5 ms jitter is
+  nothing next to a 200 ms round trip) and most requests in an adversarial
+  two-seat load end `503`; its retry loop is therefore also bounded in time
+  (3 s, `RETRY_BUDGET_MS`), which turns what would be client timeouts into
+  answered `503`s. `optimistic`'s retry loop did not run in the slow-link
+  cell at all (every response carried `X-Booking-Retries: 0`); it is not
+  time-bounded, deliberately.
 - **Double-booked?**: ground truth from `booking_seats`, not from HTTP
   status codes (see `run.ts`'s `runOnce`/`runSpreadSeatsOnce`) — the
   single hard pass/fail gate (PRD §Metrics & Acceptance Criteria).

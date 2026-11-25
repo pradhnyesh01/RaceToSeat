@@ -424,6 +424,24 @@ firing with p99 within Exhibit C's. Retry loops are unaffected (the bounds are p
 not retriable and never `retry_exhausted`). Exhibit H gained section G. The other six Robustness findings stay
 unfixed (R2 is its own PR; R5-R7, RF1, RF2).
 
+Issue #59 (finding R6) is decided, split by evidence (ADR-0028): the ticket's hypothesis (retry loops
+multiply slow-link latency) held for `serializable` and not for `optimistic`. A probe reading each
+response's `X-Booking-Retries` (`load-harness/chaos/probe-retry-latency.ts`) showed `optimistic` ×
+`hammer-seat` never entered its CAS loop (every non-504 response had retries 0): the cost is queueing
+behind the winner's row lock, which R4's `statement_timeout` already turns from 26 client timeouts per
+run into 48 answered `504`s at ~2.5 s. Accepted and documented, no code change (Exhibit C/E notes,
+Exhibit H section J). `serializable` × `deadlock-pairs` retries in lockstep (1-5 ms jitter against a
+200 ms round trip) and at 125 ms per chunk 51-52 of 60 clients timed out. `withSerializableTransaction`
+now also stops starting attempts once another is predicted to end past `RETRY_BUDGET_MS` (default 3 s,
+`src/db/retryBudget.ts`; ADR-0026's server-side worst case), ending as the same `retry_exhausted` `503`:
+at 125 ms per chunk 0 client timeouts (was 154 of 180), slowest request 3.4 s (was 5.0 s). The honest
+cost: fewer requests complete (7 of 60 resolved instead of 11 at 100 ms) because fewer retries means
+fewer chances to win; the lockstep collisions themselves are not fixed. Normal-load spot-check
+(`serializable` × `hammer-seat`, 100 concurrent, 5 repeats): 0 `503`, p99 within Exhibit C. The two new
+lines in `src/db/pool.ts` put Exhibit G's pinned anchors at the drift test's 4-line tolerance; the next
+edit above them must re-pin those rows. Exhibit H gained section J. Three Robustness findings remain
+unfixed (R7, RF1, RF2); R5 shipped separately (#58, ADR-0027).
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
