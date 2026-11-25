@@ -196,3 +196,16 @@ export async function withDeadlockRetry<T>(
     }
   }
 }
+
+// An idle pooled connection that dies (backend killed, network torn down)
+// makes the Pool emit 'error'; with no listener Node treats that as an
+// uncaught exception and the process exits with no request in flight at all
+// (finding R2, issue #54). pg-pool has already removed the dead client from
+// the pool by the time this fires, so logging it once is the whole job — the
+// next pool.connect() simply opens a fresh connection. This covers only
+// clients sitting idle in the pool: pg-pool detaches its own listener when a
+// client is checked out, so a connection that errors mid-request is a
+// separate path (finding R1, issue #53) and is not handled here.
+pool.on("error", (err) => {
+  console.error("Idle pooled connection errored and was discarded:", err.message);
+});
