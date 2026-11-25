@@ -11,6 +11,7 @@
 #                                         DeadlockUnsortedStuck-> TLC "Deadlock reached" (same, without the cycle checker)
 #                                         DeadlockSortedWitness-> NoHoldAndWait violated (vacuity guard)
 #                                         DeadlockNowaitWitness-> NoConflictAbort violated (vacuity guard)
+#                                       Lifecycle*           -> F3 (SeatLifecycle.tla): see LC_NEGATIVE below
 #   formal/check.sh --all               both, in that order
 #
 # Exit 0 only if every selected check behaves as expected. A positive check
@@ -34,8 +35,28 @@ NEGATIVE=(NaiveMutualExclusion:MutualExclusion PartialAtomicity:Atomicity Witnes
 DL_POSITIVE=(DeadlockSorted DeadlockNowait)
 DL_NEGATIVE=(DeadlockUnsorted:NoWaitForCycle DeadlockUnsortedStuck:@stuck DeadlockSortedWitness:NoHoldAndWait DeadlockNowaitWitness:NoConflictAbort)
 
+# F3 (SeatLifecycle.tla): configs named Lifecycle*. Safety and liveness are separate runs.
+# expect "@temporal" means a liveness violation (TLC exit 13, "Temporal properties were violated").
+LC_POSITIVE=(LifecycleSafety LifecycleLiveReaper LifecycleLiveSeat)
+LC_NEGATIVE=(
+  LifecycleNoExpiryCheck:NoConfirmOnExpired LifecycleReplayConfirm:HoldConfirmedAtMostOnce
+  LifecycleUnguardedReaper:ReapOnlyExpired LifecycleStaleReaper:SeatStatusAgrees
+  LifecycleStaleReaperExclusion:SeatBelongsToAtMostOne
+  LifecycleWitnessExpiryDuringConfirm:NoExpiryDuringConfirm LifecycleWitnessConfirmWonAfterExpiry:NoConfirmWonAfterExpiry
+  LifecycleWitnessReuseAfterReap:NoReuseAfterReap LifecycleWitnessBookingBlockedByHold:NoBookingBlockedByHold
+  LifecycleWitnessCancelAfterConfirm:NoCancelAfterConfirm
+  LifecycleLiveNoFairness:@temporal LifecycleLiveReaperDisabled:@temporal
+  LifecycleLiveNoTimeFairness:@temporal LifecycleLiveNoCommitFairness:@temporal
+)
+
 # module_of <config-name>: the TLA+ module a config belongs to.
-module_of() { case "$1" in Deadlock*) echo DeadlockFreedom.tla ;; *) echo SeatBooking.tla ;; esac; }
+module_of() {
+  case "$1" in
+    Deadlock*) echo DeadlockFreedom.tla ;;
+    Lifecycle*) echo SeatLifecycle.tla ;;
+    *) echo SeatBooking.tla ;;
+  esac
+}
 
 sha256_of() { if command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
@@ -68,7 +89,7 @@ run_positive() {
   local name="$1" out rc
   out="$(tlc "$name")"; rc=$?
   if [[ $rc -eq 0 ]]; then
-    echo "PASS  $name  ($(grep -E 'distinct states found' <<<"$out" | head -1 | sed -E 's/^([0-9]+) states generated, ([0-9]+) distinct.*/\1 states, \2 distinct/'))"
+    echo "PASS  $name  ($(grep -E '^[0-9]+ states generated, [0-9]+ distinct states found' <<<"$out" | tail -1 | sed -E 's/^([0-9]+) states generated, ([0-9]+) distinct.*/\1 states, \2 distinct/'))"
   else
     echo "FAIL  $name  (TLC exit $rc)"; echo "$out" | sed 's/^/      /'; failures=$((failures + 1))
   fi
@@ -79,6 +100,7 @@ run_negative() {
   out="$(tlc "$name")"; rc=$?
   local want_rc=12 want_text="Invariant $expect is violated"
   if [[ "$expect" == "@stuck" ]]; then want_rc=11; want_text="Deadlock reached"; fi
+  if [[ "$expect" == "@temporal" ]]; then want_rc=13; want_text="Temporal properties were violated"; fi
   if [[ $rc -eq $want_rc ]] && grep -q "$want_text" <<<"$out"; then
     echo "PASS  $name  (expected '$want_text' found; trace length $(grep -cE '^State [0-9]+:' <<<"$out"))"
     [[ -n "${FORMAL_SHOW_TRACE:-}" ]] && echo "$out" | sed 's/^/      /'
@@ -99,11 +121,11 @@ fetch_jar
 
 if [[ "$mode" == positive || "$mode" == --positive || "$mode" == --all ]]; then
   echo "== Positive checks: invariants must hold =="
-  for n in "${POSITIVE[@]}" "${DL_POSITIVE[@]}"; do run_positive "$n"; done
+  for n in "${POSITIVE[@]}" "${DL_POSITIVE[@]}" "${LC_POSITIVE[@]}"; do run_positive "$n"; done
 fi
 if [[ "$mode" == --negative-control || "$mode" == --all ]]; then
   echo "== Negative controls: checkers must be shown to fail =="
-  for n in "${NEGATIVE[@]}" "${DL_NEGATIVE[@]}"; do run_negative "$n"; done
+  for n in "${NEGATIVE[@]}" "${DL_NEGATIVE[@]}" "${LC_NEGATIVE[@]}"; do run_negative "$n"; done
 fi
 
 if [[ $failures -ne 0 ]]; then echo "formal:check FAILED ($failures)"; exit 1; fi
