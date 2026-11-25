@@ -29,6 +29,7 @@ describe("config", () => {
   afterEach(() => {
     delete process.env.HOLD_TTL_SECONDS;
     delete process.env.REAPER_INTERVAL_MS;
+    delete process.env.RETRY_BUDGET_MS;
     for (const name of DB_TIMEOUT_ENV) delete process.env[name];
     vi.resetModules();
   });
@@ -52,6 +53,19 @@ describe("config", () => {
   it.each(DB_TIMEOUT_ENV)("throws at startup when %s is zero or negative", async (name) => {
     process.env[name] = "0";
     await expect(import("../src/config.js")).rejects.toThrow(new RegExp(name));
+  });
+
+  // Issue #59 (R6, ADR-0027). Same { min: 1 } rule: a zero budget would make every request give
+  // up after its first attempt, which is a different (and silent) behaviour from "no budget".
+  it("throws at startup when RETRY_BUDGET_MS is zero or negative", async () => {
+    process.env.RETRY_BUDGET_MS = "0";
+    await expect(import("../src/config.js")).rejects.toThrow(/RETRY_BUDGET_MS/);
+  });
+
+  it("has a retry budget below a typical 5 s client timeout by default", async () => {
+    const { config } = await import("../src/config.js");
+    expect(config.retryBudgetMs).toBeGreaterThan(0);
+    expect(config.retryBudgetMs).toBeLessThan(5000);
   });
 
   it("has bounded defaults, each well below a typical 5 s client timeout", async () => {

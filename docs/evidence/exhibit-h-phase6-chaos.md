@@ -8,7 +8,7 @@ Every number below is recomputed from the per-run JSON reports in `docs/evidence
 
 |  |  |
 |---|---|
-| Report files read (`docs/evidence/chaos/*.json`) | **848** — 556 pre-fix (everything below except sections E, G and H), 292 post-fix reruns (`r1-after-*`, issue #53, section E; `r4-after-*`, issue #56, section G; `r2-after-*`, issue #54, section H) |
+| Report files read (`docs/evidence/chaos/*.json`) | **875** — 556 pre-fix (everything below except sections E, G, H and J), 319 post-fix reruns (`r1-after-*`, issue #53, section E; `r4-after-*`, issue #56, section G; `r2-after-*`, issue #54, section H; `r6-*`, issue #59, section J) |
 | Measured runs (every run that is not a negative control) | **540** — 516 under a Fault (332 on unmodified code, 184 with the `--survive-uncaught` scaffold), 24 no-Fault baselines/reruns |
 | **Correctness violations** in measured runs (any Oracle failing) | **0** |
 | Negative controls that went red as required | **16 of 16** end-to-end (`expectViolations`); the control's control on the real schema stayed green in 1 of 1 |
@@ -477,6 +477,61 @@ Before (unmodified + scaffolded): **92 of 120** runs flagged a transaction outli
 | `mergedidle` | pessimistic × hammer-seat | 10 | 0/10 | 0 | 0 | 10/10 |
 | `mergedidle` | unique_constraint × hammer-seat | 10 | 0/10 | 0 | 0 | 10/10 |
 
+### J. After the R6 decision (#59) — retry loops under a slow link
+
+Issue #59 (R6) asked whether the two mechanisms with retry loops should be bounded in time. Every row below is the C2 `latency-below` Fault (100 ms added per protocol chunk, client timeout T = 5 s) unless stated, `hammer-seat` 60 clients and `deadlock-pairs` 30 pairs-of-requests, unmodified application (no `--survive-uncaught`), each run on its own scratch database. The decision is ADR-0027; the loops themselves are ADR-0009 (`optimistic`) and ADR-0011 (`serializable`). **27 runs; Correctness violations: 0.**
+
+#### J1. The two cells the finding named, re-measured on `main` with R1–R4
+
+`optimistic` × `hammer-seat`:
+
+| variant | runs | requests | client timeouts | 201 / 409 / 503 / 504 | median p95 / slowest request (ms) | Oracles clean |
+|---|---|---|---|---|---|---|
+| before: committed C2 matrix (pre-R4 code) | 5 | 300 | 130 | 5 / 165 / 0 / 0 | 4,999 / 5,000 | 5/5 |
+| before: `main` with R1–R4 (`r6-before-*`) — **no code change, accepted** | 3 | 180 | 0 | 3 / 33 / 0 / 144 | 2,504 / 2,680 | 3/3 |
+
+`serializable` × `deadlock-pairs`:
+
+| variant | runs | requests | client timeouts | 201 / 409 / 503 / 504 | median p95 / slowest request (ms) | Oracles clean |
+|---|---|---|---|---|---|---|
+| before: committed C2 matrix (pre-R4 code) | 5 | 300 | 37 | 30 / 27 / 206 / 0 | 4,970 / 5,000 | 5/5 |
+| before: `main` with R1–R4 (`r6-before-*`) | 3 | 180 | 11 | 18 / 15 / 136 / 0 | 4,986 / 4,999 | 3/3 |
+| **after: retry time budget, 3 s (`r6-after-*`)** | 5 | 300 | 0 | 20 / 15 / 265 / 0 | 3,403 / 3,507 | 5/5 |
+
+R4's statement bound already changed the first cell's *shape*: the client timeouts (26 per run) are gone and 48 requests per run now end as `504` (a `statement_timeout` on the row-lock wait) at about 2.5 s. That is not an improvement in what the mechanism does under a slow link, only in how it fails; and the retry loop is not what is slow there (J3).
+
+#### J2. Sensitivity: the same `serializable` cell at 125 ms per chunk, with and without the budget (3 reps each, same code, only `RETRY_BUDGET_MS` differs)
+
+| variant | runs | requests | client timeouts | 201 / 409 / 503 / 504 | median p95 / slowest request (ms) | Oracles clean |
+|---|---|---|---|---|---|---|
+| budget off (`RETRY_BUDGET_MS=3600000`) | 3 | 180 | 154 | 14 / 12 / 0 / 0 | 5,000 / 5,004 | 3/3 |
+| **budget on (default 3 s)** | 3 | 180 | 0 | 9 / 9 / 162 / 0 | 3,432 / 3,439 | 3/3 |
+
+#### J3. Where the time goes (ad hoc probe, `load-harness/chaos/probe-retry-latency.ts`; output in `docs/evidence/chaos/r6-probe-results.txt`, not recomputed here)
+
+The chaos reports carry HTTP statuses only; the probe also reads each response's `X-Booking-Retries` header. Results (ADR-0027 has the tables): `optimistic` × `hammer-seat` at 20, 50 and 100 ms per chunk: **every response that was not a `504` had retries 0**, so the CAS retry loop does not run in that cell; the `504`s (34 of 60 at 50 ms, 48 at 100 ms) are row-lock waits cut off by R4's 1.5 s `statement_timeout`, and with the database bounds raised to 20 s all 60 complete as `409`/`201` with retries 0 but in 7.7 s against `naive`'s 1.2 s. `serializable` × `deadlock-pairs`: 18–19 of 30 requests spend all 5 retries from 20 ms per chunk upward (retries collide in lockstep; the 1–5 ms jitter is far below a round trip), and without the budget 22, 23 and 25 of 30 requests are unanswered at the client's 5 s at 125, 150 and 200 ms; with it they are answered `503` at 3.0–3.8 s.
+
+#### J4. Reference: the other mechanisms in the same two cells (1 run each, 100 ms per chunk)
+
+| mechanism | load | requests | client timeouts | 201 / 409 / 503 / 504 | median p95 / slowest request (ms) | Oracles clean |
+|---|---|---|---|---|---|---|
+| `naive` | `deadlock-pairs` | 60 | 0 | 30 / 30 / 0 / 0 | 1,201 / 1,202 | 1/1 |
+| `unique_constraint` | `deadlock-pairs` | 60 | 0 | 30 / 30 / 0 / 0 | 1,212 / 1,212 | 1/1 |
+| `pessimistic` | `deadlock-pairs` | 60 | 0 | 30 / 30 / 0 / 0 | 1,230 / 1,230 | 1/1 |
+| `optimistic` | `deadlock-pairs` | 60 | 0 | 30 / 30 / 0 / 0 | 1,716 / 1,717 | 1/1 |
+| `advisory` | `deadlock-pairs` | 60 | 0 | 30 / 30 / 0 / 0 | 1,097 / 1,097 | 1/1 |
+| `naive` | `hammer-seat` | 60 | 0 | 1 / 59 / 0 / 0 | 1,199 / 1,199 | 1/1 |
+| `unique_constraint` | `hammer-seat` | 60 | 0 | 1 / 59 / 0 / 0 | 1,224 / 1,224 | 1/1 |
+| `pessimistic` | `hammer-seat` | 60 | 0 | 1 / 59 / 0 / 0 | 1,238 / 1,238 | 1/1 |
+| `advisory` | `hammer-seat` | 60 | 0 | 1 / 59 / 0 / 0 | 790 / 1,104 | 1/1 |
+| `serializable` | `hammer-seat` | 60 | 0 | 1 / 59 / 0 / 0 | 1,223 / 1,223 | 1/1 |
+
+#### J5. No regression under normal load (no Fault, `serializable`, `hammer-seat`)
+
+| mechanism | concurrency | repeats | requests | 201 / 409 / 503 / other | double-booked? | p50 (ms) | p99 (ms) now | p99 (ms) Exhibit C | throughput (req/s) now | Exhibit C |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `serializable` | 100 | 5 | 500 | 5 / 495 / 0 / **0** | no | 41.7 | 44.3 | 53.3 | 2189 | 1746 |
+
 ## Robustness findings — canonical numbering (R1–R7)
 
 C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); R1 has since been fixed (#53, section E) and the other six are not, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in `docs/phase6-robustness-ticket-drafts.md`).
@@ -488,10 +543,10 @@ C2 and C3 each independently labelled a different finding "R5". This exhibit use
 | R3 | `ROLLBACK` on a dead connection masks the original error; infrastructure failure surfaces as an unclassified HTTP 500 | Robustness | C1 R3 · C2 R3 · C3 R3 | On scaffolded runs 3,600 requests were answered an unclassified HTTP 500 to clients, and the app logged 6,449 dead-connection errors — more than clients saw, because 2,872 of them were logged during scaffolded `partition-stall` runs, where clients had already timed out and saw 0 5xx. The top frame of the logged error is the catch-block `ROLLBACK`/`BEGIN` on the dead client (`pool.ts:47`/`:134`/`:181`/`:187`/`:41`) — **not derivable from the JSON** (see Record consistency check). **Fix ticket [#55](https://github.com/pradhnyesh01/RaceToSeat/issues/55)** (ADR-0025): across 35 scaffolded reruns of the cells below, client-visible unclassified 500s fell from 1,206 (the same cells' committed before-runs) to 0, and 1,175 requests were answered the designed `502` instead (section E) |
 | [R4](https://github.com/pradhnyesh01/RaceToSeat/issues/56) (fixed) | No timeouts anywhere: a partition stalls requests, transactions and row locks for its whole duration | Robustness | C1 R4 (impact pending) · C2 R4 (impact measured) · C3 R4 | **Fixed by #56 (ADR-0026; section G): after the fix 0/60 short-partition runs flagged a transaction outliving the client timeout, and a 30 s partition ended every transaction in 1,561 ms at most.** Before the fix: 92/120 partition-stall runs flagged a transaction outliving the client timeout; longest app transaction 7.4s under a 7 s partition and 30.1s under a 30 s one; 0 transactions leaked after heal in the 420-run matrix (longest drain 134 ms). Server settings in every report: `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `idle_session_timeout` all 0 |
 | R5 | `advisory`: stale-snapshot race returns an unclassified HTTP 500 instead of 409 (UNIQUE backstop holds) | Robustness (latent) | C2 R5 (unchanged) | 1 of 420 matrix runs logged the `booking_seats_seat_id_key` violation behind an HTTP 500 (`c2-partition-stall-advisory-hammer-seat-rep1`); 0 of 20 dedicated no-Fault advisory reruns answered a 500. Deterministic repro: `load-harness/chaos/repro-advisory-snapshot-race.ts` (a `pg_sleep` widens the window; not re-run here). Oracles stayed green: the UNIQUE backstop held |
-| R6 | Retry loops amplify latency under a slow link (`optimistic`, `serializable`) | Robustness (performance) | C2 R6 (unchanged) | At 100 ms/chunk (below the 5 s timeout) `optimistic` × `hammer-seat` timed out 130/300; `serializable` × `deadlock-pairs` timed out 37/300 and answered 206× 503; every other cell: 0 timeouts |
+| [R6](https://github.com/pradhnyesh01/RaceToSeat/issues/59) (decided) | Retry loops amplify latency under a slow link (`optimistic`, `serializable`) | Robustness (performance) | C2 R6 (unchanged) | At 100 ms/chunk (below the 5 s timeout) `optimistic` × `hammer-seat` timed out 130/300; `serializable` × `deadlock-pairs` timed out 37/300 and answered 206× 503; every other cell: 0 timeouts. **Decided by #59 (ADR-0027; section J): `serializable`'s loop gets a 3 s time budget; `optimistic`'s cost is accepted** (its retry loop never ran in that cell, and R4 already turns its timeouts into `504`) |
 | R7 | A stalled reaper sweep holds row locks on other expired seats and blocks unrelated Hold/Confirm | Robustness | **C3 R5 → R7** (renumbered; C2's R5 kept the number) | Reaper stalled on 3 row-locked expired seats, no Fault: 0 of 12 fresh Hold attempts won (baseline 12 of 12), 623×409 (baseline 527). Under backend-kill 31 reaper sweeps were killed mid-flight (7 unmodified, 24 scaffolded); all seats were reaped after heal. The "blocked sweep leaves NOWAIT on 5 other expired seats failing with 55P03" probe was verified directly by C3, not recorded in a report |
 
-Notes: **R1/R2** — a per-checkout `client.on('error')` is needed; `pool.on('error')` covers R2 only. #53's fix ships both (one hook in `src/db/pool.ts`), so R2's idle path is guarded too, though #54's own before/after criteria are still open. **R3** also affects `withSerializableTransaction` (`pool.ts:134`) and `withDeadlockRetry` (`pool.ts:181`, `:187`), not just `withTransaction` (`pool.ts:47`); the unclassified 500 is the global error handler (`src/app.ts:10`). **R5** is not Fault-dependent and rare; Oracle 1 is a statement about stored state and the `UNIQUE(seat_id)` constraint (ADR-0008) kept it correct — what failed was the HTTP answer. It is, though, a mechanism leaning on its backstop while its own check is racy, which ADR-0013 says openly about `serializable` and not yet about `advisory`. **R6** is a design trade-off of ADR-0009/0011/0013 recorded because it is where "below the timeout" is not below it. **R7** needs a leaked or slow lock (R4) to persist indefinitely.
+Notes: **R1/R2** — a per-checkout `client.on('error')` is needed; `pool.on('error')` covers R2 only. #53's fix ships both (one hook in `src/db/pool.ts`), so R2's idle path is guarded too, though #54's own before/after criteria are still open. **R3** also affects `withSerializableTransaction` (`pool.ts:134`) and `withDeadlockRetry` (`pool.ts:181`, `:187`), not just `withTransaction` (`pool.ts:47`); the unclassified 500 is the global error handler (`src/app.ts:10`). **R5** is not Fault-dependent and rare; Oracle 1 is a statement about stored state and the `UNIQUE(seat_id)` constraint (ADR-0008) kept it correct — what failed was the HTTP answer. It is, though, a mechanism leaning on its backstop while its own check is racy, which ADR-0013 says openly about `serializable` and not yet about `advisory`. **R6** is a design trade-off of ADR-0009/0011/0013 recorded because it is where "below the timeout" is not below it. #59 decided it (ADR-0027, section J): the retry-loop hypothesis held for `serializable` only, which now has a time budget; `optimistic`'s cell never ran its loop and is documented, not changed. **R7** needs a leaked or slow lock (R4) to persist indefinitely.
 
 ### Formal-derived findings (RF1–RF2) — kept apart from R1–R7
 
@@ -601,6 +656,12 @@ npx tsx load-harness/chaos/run.ts --strategy pessimistic --load deadlock-pairs -
   --base-latency-ms 40 --partition-ms 30000 --label r4-after-pessimistic                 # + advisory, serializable
 npx tsx load-harness/chaos/matrix.ts --label-prefix r4-after- --faults partition-stall --survive-faults none --reps 5
 BOOKING_STRATEGY=<mechanism> npm run harness -- --pattern hammer-seat --concurrency 100 --repeat 5   # no-regression; move the reports to docs/evidence/chaos/r4-nofault/
+# R6 decision reruns (section J), after #59 (ADR-0027); `--proxy-upstream` only if your Postgres is not racetoseat-postgres:
+npx tsx load-harness/chaos/run.ts --strategy serializable --load deadlock-pairs --concurrency 30 --fault latency-below --db scratch \
+  --toxiproxy-api http://localhost:8475 --proxy-port 5440 --app-port 3200 --request-timeout-ms 5000 --label r6-after-serializable-deadlock-pairs-rep1   # x5
+RETRY_BUDGET_MS=3600000 npx tsx load-harness/chaos/run.ts ... --latency-below-ms 125 --label r6-slow125-nobudget-...   # sensitivity: budget off vs on
+npx tsx load-harness/chaos/probe-retry-latency.ts serializable deadlock-pairs 125 --toxiproxy-api http://localhost:8475   # per-request X-Booking-Retries
+BOOKING_STRATEGY=serializable npm run harness -- --base-url http://localhost:3000 --pattern hammer-seat --concurrency 100 --repeat 5   # J5; move the report to docs/evidence/chaos/r6-nofault/
 npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json
 npx vitest run test/chaos                              # the unit controls
 ```
