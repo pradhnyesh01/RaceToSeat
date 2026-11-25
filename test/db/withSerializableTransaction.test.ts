@@ -195,7 +195,7 @@ describe("withSerializableTransaction", () => {
     }
   });
 
-  // Issue #59 (R6, ADR-0027): a total time budget alongside the retry-count cap. Under a slow
+  // Issue #59 (R6, ADR-0028): a total time budget alongside the retry-count cap. Under a slow
   // link every attempt costs many round trips, so five count-capped retries can outlast the
   // client's own timeout; the loop therefore also stops starting attempts it predicts would
   // finish past the budget. The prediction is the last failed attempt's own duration.

@@ -565,7 +565,7 @@ project set out to compare against pessimistic/advisory locking, not a bug
 in it.
 
 Under a slow link the same design shows up as latency, not retries (issue
-#59, finding R6, ADR-0027): with 100 ms added per protocol chunk, 48 of 60
+#59, finding R6, ADR-0028): with 100 ms added per protocol chunk, 48 of 60
 hot-seat requests waited on the winner's row lock past the 1.5 s statement
 bound and were answered \`504\`, while \`naive\` finished all 60 in 1.2 s. Every
 \`optimistic\` response in that run carried \`X-Booking-Retries: 0\` — the CAS
@@ -907,7 +907,12 @@ async function mainExhibitH(evidenceDir: URL, outPath: string) {
   const unitControls = await countUnitControls(new URL("../test/chaos/", import.meta.url), UNIT_CONTROL_FILES);
   const noRegression = await loadNoRegressionRows(new URL("r4-nofault/", chaosDir), evidenceDir);
   const r6NoRegression = await loadNoRegressionRows(new URL("r6-nofault/", chaosDir), evidenceDir);
-  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression, r6NoRegression }));
+  // R5 (#58): the same advisory no-Fault runs on the code without and with the fix.
+  const r5NoRegression = {
+    before: await loadNoRegressionRows(new URL("r5-nofault/before/", chaosDir), evidenceDir),
+    after: await loadNoRegressionRows(new URL("r5-nofault/after/", chaosDir), evidenceDir),
+  };
+  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression, r5NoRegression, r6NoRegression }));
 
   const measured = reports.filter((r) => !r.report.args.expectViolations);
   const violations = measured.filter((r) => r.report.correctnessViolation);
@@ -1025,7 +1030,7 @@ ${renderTwoRepeatGate(cells)}
   rather than retrying, and \`naive\`/\`unique_constraint\`/\`pessimistic\`
   never retry at all, so \`0.0%\` is definitional for all four.
   **That zero is a property of a fast link, not of the mechanisms.** Under
-  100 ms of added latency per protocol chunk (Exhibit H, section J; ADR-0027),
+  100 ms of added latency per protocol chunk (Exhibit H, section J; ADR-0028),
   \`serializable\`'s retries re-collide in lockstep (a 1-5 ms jitter is
   nothing next to a 200 ms round trip) and most requests in an adversarial
   two-seat load end \`503\`; its retry loop is therefore also bounded in time

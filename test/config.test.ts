@@ -55,7 +55,7 @@ describe("config", () => {
     await expect(import("../src/config.js")).rejects.toThrow(new RegExp(name));
   });
 
-  // Issue #59 (R6, ADR-0027). Same { min: 1 } rule: a zero budget would make every request give
+  // Issue #59 (R6, ADR-0028). Same { min: 1 } rule: a zero budget would make every request give
   // up after its first attempt, which is a different (and silent) behaviour from "no budget".
   it("throws at startup when RETRY_BUDGET_MS is zero or negative", async () => {
     process.env.RETRY_BUDGET_MS = "0";

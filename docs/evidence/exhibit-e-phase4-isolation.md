@@ -146,7 +146,7 @@ project set out to compare against pessimistic/advisory locking, not a bug
 in it.
 
 Under a slow link the same design shows up as latency, not retries (issue
-#59, finding R6, ADR-0027): with 100 ms added per protocol chunk, 48 of 60
+#59, finding R6, ADR-0028): with 100 ms added per protocol chunk, 48 of 60
 hot-seat requests waited on the winner's row lock past the 1.5 s statement
 bound and were answered `504`, while `naive` finished all 60 in 1.2 s. Every
 `optimistic` response in that run carried `X-Booking-Retries: 0` — the CAS

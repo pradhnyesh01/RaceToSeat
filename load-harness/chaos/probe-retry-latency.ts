@@ -1,4 +1,4 @@
-// R6 probe (issue #59, ADR-0027): per-request status, X-Booking-Retries header and duration for
+// R6 probe (issue #59, ADR-0028): per-request status, X-Booking-Retries header and duration for
 // one mechanism under constant added latency, against a throwaway scratch database behind its
 // own Toxiproxy proxy. Not a chaos run (no Oracles, no report): it exists to answer one
 // question the chaos reports cannot, which is whether a request's retry loop actually ran. A

@@ -1,4 +1,4 @@
-// A total time budget for a retry loop (issue #59, finding R6, ADR-0027).
+// A total time budget for a retry loop (issue #59, finding R6, ADR-0028).
 //
 // The retry loops cap *how many* attempts a request may make. Under a slow
 // link every attempt costs many round trips, so a count cap alone can let a
@@ -14,7 +14,7 @@
 // stays near the budget instead of overshooting it by a whole attempt, with no
 // guess about the link's speed baked in. The first attempt is never refused.
 export interface RetryBudgetOptions {
-  // Total time budget for the whole retry loop; defaults to config.retryBudgetMs (ADR-0027).
+  // Total time budget for the whole retry loop; defaults to config.retryBudgetMs (ADR-0028).
   budgetMs?: number;
 }
 
