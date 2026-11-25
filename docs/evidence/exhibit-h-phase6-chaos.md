@@ -8,8 +8,8 @@ Every number below is recomputed from the per-run JSON reports in `docs/evidence
 
 |  |  |
 |---|---|
-| Report files read (`docs/evidence/chaos/*.json`) | **521** |
-| Measured runs (every run that is not a negative control) | **505** — 481 under a Fault (326 on unmodified code, 155 with the `--survive-uncaught` scaffold), 24 no-Fault baselines/reruns |
+| Report files read (`docs/evidence/chaos/*.json`) | **550** |
+| Measured runs (every run that is not a negative control) | **534** — 510 under a Fault (326 on unmodified code, 184 with the `--survive-uncaught` scaffold), 24 no-Fault baselines/reruns |
 | **Correctness violations** in measured runs (any Oracle failing) | **0** |
 | Negative controls that went red as required | **16 of 16** end-to-end (`expectViolations`); the control's control on the real schema stayed green in 1 of 1 |
 | Robustness findings (canonical numbering) | **7** chaos-observed (R1–R7) + **2** formal-derived (RF1–RF2, found by model checking, not by a chaos run); none fixed; filed as fix tickets #53–#61 (drafts in `docs/phase6-robustness-ticket-drafts.md`) |
@@ -305,6 +305,38 @@ A request and its row locks stall for as long as the partition lasts; nothing gi
 
 The 20 dedicated no-Fault advisory reruns (`c2adv-*`, R5) and the no-Fault `naive` control twin are summarised under R5 and in the controls table.
 
+### F. After the R3 fix (#55) — masked errors and the unclassified 500
+
+Same load, Fault and scaffold as the "before" reports (`--survive-uncaught`, because R1 (#53) is a separate change); the "after" runs differ in code (ADR-0025) and, necessarily, in the random timing of each kill or partition, so counts are comparable in kind, not run for run. The C1 and C3 "after" reruns used a throwaway scratch database rather than the shared one.
+
+| Cell |  | Runs | HTTP 500 | HTTP 502 | HTTP 201 | HTTP 409 | Oracles clean |
+|---|---|---|---|---|---|---|---|
+| C1 backend-kill (`pessimistic`, `deadlock-pairs`, kill fraction 0.3) | before | 6 | 53 | 0 | 350 | 317 | 6/6 |
+|  | **after (#55)** | 6 | 0 | 84 | 340 | 296 | 6/6 |
+| C2 `partition-reset` (`pessimistic` × `deadlock-pairs`) | before | 5 | 300 | 0 | 0 | 0 | 5/5 |
+|  | **after (#55)** | 5 | 0 | 243 | 44 | 13 | 5/5 |
+| C2 `partition-reset` (`serializable` × `deadlock-pairs`) | before | 5 | 297 | 0 | 3 | 0 | 5/5 |
+|  | **after (#55)** | 5 | 0 | 296 | 2 | 2 | 5/5 |
+| C2 `partition-reset` (`naive` × `deadlock-pairs`) | before | 5 | 297 | 0 | 3 | 0 | 5/5 |
+|  | **after (#55)** | 5 | 0 | 229 | 38 | 33 | 5/5 |
+| C3 hold-confirm, one-shot (`pessimistic`, backend-kill every 10 ms) | before | 8 | 258 | 0 | 542 | 0 | 8/8 |
+|  | **after (#55)** | 8 | 0 | 251 | 549 | 0 | 8/8 |
+
+**Retry still completes every Confirm exactly once.** After the Fault, the replay re-sent each hold's Confirm: 800 of 800 holds answered `201` before the fix, 800 of 800 after, and the `Oracle 3 (idempotent recovery: a live Hold's retried Confirm yields exactly one Booking)` extension passed in 8/8 reruns. A `502` is exactly the signal that this retry is safe.
+
+**What the logged error names (hand-counted from the app logs, which are git-ignored — not derivable from the JSON).** Run like for like on a throwaway checkout of unmodified `main` (C1 command, 6 reps, same scratch database and ports as the "after" reps) and on this change, counting the first `src/` frame of every error the global handler logged:
+
+| C1 backend-kill, 6 reps | before (unmodified `main`) | after (#55) |
+|---|---|---|
+| requests answered by the handler (= the 500s / 502s above, from the reports) | 67 × 500 | 84 × 502 |
+| top `src/` frame is the catch-block `ROLLBACK` / `BEGIN` (`pool.ts:47`, `:41`) | **66** of 67 (64 + 2) | **0** of 84 |
+| top `src/` frame is the statement that failed (`pessimistic.ts`, `idempotency.ts`) | 1 | 71 |
+| top `src/` frame is the `COMMIT` that failed (`pool.ts:220`, outcome unknown) | 0 | 13 |
+| logged headline is the kill itself ("terminating connection due to administrator command") | 1 | 18 |
+| "ROLLBACK also failed" secondary lines | 0 | 81 |
+
+On the three C2 `partition-reset` cells the same count over the 15 after-runs: 768 logged errors (= the 768 × 502), none whose top frame is a catch-block `ROLLBACK` (strategy statements, the failed `COMMIT`, and — for `serializable` — 48 retry `BEGIN`s on a connection that had died after a genuine `40001`; the `40001` is named on the secondary "ROLLBACK also failed" line next to it, and the request is answered 502, not 503, because no retry budget was spent) plus 2 designed `409`s whose closing `ROLLBACK` failed and which were still answered `409`.
+
 ## Robustness findings — canonical numbering (R1–R7)
 
 C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); none is fixed here, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in `docs/phase6-robustness-ticket-drafts.md`).
@@ -313,7 +345,7 @@ C2 and C3 each independently labelled a different finding "R5". This exhibit use
 |---|---|---|---|---|
 | R1 | App process exits when a checked-out connection errors (unhandled `Client` `'error'`) | Robustness | C1 R1 · C2 R1 · C3 R1 | 134/142 unmodified runs under a connection-tearing Fault crashed (the idle-pool run is under R2; C1 backend-kill (`pessimistic`, `deadlock-pairs`): 4/4; C2 `partition-stall` (six mechanisms): 60/60; C2 `partition-reset` (six mechanisms): 52/60; C3 backend-kill on the hold flow (`pessimistic`): 18/18); 125 died on an unhandled `Client` event. `pool.on("error")` alone would not fix it: pg-pool removes its listener on checkout (`pg-pool/index.js:344`; C1 read the source, the fix was not tried) |
 | R2 | App process exits when an idle pooled connection errors (unhandled `BoundPool` `'error'`) | Robustness | C1 R2 · C2 R2 (C3: not re-tested) | Idle-pool kill, no request in flight: 1/1 crashed on `BoundPool`. 9 `partition-stall` runs died *only* via `BoundPool` (the heal found nothing but idle pooled connections). C3 did not re-test |
-| R3 | `ROLLBACK` on a dead connection masks the original error; infrastructure failure surfaces as an unclassified HTTP 500 | Robustness | C1 R3 · C2 R3 · C3 R3 | On scaffolded runs 3,600 requests were answered an unclassified HTTP 500 to clients, and the app logged 6,449 dead-connection errors — more than clients saw, because 2,872 of them were logged during scaffolded `partition-stall` runs, where clients had already timed out and saw 0 5xx. The top frame of the logged error is the catch-block `ROLLBACK`/`BEGIN` on the dead client (`pool.ts:47`/`:134`/`:181`/`:187`/`:41`) — **not derivable from the JSON** (see Record consistency check) |
+| R3 | `ROLLBACK` on a dead connection masks the original error; infrastructure failure surfaces as an unclassified HTTP 500 | Robustness | C1 R3 · C2 R3 · C3 R3 | On scaffolded runs 3,600 requests were answered an unclassified HTTP 500 to clients, and the app logged 6,449 dead-connection errors — more than clients saw, because 2,872 of them were logged during scaffolded `partition-stall` runs, where clients had already timed out and saw 0 5xx. The top frame of the logged error is the catch-block `ROLLBACK`/`BEGIN` on the dead client (`pool.ts:47`/`:134`/`:181`/`:187`/`:41`) — **not derivable from the JSON** (see Record consistency check). **Fix ticket [#55](https://github.com/pradhnyesh01/RaceToSeat/issues/55)** (ADR-0025): across 29 scaffolded reruns of the cells below, client-visible unclassified 500s fell from 1,205 (the same cells' committed before-runs) to 0, and 1,103 requests were answered the designed `502` instead (section E) |
 | R4 | No timeouts anywhere: a partition stalls requests, transactions and row locks for its whole duration | Robustness | C1 R4 (impact pending) · C2 R4 (impact measured) · C3 R4 | 92/120 partition-stall runs flagged a transaction outliving the client timeout; longest app transaction 7.4s under a 7 s partition and 30.1s under a 30 s one; 0 transactions leaked after heal in the 420-run matrix (longest drain 134 ms). Server settings in every report: `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `idle_session_timeout` all 0 |
 | R5 | `advisory`: stale-snapshot race returns an unclassified HTTP 500 instead of 409 (UNIQUE backstop holds) | Robustness (latent) | C2 R5 (unchanged) | 1 of 420 matrix runs logged the `booking_seats_seat_id_key` violation behind an HTTP 500 (`c2-partition-stall-advisory-hammer-seat-rep1`); 0 of 20 dedicated no-Fault advisory reruns answered a 500. Deterministic repro: `load-harness/chaos/repro-advisory-snapshot-race.ts` (a `pg_sleep` widens the window; not re-run here). Oracles stayed green: the UNIQUE backstop held |
 | R6 | Retry loops amplify latency under a slow link (`optimistic`, `serializable`) | Robustness (performance) | C2 R6 (unchanged) | At 100 ms/chunk (below the 5 s timeout) `optimistic` × `hammer-seat` timed out 130/300; `serializable` × `deadlock-pairs` timed out 37/300 and answered 206× 503; every other cell: 0 timeouts |
@@ -383,7 +415,7 @@ The formal track's crash / ambiguous-commit / idempotent-retry model (F4, #47, m
 - **R3 top-frame counts (C2 record).** The record's table of top frames (`pool.ts:187` 2,663×, `:47` 1,090×, `:134` 1,049×, `:181` 301×, `:41` 175×) mixes denominators and two of its five numbers do not reproduce. Re-counting the stack traces in the 120 scaffolded C2 app logs (which still exist in the C2 worktree but are **git-ignored and not in the repository**, so this cannot be regenerated from committed evidence): `:187` 2,663 ✓, `:181` 301 ✓, `:41` 175 ✓, but `:47` is **1,474** (not 1,090) and `:134` is **1,136** (not 1,049), plus 120× `uniqueConstraint.ts:37`, 58× `naive.ts:49` and 54× `pool.ts:128`. Also, the same sentence pairs those frame counts with "3,109 500s on `partition-reset`", but the frames total 5,981 across `partition-reset` (3,109) *and* `partition-stall` (2,872 — inferred to be requests the app answered 500 after the client had already timed out: the clients saw no 5xx on those runs). The qualitative claim (the catch-block `ROLLBACK`/`BEGIN` on a dead client is the top frame, hiding the original error) is confirmed. C1's 50 of 53 (`pool.ts:47`) and C3's 250 of 258 reproduce exactly.
 - **C2 "30 `Reaper sweep failed` log lines" sits in the app-SIGKILL paragraph** but the lines come from the partition runs (20 `partition-reset`, 10 `partition-stall` in the matrix, 6 more in the long-partition runs); the app-SIGKILL runs produced none (the killed process cannot log). The point it makes — the reaper's own `.catch` survives a dead connection where the request path does not — stands.
 - **R5 frequency.** C2 estimates "1 in ~600 same-seat races". The reports support only "1 in 420 matrix runs" (1 in the 70 advisory ones; plus 0 in 20 dedicated reruns); the ~600 denominator (races per run × runs) is not recorded and could not be reproduced, so no rate beyond "rare" is claimed here.
-- **Counts that differ only in what they count** (not errors): the C2 record's "420 matrix runs" excludes 20 `c2adv`, 4 `c2long`, 10 `c2ctl` reports; C3's "49 measured" excludes its 3 controls; this exhibit's "505 measured" includes everything that is not a control.
+- **Counts that differ only in what they count** (not errors): the C2 record's "420 matrix runs" excludes 20 `c2adv`, 4 `c2long`, 10 `c2ctl` reports; C3's "49 measured" excludes its 3 controls; this exhibit's "534 measured" includes everything that is not a control.
 
 ## Test environment
 

@@ -379,6 +379,22 @@ is assumed by the formal model and tested by neither track. Full test suite pass
 skipped that need a local Toxiproxy server) and `npm run typecheck` is clean. Phase 8's writeup
 should cite both exhibits.
 
+Issue #55 (finding R3) is done: a dead connection no longer masks the real error, and an
+infrastructure failure is a designed outcome instead of a bare 500. `src/db/pool.ts`'s three
+transaction helpers roll back through a best-effort helper (a failing `ROLLBACK` is logged as
+secondary, the original error object is rethrown untouched, and a designed no-commit result such
+as a `409`/`404` survives a failing closing `ROLLBACK`; a failing `COMMIT` is still thrown, its
+outcome being unknown); the global error handler answers a connection-level failure (classified
+by `isInfrastructureFailure` in `src/db/pgErrors.ts`) with HTTP **502**, `Retry-After: 1`, body
+`outcome: "infrastructure_failure"`, deliberately not `503` (ADR-0012/0015: that stays
+`retry_exhausted`'s) — ADR-0025 records why and the client retry contract. Scaffolded
+(`--survive-uncaught`, R1 not in this change) before/after reruns: client-visible unclassified
+500s went to 0 in every measured cell (C1 53 to 0, C2 `partition-reset` 894 to 0, C3 258 to 0),
+the catch-block `ROLLBACK`/`BEGIN` as top logged frame went from 66 of 67 to 0 of 84, and every
+retried Confirm still completed exactly once; all Oracles green, negative controls still red.
+Exhibit H gained section F. The other seven Robustness findings stay unfixed (R4-R7, RF1, RF2,
+plus R1/R2 in their own PRs).
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

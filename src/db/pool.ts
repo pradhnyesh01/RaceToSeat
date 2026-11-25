@@ -41,10 +41,10 @@ export async function withTransaction<T>(
   await client.query("BEGIN");
   try {
     const result = await fn(client);
-    await client.query(shouldCommit(result) ? "COMMIT" : "ROLLBACK");
+    await finishTransaction(client, shouldCommit(result) ? "COMMIT" : "ROLLBACK");
     return result;
   } catch (err) {
-    await client.query("ROLLBACK");
+    await rollbackAfterFailure(client, err);
     throw err;
   }
 }
@@ -128,10 +128,10 @@ export async function withSerializableTransaction<T>(
     await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
     try {
       const result = await fn(client, attempt);
-      await client.query(shouldCommit(result) ? "COMMIT" : "ROLLBACK");
+      await finishTransaction(client, shouldCommit(result) ? "COMMIT" : "ROLLBACK");
       return result;
     } catch (err) {
-      await client.query("ROLLBACK");
+      await rollbackAfterFailure(client, err);
       if (!isSerializationFailure(err) && !isDeadlockDetected(err)) {
         throw err;
       }
@@ -181,10 +181,10 @@ export async function withDeadlockRetry<T>(
     await client.query("BEGIN");
     try {
       const result = await fn(client, attempt);
-      await client.query(shouldCommit(result) ? "COMMIT" : "ROLLBACK");
+      await finishTransaction(client, shouldCommit(result) ? "COMMIT" : "ROLLBACK");
       return result;
     } catch (err) {
-      await client.query("ROLLBACK");
+      await rollbackAfterFailure(client, err);
       if (!isDeadlockDetected(err)) {
         throw err;
       }
@@ -194,5 +194,49 @@ export async function withDeadlockRetry<T>(
       attempt++;
       await sleep(jitteredBackoffMs());
     }
+  }
+}
+
+// Ending a transaction without losing the outcome that ended it (issue #55,
+// finding R3, ADR-0025). Appended here, below everything the formal mapping
+// (Exhibit G) pins by line number, for the same reason the torn-connection
+// hook is.
+//
+// Two situations, deliberately different:
+//
+//  - `finishTransaction("COMMIT")`: a failure here is NOT tolerated. If the
+//    connection dies around COMMIT the client cannot know whether the write
+//    landed, so the error must reach the caller (it becomes the infrastructure
+//    outcome, whose contract is "retry with the same key").
+//  - `finishTransaction("ROLLBACK")`: this is a *designed* outcome (a lost race,
+//    an unknown id — `shouldCommit` was false) whose answer was already decided
+//    by reads inside the transaction; nothing needed persisting. If the
+//    ROLLBACK itself cannot be sent the connection is dead, and Postgres
+//    releases a dead backend's locks and discards its open transaction on its
+//    own. So the 409/404 stands; turning it into an infrastructure error would
+//    tell the client a lie about a request whose answer is known.
+async function finishTransaction(client: PoolClient, statement: "COMMIT" | "ROLLBACK"): Promise<void> {
+  if (statement === "COMMIT") {
+    await client.query("COMMIT");
+    return;
+  }
+  await rollbackAfterFailure(client, undefined);
+}
+
+// Best-effort ROLLBACK from a catch block (or a designed no-commit): it must
+// release locks when it can, and must never replace the error being handled.
+// A ROLLBACK that throws means the connection is already dead (it was the
+// cause of the original failure, or died since); that is logged next to the
+// original's message — both appear in the operator's log, the statement that
+// actually failed stays the one the caller sees — and then ignored. The
+// caller always rethrows the original itself.
+async function rollbackAfterFailure(client: PoolClient, original: unknown): Promise<void> {
+  try {
+    await client.query("ROLLBACK");
+  } catch (rollbackErr) {
+    const rollbackMessage = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+    const originalMessage =
+      original === undefined ? "(no error; a designed no-commit result)" : original instanceof Error ? original.message : String(original);
+    console.error(`ROLLBACK also failed (connection already dead): ${rollbackMessage}; the error it did not replace: ${originalMessage}`);
   }
 }
