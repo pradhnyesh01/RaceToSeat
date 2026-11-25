@@ -23,9 +23,18 @@
 // this reads the single most recent report rather than building a
 // per-strategy matrix.
 //
-// Usage: tsx load-harness/aggregate.ts [--exhibit c|e|f] [--out <path>]
+// Issue #52 adds a fourth mode, "h": Exhibit H, Phase 6's chaos-testing
+// evidence, reading the per-run reports load-harness/chaos/ writes under
+// docs/evidence/chaos/ (a subdirectory, unlike the three modes above, so none
+// of them can pick those reports up by accident). Most of the logic lives in
+// load-harness/exhibitH.ts to keep this file's size in check; this file only
+// wires the mode up.
+//
+// Usage: tsx load-harness/aggregate.ts [--exhibit c|e|f|h] [--out <path>]
 import { readdir, readFile, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { countUnitControls, loadChaosReports, renderExhibitH } from "./exhibitH.js";
 
 interface RunReportLike {
   ranAt: string;
@@ -812,25 +821,60 @@ follow-up ticket from this exhibit.
   );
 }
 
-function parseExhibit(argv: string[]): "c" | "e" | "f" {
+export type Exhibit = "c" | "e" | "f" | "h";
+
+export function parseExhibit(argv: string[]): Exhibit {
   const flagIndex = argv.indexOf("--exhibit");
   const value = flagIndex !== -1 ? argv[flagIndex + 1] : undefined;
   if (value === undefined || value === "c") return "c";
   if (value === "e") return "e";
   if (value === "f") return "f";
-  throw new Error(`--exhibit must be "c", "e", or "f", got ${JSON.stringify(value)}`);
+  if (value === "h") return "h";
+  throw new Error(`--exhibit must be "c", "e", "f", or "h", got ${JSON.stringify(value)}`);
 }
 
-function parseOutPath(argv: string[], exhibit: "c" | "e" | "f"): string {
+const DEFAULT_OUT_NAMES: Record<Exhibit, string> = {
+  c: "exhibit-c-phase2-comparison.md",
+  e: "exhibit-e-phase4-isolation.md",
+  f: "exhibit-f-phase5-hold-expiry.md",
+  h: "exhibit-h-phase6-chaos.md",
+};
+
+export function parseOutPath(argv: string[], exhibit: Exhibit): string {
   const flagIndex = argv.indexOf("--out");
   if (flagIndex !== -1 && argv[flagIndex + 1]) return argv[flagIndex + 1]!;
-  const defaultName =
-    exhibit === "e"
-      ? "exhibit-e-phase4-isolation.md"
-      : exhibit === "f"
-        ? "exhibit-f-phase5-hold-expiry.md"
-        : "exhibit-c-phase2-comparison.md";
-  return fileURLToPath(new URL(`../docs/evidence/${defaultName}`, import.meta.url));
+  return fileURLToPath(new URL(`../docs/evidence/${DEFAULT_OUT_NAMES[exhibit]}`, import.meta.url));
+}
+
+// --- Exhibit H: Phase 6 chaos testing (issue #52) ---
+
+const UNIT_CONTROL_FILES = ["oracles.test.ts", "faults.test.ts", "faultScoping.test.ts", "c2.test.ts", "holdOracles.test.ts"];
+
+async function mainExhibitH(evidenceDir: URL, outPath: string) {
+  const chaosDir = new URL("chaos/", evidenceDir);
+  const reports = await loadChaosReports(chaosDir);
+  if (reports.length === 0) {
+    throw new Error(`No chaos report JSON found under ${fileURLToPath(chaosDir)} — run the chaos harness first (see Exhibit H's Reproducing section).`);
+  }
+  const unitControls = await countUnitControls(new URL("../test/chaos/", import.meta.url), UNIT_CONTROL_FILES);
+  await writeFile(outPath, renderExhibitH({ reports, unitControls }));
+
+  const measured = reports.filter((r) => !r.report.args.expectViolations);
+  const violations = measured.filter((r) => r.report.correctnessViolation);
+  const controls = reports.filter((r) => r.report.args.expectViolations);
+  const flagged = controls.filter((r) => r.report.correctnessViolation);
+  console.log(`Exhibit H written to ${outPath}`);
+  console.log(`${reports.length} report(s): ${measured.length} measured, ${controls.length} negative control(s).`);
+  console.log(
+    violations.length > 0
+      ? `FAIL: ${violations.length} Correctness violation(s): ${violations.map((v) => v.report.label).join(", ")}`
+      : `PASS: 0 Correctness violations in ${measured.length} measured run(s); ${flagged.length}/${controls.length} negative controls flagged.`,
+  );
+  if (flagged.length !== controls.length) {
+    console.log("FAIL: a negative control was NOT flagged — the checker cannot be trusted.");
+    process.exitCode = 1;
+  }
+  if (violations.length > 0) process.exitCode = 1;
 }
 
 async function main() {
@@ -845,6 +889,10 @@ async function main() {
   }
   if (exhibit === "f") {
     await mainExhibitF(evidenceDir, outPath);
+    return;
+  }
+  if (exhibit === "h") {
+    await mainExhibitH(evidenceDir, outPath);
     return;
   }
 
@@ -946,7 +994,12 @@ contention cost from single-mechanism overhead.
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// Run only when invoked as a script (`npm run harness:aggregate`), so tests can
+// import parseExhibit/parseOutPath without regenerating an exhibit as a side
+// effect.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}

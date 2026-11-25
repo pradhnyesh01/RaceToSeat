@@ -1,5 +1,7 @@
 # Chaos C1 (tracer): backend-kill against `pessimistic`, measured on unmodified code
 
+> **Finding numbering (added by C5, #52 — the text below is as written at C1 time).** Exhibit H uses one canonical list, R1–R7. This record's **R1–R4 keep their numbers**. Later records add R5 (`advisory` stale-snapshot 500, from C2) and R6 (retry-loop latency under a slow link, from C2); the stalled-reaper finding that C3's record calls "R5" is canonically **R7**. See [Exhibit H](exhibit-h-phase6-chaos.md) and the ticket drafts in [../phase6-robustness-ticket-drafts.md](../phase6-robustness-ticket-drafts.md).
+
 Issue #44, under umbrella #42. This is the C1 findings record — the raw first-run result, kept as found. It is **not** Exhibit H (that is C5, #52, which will fold this in alongside C2–C4). Definitions (Fault, Ambiguous outcome, Oracle, Correctness violation, Robustness finding) are in `CONTEXT.md`; the reasoning is in ADR-0022 (what "correct under chaos" means) and ADR-0023 (negative controls without production toggles).
 
 Raw per-run reports and app logs are in `docs/evidence/chaos/` (one `.json` + `.app.log` per run).

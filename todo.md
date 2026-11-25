@@ -80,7 +80,8 @@ ADRs 0021–0023 are written as the relevant tickets land, not up front.
 - [x] #49 C2: latency, partition+heal, app SIGKILL across all six mechanisms
 - [x] #50 C3: hold/confirm/reaper under fault (`pessimistic`)
 - [ ] #51 C4 (stretch): Postgres restart under load
-- [ ] #52 C5: Exhibit H; each Robustness finding filed as its own fix ticket with before/after rerun
+- [x] #52 C5: Exhibit H; each Robustness finding filed as its own fix ticket with before/after rerun
+  (Exhibit H written; the seven findings are *drafted* in `docs/phase6-robustness-ticket-drafts.md` — GitHub issues not yet filed, pending review)
   (C5 must reconcile finding numbering: C2 and C3 each used "R5" for different findings — C2's advisory 500 vs C3's stalled reaper — and C2 also has an R6)
 
 **Cut order if time runs short** (first dropped first): C4, F4, reaper liveness in F3,
