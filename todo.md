@@ -76,7 +76,7 @@ ADRs 0021–0023 are written as the relevant tickets land, not up front.
 - [ ] #48 F5: spec-action → SQL (`file:line`) mapping table + Exhibit G
 
 **Chaos track** (Toxiproxy compose profile + scripted `pg_terminate_backend`)
-- [ ] #44 C1 (tracer): fault driver, four DB-state oracles + corrupted-state unit tests, scratch-DB (no UNIQUE) negative control; backend-kill vs `pessimistic`, measured on unmodified code
+- [x] #44 C1 (tracer): fault driver, four DB-state oracles + corrupted-state unit tests, scratch-DB (no UNIQUE) negative control; backend-kill vs `pessimistic`, measured on unmodified code
 - [ ] #49 C2: latency, partition+heal, app SIGKILL across all six mechanisms
 - [ ] #50 C3: hold/confirm/reaper under fault (`pessimistic`)
 - [ ] #51 C4 (stretch): Postgres restart under load

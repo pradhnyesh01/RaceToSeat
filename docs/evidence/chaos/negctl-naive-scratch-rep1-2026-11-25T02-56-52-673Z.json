@@ -1,0 +1,106 @@
+{
+  "label": "negctl-naive-scratch-rep1",
+  "ranAt": "2026-11-25T02:56:52.673Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "none",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": true,
+    "label": "negctl-naive-scratch-rep1",
+    "appPort": 3100,
+    "proxyPort": 5434
+  },
+  "eventId": "8ab21734-10bb-42a0-b019-ce206ec6ba64",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "k6": {
+    "statusTally": {
+      "201": 13,
+      "409": 47
+    },
+    "transportErrors": {},
+    "durationMs": 479,
+    "maxRequestMs": 60
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 13,
+      "409": 47
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 7ca25346-4f5e-47b2-a435-f7b8101eb2dd is claimed by 13 bookings",
+          "seatIds": [
+            "7ca25346-4f5e-47b2-a435-f7b8101eb2dd"
+          ],
+          "bookingIds": [
+            "74d8d406-fc87-4c96-9058-71d45c90482a",
+            "80a6376f-f059-446c-ba86-1926b3d7169d",
+            "894820a3-0225-4a0f-9d87-138e592cd2c6",
+            "9b635ee5-ebe4-4e19-984b-d75b71e9a39c",
+            "a62cbedc-1a19-4384-967b-47eb06c22df4",
+            "af93466b-f489-4ae6-9a72-57dcdb91cb25",
+            "b0cb250e-e2ec-475c-a5d5-486f5dfac9b5",
+            "c08b56be-3aaf-4482-aa54-fdf9e9ff9822",
+            "c1cf74cf-f301-4dee-b596-259a9f07d09e",
+            "c28f043b-f0a7-4b71-bd31-1c22260c78f7",
+            "d4745c0e-110f-4983-b16f-b9a37b4f3fb5",
+            "e05e0079-c101-4bb6-aee2-7b029286f63f",
+            "fab54892-5c2f-4b62-824a-3175ac5a5461"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

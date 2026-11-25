@@ -17,7 +17,8 @@
     "harness": "tsx load-harness/run.ts",
     "harness:aggregate": "tsx load-harness/aggregate.ts",
     "formal:check": "bash formal/check.sh",
-    "formal:check:negative": "bash formal/check.sh --negative-control"
+    "formal:check:negative": "bash formal/check.sh --negative-control",
+    "chaos": "tsx load-harness/chaos/run.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
