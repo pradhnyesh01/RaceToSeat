@@ -4,7 +4,9 @@
 
 Finding numbers are the **canonical** list from Exhibit H (C2 and C3 had each used "R5" for different findings): R1–R4 as in C1; **R5** = `advisory` stale-snapshot 500 (C2's R5); **R6** = retry-loop latency amplification (C2's R6); **R7** = stalled reaper blocks unrelated Hold/Confirm (C3's "R5").
 
-None of these is a Correctness violation: every Oracle stayed intact in every measured run (505 runs, 0 violations). They are fixes to availability, diagnosability and latency, and none may weaken the single hard gate (zero double-booking).
+**Two further drafts, RF1 and RF2, are *formal-derived*** and deliberately numbered apart from the chaos-observed R1–R7: they were found by the formal track's model checking (F4, #47, merged to `main` as 2f47207; see `formal/README.md`, "Findings: behavior the model exposes in the real implementation"), not by any chaos run, so no "before" number in them comes from `docs/evidence/chaos/`. Their before/after criteria are therefore a deterministic regression test on the real code path plus the matching `CrashFinding*` TLC configuration flipping from *violated on purpose* to *passing* — not a chaos rerun (a clean chaos run cannot see them; Exhibit H says so under "What this does not show"). They live further down, under "Formal-derived findings".
+
+None of these is a Correctness violation: every Oracle stayed intact in every measured run (505 runs, 0 violations), and neither formal-derived finding fails a chaos Oracle. They are fixes to availability, diagnosability and latency, and none may weaken the single hard gate (zero double-booking).
 
 | Draft | Finding | Class | Suggested order | Blocked by |
 |---|---|---|---|---|
@@ -15,6 +17,8 @@ None of these is a Correctness violation: every Oracle stayed intact in every me
 | [R7](#r7--a-stalled-reaper-sweep-must-not-block-unrelated-holds-and-confirms) | Stalled reaper blocks unrelated Hold/Confirm | Robustness | 4 | — (coordinate with R4) |
 | [R5](#r5--advisory-returns-409-not-500-when-a-loser-takes-its-snapshot-before-the-winner-commits) | `advisory` stale-snapshot 500 | Robustness (latent) | 5 | — |
 | [R6](#r6--decide-whether-optimistic-and-serializable-retry-loops-get-a-time-budget) | Retry loops amplify latency under a slow link | Robustness (performance) | 6 | — |
+| [RF1](#rf1--decide-and-state-how-long-an-idempotency-key-lives) | **Formal-derived.** Idempotency key lifetime = row lifetime: retry after Cancel/reap creates a second Booking/Hold | Robustness (formal-derived) | 7 | — (shares `idempotency.ts` with RF2) |
+| [RF2](#rf2--a-same-key-retry-must-replay-not-409-when-the-originals-key-row-is-committed) | **Formal-derived.** Same-key retry can be told 409 although the original's key row is committed | Robustness (formal-derived) | 8 | — (shares `idempotency.ts` with RF1) |
 
 Shared rerun conventions (each ticket's "before" numbers are the committed reports named in it; the "after" runs write new JSON beside them under `docs/evidence/chaos/` with a distinct label, e.g. `--label r1-after-rep1`, so `aggregate.ts --exhibit h` picks them up and the exhibit can show before and after side by side):
 
@@ -253,3 +257,71 @@ Evidence: Exhibit H, finding R6.
 ### Blocked by
 
 None (can start immediately)
+
+---
+
+# Formal-derived findings
+
+Found by TLC in the F4 crash / ambiguous-commit / idempotent-retry model, which mirrors the real `pessimistic` code paths. Neither breaks a chaos Oracle (ADR-0022 reads stored state after the Fault clears). Editing the model is within these tickets' scope even though `formal/` was off-limits to C5: a fix that makes the real code stop exhibiting the behavior must be mirrored in `formal/CrashRecovery.tla`, `formal/check.sh` and `formal/README.md`, and the formal check is the other half of the "after" evidence. Confirm the model is still pinned to the same code (it was at 2f47207) before relying on a trace number.
+
+## RF1 — decide and state how long an Idempotency Key lives
+
+**Title:** Idempotency-key lifetime equals row lifetime: a retry after Cancel or reap creates a second Booking/Hold (RF1, formal-derived)
+
+### Parent
+
+Part of #42 (Phase 6; formal-derived finding RF1, from F4 #47 — `CrashFindingKeyReuse` trace 10, `CrashFindingHoldKeyReuse` trace 11)
+
+### What to build
+
+The only home of an Idempotency Key is the `idempotency_key … UNIQUE` column of the `bookings` / `holds` row. ADR-0020 deletes that row on Cancel, Confirm and reap, so the key is forgotten with it. Consequences, both reproduced by the model: **book → cancel → retry the same key creates a second Booking**, and **hold → expire → reap → retry the same key creates a second, fresh Hold**. The model's `BookingKeyCreatesAtMostOne` / `HoldKeyCreatesAtMostOne` ("a key creates at most one Booking/Hold *ever*") are therefore false for the real code; what holds is `KeyAtMostOneBooking` / `KeyAtMostOneHold` (at most one **live** row) and `KeyReuseOnlyAfterRelease`. Chaos Oracle 3's wording ("no key has more than one Booking") is satisfied by exactly this reading, so a client that replays a *stale* request after cancelling gets a new Booking, not a replay.
+
+This is also a mismatch with the project's own glossary: `CONTEXT.md` defines **Idempotency Key** as a token whose requests "must never produce two Bookings or two Holds". The ticket must resolve that contradiction one way or the other. The design is the ticket's to decide, and **"keep today's behavior and amend the contract" is a legitimate outcome** (as with #36 and R6): candidates are (a) retain keys beyond their row — a dedicated `idempotency_keys` table (key → what it created, retention/expiry policy; note the roadmap's earlier "dedupe table" was superseded in Phase 0/1 by the UNIQUE column, RaceToSeat#1, so this reverses that choice and needs an ADR), or a tombstone on the deleted row; (b) keep key = row lifetime and rewrite the `CONTEXT.md` definition and API documentation to say "dedupes while the Booking/Hold exists". If (a), also decide what a post-Cancel retry should answer (a replay would hand back an id for a Booking that no longer exists; a distinct outcome such as `410`/`409` may be right) and how `hold-confirm:<id>` synthesized keys (`pessimisticConfirm.ts`) retire.
+
+Evidence: Exhibit H, finding RF1 (cited from `formal/README.md`; not a chaos result).
+
+### Acceptance criteria
+
+- [ ] **Decision recorded in an ADR** (retain keys vs. document the contract), and `CONTEXT.md`'s **Idempotency Key** definition made consistent with it.
+- [ ] **Deterministic regression tests on the real code path** (Vitest, `app.inject()` + `pool.query` like `test/strategies/*.test.ts`) that fail before the change and encode the decision: (i) `POST /bookings` → `DELETE /bookings/{id}` → `POST /bookings` with the *same* `idempotency_key`; (ii) `POST /holds` → expire (`expireHold` helper) → `runReaperSweep` → `POST /holds` with the same key. If keys are retained: neither creates a second row and the response is the decided one. If the contract is documented instead: the tests pin today's behavior so it can no longer change by accident.
+- [ ] **Formal "after":** `formal/CrashRecovery.tla` updated to mirror the decision, and the matching configurations flip from *violated on purpose* to *passing* — if keys are retained, `CrashFindingKeyReuse` (`BookingKeyCreatesAtMostOne`) and `CrashFindingHoldKeyReuse` (`HoldKeyCreatesAtMostOne`) move out of `formal/check.sh`'s expected-violation list into the positive checks; if the contract is documented, they stay violated-on-purpose and `formal/README.md` records the decision next to them. Either way `npm run formal:check` and `npm run formal:check:negative` pass, and `formal/README.md`'s "Findings" section is updated.
+- [ ] **Chaos non-regression:** one matrix cell per mechanism family still passes all four Oracles with the key logic changed (e.g. the C2 `latency-above` cells for `naive` and `pessimistic` × `hammer-seat`, which resolve unacknowledged commits purely by Idempotency-Key replay: Exhibit H shows 5 unacknowledged commits per cell, all resolved to exactly one Booking). If a new Oracle is added to cover post-Cancel replay, it ships with its own negative control (ADR-0023); note that HTTP statuses stay non-evidence (ADR-0022).
+- [ ] Full existing suite passes (existing idempotency tests unmodified unless the decision changes them, in which case say which and why); `npm run typecheck` clean.
+- [ ] Exhibit H regenerated if any chaos run is added; RF1 row's issue link filled in.
+
+### Blocked by
+
+None (coordinate with RF2, which edits the same `src/strategies/idempotency.ts` helpers)
+
+---
+
+## RF2 — a same-key retry must replay, not 409, when the original's key row is committed
+
+**Title:** A concurrent same-key book/hold retry can be told 409 although the original's key is already committed (RF2, formal-derived)
+
+### Parent
+
+Part of #42 (Phase 6; formal-derived finding RF2, from F4 #47 — `CrashFindingSpuriousConflict` trace 7, invariant `KeyNeverFalselyRefused`)
+
+### What to build
+
+`bookSeatPessimistic` and `holdSeatsPessimistic` look the Idempotency Key up **before `BEGIN`** (`src/strategies/pessimistic.ts:25`, `src/strategies/pessimisticHold.ts:20`). If the original attempt commits *between that lookup and the retry's `SELECT … FOR UPDATE NOWAIT`*, the retry's lock succeeds, sees the seat already taken, and answers `409 conflict` — not a replay of the original. (If the original is still in flight, `NOWAIT` fails immediately: also 409, but no row is committed yet, so that case is correct.) If the original's response was also lost, the client's only answer is a 409 for a request that succeeded; only a *further* retry, which overlaps nothing, learns the truth. `resolveIdempotencyKeyRace` (unique violation → replay) does not catch it: under `pessimistic` that path is reachable only when a same-key retry wants *different* seats, because for the same seats `NOWAIT` / the status check refuses first. The Confirm path is **not** affected (`ConfirmNeverFalselyRefused` holds): `confirmHoldPessimistic` repeats its key lookup inside the transaction, after its locks, which is exactly what the book/hold paths lack.
+
+The same pre-`BEGIN` lookup exists in `naive.ts:37` and `advisory.ts:37`; whether it yields a spurious 409 there depends on each mechanism's own conflict path and was **not modeled** (F4 models `pessimistic` only). The ticket must survey every strategy that does a pre-transaction key lookup and either fix it or record why it cannot misreport.
+
+The design is the ticket's to decide; candidates (not tried): repeat the key lookup inside the transaction after the locks are taken (mirroring `confirmHoldPessimistic`), or, on the `conflict` path only, re-check the key once on a fresh read before answering 409 and replay if found. It must preserve ADR-0006's non-blocking acquisition and `404`-before-`409` precedence, and must not turn a genuine conflict (a *different* key wanting a taken seat) into a replay.
+
+Evidence: Exhibit H, finding RF2 (cited from `formal/README.md`; not a chaos result — no Oracle can see it because the Booking exists exactly once and the wrong answer is an HTTP status).
+
+### Acceptance criteria
+
+- [ ] **Deterministic regression tests on the real code path** that fail before the fix: for `POST /bookings` under `pessimistic`, drive the interleaving explicitly (the retry's key lookup misses; the original then commits; the retry then reaches its lock) using query interception (`interceptQuery` in `test/testDb.ts`, as `test/strategies/serializableRetryExhaustion.test.ts` does), and assert the retry answers `201`/idempotent replay with the **original's booking id** — not `409`. Same test for `POST /holds` (`holdSeatsPessimistic`) answering a replay of the original Hold. Companion tests, passing before and after: a *different* key wanting the same seat still gets `409`; an in-flight original still makes the retry `409` without a replay (no row yet).
+- [ ] **Formal "after":** `formal/CrashRecovery.tla` updated so the book/hold lookup mirrors the fix, and `CrashFindingSpuriousConflict` moves from *violated on purpose* (`KeyNeverFalselyRefused`) to *passing* in `formal/check.sh`; `CrashWitnessKeyRace` and the replay witnesses (`CrashWitnessReplay*`) still hold, `ConfirmNeverFalselyRefused` unchanged; `npm run formal:check` and `npm run formal:check:negative` pass; `formal/README.md`'s "Findings" section updated.
+- [ ] **Survey result recorded:** for each of `naive`, `advisory` (and any other strategy found) either a fix + test, or a written reason it cannot answer a spurious 409.
+- [ ] **Chaos non-regression:** the C2 `latency-above` cells (unacknowledged commits resolved by replay) for `pessimistic` × `hammer-seat` and × `deadlock-pairs`, 5 reps, unmodified: all four Oracles green and the post-Fault replay still ends with exactly one Booking per key. (This shows no regression; it cannot show the bug fixed — see above.)
+- [ ] Existing suite passes unmodified (`pessimistic.test.ts`, `pessimisticHold.test.ts`, idempotency tests); `npm run typecheck` clean.
+- [ ] RF2 row's issue link filled in on Exhibit H.
+
+### Blocked by
+
+None (coordinate with RF1, which edits the same `src/strategies/idempotency.ts` helpers)

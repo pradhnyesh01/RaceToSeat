@@ -15,6 +15,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { parseExhibit, parseOutPath } from "../load-harness/aggregate.js";
 import {
   CANONICAL_FINDINGS,
+  FORMAL_FINDINGS,
   checkRecordClaims,
   classify,
   computeFindingEvidence,
@@ -166,6 +167,17 @@ describe("canonical finding numbering", () => {
     expect(byId.R6!.title).toMatch(/Retry loops/);
     expect(byId.R7!.title).toMatch(/reaper/i);
     expect(byId.R7!.oldNumbers).toContain("C3 R5");
+  });
+});
+
+describe("formal-derived findings", () => {
+  it("are numbered RF1..RF2, apart from the chaos-observed R1..R7, and cited rather than computed", () => {
+    expect(FORMAL_FINDINGS.map((f) => f.id)).toEqual(["RF1", "RF2"]);
+    expect(CANONICAL_FINDINGS.some((f) => f.id.startsWith("RF"))).toBe(false);
+    const doc = renderExhibitH({ reports: [load(mk("c2-latency-below-naive-hammer-seat-rep1", { args: { fault: "latency-below" } }))], unitControls: null });
+    expect(doc).toContain("### Formal-derived findings (RF1–RF2)");
+    expect(doc).toContain("invisible to these runs by construction");
+    for (const f of FORMAL_FINDINGS) expect(f.whyChaosMissesIt).toMatch(/stored state|Oracle/);
   });
 });
 
