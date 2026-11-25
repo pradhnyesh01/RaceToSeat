@@ -73,7 +73,7 @@ ADRs 0021–0023 are written as the relevant tickets land, not up front.
 - [x] #45 F2: deadlock A/B — unsorted blocking acquisition yields a TLC counterexample; the fixed protocol is clean
 - [x] #46 F3: lifecycle layer — Hold, Confirm, Expire (monotonic flag), Reaper, Cancel; reaper liveness under weak fairness
 - [x] #47 F4: crash / ambiguous-commit / idempotent-retry layer
-- [ ] #48 F5: spec-action → SQL (`file:line`) mapping table + Exhibit G
+- [x] #48 F5: spec-action → SQL (`file:line`) mapping table + Exhibit G
 
 **Chaos track** (Toxiproxy compose profile + scripted `pg_terminate_backend`)
 - [x] #44 C1 (tracer): fault driver, four DB-state oracles + corrupted-state unit tests, scratch-DB (no UNIQUE) negative control; backend-kill vs `pessimistic`, measured on unmodified code
