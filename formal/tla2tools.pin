@@ -1,0 +1,8 @@
+# Pinned TLC toolchain for `npm run formal:check`. Read by formal/check.sh.
+# The jar is downloaded on first use into formal/.cache/ (gitignored) and its
+# SHA-256 verified against this file; a mismatch aborts the run.
+TLA_VERSION=v1.7.4
+TLA_URL=https://github.com/tlaplus/tlaplus/releases/download/v1.7.4/tla2tools.jar
+TLA_SHA256=936a262061c914694dfd669a543be24573c45d5aa0ff20a8b96b23d01e050e88
+# JRE image, pinned by manifest-list digest (eclipse-temurin:17-jre as of 2026-11-25).
+JRE_IMAGE=eclipse-temurin@sha256:541b08fc7f494edf14e436ff6bfb55767e4a115c87bfc547b8c5de957b58737f

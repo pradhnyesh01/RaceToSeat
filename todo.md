@@ -69,7 +69,7 @@ before deepening either. Dependencies: F1→{F2,F3}→F4→F5, C1→{C2,C3}→C5
 ADRs 0021–0023 are written as the relevant tickets land, not up front.
 
 **Formal track** (TLA+, TLC in a pinned Docker image, `npm run formal:check`)
-- [ ] #43 F1 (tracer): core spec — claim + multi-seat Booking, mutual-exclusion & atomicity invariants, Docker TLC runner, naive-claim negative control
+- [x] #43 F1 (tracer): core spec — claim + multi-seat Booking, mutual-exclusion & atomicity invariants, Docker TLC runner, naive-claim negative control
 - [ ] #45 F2: deadlock A/B — unsorted blocking acquisition yields a TLC counterexample; the fixed protocol is clean
 - [ ] #46 F3: lifecycle layer — Hold, Confirm, Expire (monotonic flag), Reaper, Cancel; reaper liveness under weak fairness
 - [ ] #47 F4: crash / ambiguous-commit / idempotent-retry layer
