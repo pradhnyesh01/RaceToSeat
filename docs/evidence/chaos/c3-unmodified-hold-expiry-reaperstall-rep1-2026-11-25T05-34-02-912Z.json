@@ -1,0 +1,147 @@
+{
+  "label": "c3-unmodified-hold-expiry-reaperstall-rep1",
+  "ranAt": "2026-11-25T05:34:02.912Z",
+  "args": {
+    "mode": "hold-expiry",
+    "concurrency": 12,
+    "fault": "backend-kill",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "holdTtlSeconds": 8,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 3,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "c3-unmodified-hold-expiry-reaperstall-rep1",
+    "appPort": 3300
+  },
+  "scratchDatabase": "racetoseat_chaos_addb7012",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 2
+  },
+  "eventId": "0b89555d-fe22-4e4c-a515-9673d71ead12",
+  "holdsSeeded": 12,
+  "reaperStallSeats": 3,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "onlyApplicationName": "racetoseat-c3-app",
+    "stats": {
+      "sweeps": 83,
+      "terminated": 4,
+      "terminatedByState": {
+        "idle in transaction": 1,
+        "active": 3
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "0": 107,
+      "409": 14,
+      "410": 12
+    },
+    "transportErrors": {
+      "read: connection reset by peer": 67,
+      "EOF": 27,
+      "dial: connection refused": 13
+    },
+    "durationMs": 650,
+    "maxRequestMs": 22
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T05:34:02.970Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "restarts": 1,
+    "reaperSweepFailures": 3,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "error: terminating connection due to administrator command": 1,
+      "Emitted 'error' event on Client instance at:": 1,
+      "severity: 'FATAL',": 4,
+      "Reaper sweep failed: error: terminating connection due to administrator command": 3
+    }
+  },
+  "confirmRetry": {
+    "tally": {
+      "404": 12
+    },
+    "unanswered": 0,
+    "heldLiveAtAnswer": 0
+  },
+  "seatStatusAtHeal": {
+    "available": 15
+  },
+  "finalState": {
+    "seats": {
+      "available": 15
+    },
+    "confirmKeyBookings": 0,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "107 request(s) got no HTTP response (connection refused/reset/timeout)"
+    },
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "3 reaper sweep(s) failed and were logged (the reaper survives a failed sweep — server.ts/reaper.ts catch it)"
+    }
+  ]
+}

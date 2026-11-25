@@ -120,11 +120,11 @@ function parseArgs(argv: string[]): Args {
   return args;
 }
 
-function sleep(ms: number): Promise<void> {
+export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function withPort(connectionString: string, port: number): string {
+export function withPort(connectionString: string, port: number): string {
   const url = new URL(connectionString);
   url.port = String(port);
   return url.toString();
@@ -215,7 +215,7 @@ interface AppExit {
 // child process the harness can watch for crashes. Never imports src/: the
 // app under test must be the unmodified production entry point, not an
 // in-process copy sharing the harness's module state.
-class AppUnderTest {
+export class AppUnderTest {
   private child: ChildProcess | undefined;
   private stopping = false;
   readonly exits: AppExit[] = [];
@@ -296,7 +296,7 @@ class AppUnderTest {
 
 // --- k6 -----------------------------------------------------------------------
 
-interface K6Outcome {
+export interface K6Outcome {
   exitCode: number | null;
   durationMs: number;
   requests: number;
@@ -311,7 +311,7 @@ interface K6Outcome {
 // other) — under a Fault the distinction that matters is among the "other"s:
 // a 500 (server answered with an error), a 0 (no answer: connection refused/
 // reset/timeout), and a request that simply took very long.
-async function runK6(script: string, env: Record<string, string>, appPort: number): Promise<K6Outcome> {
+export async function runK6(script: string, env: Record<string, string>, appPort: number): Promise<K6Outcome> {
   await mkdir(new URL("../../docs/evidence/chaos/", import.meta.url), { recursive: true });
   const outPath = fileURLToPath(new URL(`../../docs/evidence/chaos/.k6-points-${randomUUID()}.json`, import.meta.url));
   const startedAt = Date.now();
@@ -402,7 +402,7 @@ async function replayLedger(
 // Collapses a captured app log into counts of distinct error headlines (the
 // non-stack-trace lines), so a run's report can say *which* errors the app
 // logged and how often without embedding thousands of near-identical lines.
-function errorSignatures(output: string[]): Record<string, number> {
+export function errorSignatures(output: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const line of output) {
     const trimmed = line.trim();
@@ -419,7 +419,7 @@ interface RobustnessObservation {
   detail: string;
 }
 
-function deriveRobustnessObservations(app: AppUnderTest, k6: K6Outcome): RobustnessObservation[] {
+export function deriveRobustnessObservations(app: AppUnderTest, k6: K6Outcome): RobustnessObservation[] {
   const found: RobustnessObservation[] = [];
   if (app.exits.length > 0) {
     found.push({
@@ -452,7 +452,7 @@ function deriveRobustnessObservations(app: AppUnderTest, k6: K6Outcome): Robustn
 
 // --- main ---------------------------------------------------------------------
 
-function printOracles(results: OracleResult[]): void {
+export function printOracles(results: OracleResult[]): void {
   for (const r of results) {
     console.log(`  Oracle ${r.oracle} (${r.name}): ${r.passed ? "PASS" : `FAIL — ${r.violations.length} violation(s)`}`);
     for (const v of r.violations.slice(0, 5)) console.log(`      - [${v.kind}] ${v.detail}`);
@@ -601,7 +601,11 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exitCode = 1;
-});
+// Importable by sibling chaos entry points (runHolds.ts, issue #50) without
+// running this file's own CLI.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
+}

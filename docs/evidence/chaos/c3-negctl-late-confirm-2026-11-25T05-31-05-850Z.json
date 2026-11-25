@@ -1,0 +1,120 @@
+{
+  "label": "c3-negctl-late-confirm",
+  "ranAt": "2026-11-25T05:31:05.850Z",
+  "args": {
+    "mode": "hold-expiry",
+    "concurrency": 12,
+    "fault": "none",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "holdTtlSeconds": 8,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 0,
+    "sabotage": "late-confirm",
+    "expectViolations": true,
+    "label": "c3-negctl-late-confirm",
+    "appPort": 3300
+  },
+  "scratchDatabase": "racetoseat_chaos_7a7d1bff",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "a02eb8c8-ed06-412b-a94f-10b278035d52",
+  "holdsSeeded": 12,
+  "reaperStallSeats": 0,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "onlyApplicationName": "racetoseat-c3-app"
+  },
+  "k6": {
+    "statusTally": {
+      "201": 12,
+      "409": 533,
+      "410": 43
+    },
+    "transportErrors": {},
+    "durationMs": 3507,
+    "maxRequestMs": 70
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {}
+  },
+  "confirmRetry": {
+    "tally": {
+      "404": 12
+    },
+    "unanswered": 0,
+    "heldLiveAtAnswer": 0
+  },
+  "seatStatusAtHeal": {
+    "held": 12
+  },
+  "finalState": {
+    "seats": {
+      "available": 11,
+      "booked": 1
+    },
+    "confirmKeyBookings": 1,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": "inserted a post-expiry booking for hold d9e13cf7-04b0-4357-bc80-49350a75acea",
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "booking-confirmed-after-hold-expiry",
+          "detail": "booking c6f2536e-8585-496b-9e0a-e73242fa8878 (hold-confirm:d9e13cf7-04b0-4357-bc80-49350a75acea) was created at 2026-11-25 05:31:18.910554+00, at/after its hold's expiry 2026-11-25 05:31:05.792333+00",
+          "bookingIds": [
+            "c6f2536e-8585-496b-9e0a-e73242fa8878"
+          ],
+          "idempotencyKey": "hold-confirm:d9e13cf7-04b0-4357-bc80-49350a75acea"
+        }
+      ]
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

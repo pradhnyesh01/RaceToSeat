@@ -25,6 +25,12 @@ export interface BackendKillOptions {
   // how the app's pool reacts to a dead *idle* connection (hypothesis 1).
   // "any": every non-harness client backend.
   scope: "in-transaction" | "idle" | "any";
+  // When set, ONLY backends whose application_name equals this are eligible
+  // (issue #50): a positive allow-list on top of the database-name scope and
+  // the harness-name exemption, so a run sharing a Postgres server with other
+  // sessions can name exactly whose connections it may kill. The app under
+  // test picks its name up from PGAPPNAME (no src/ change needed).
+  onlyApplicationName?: string;
 }
 
 export interface BackendKillStats {
@@ -44,7 +50,7 @@ export interface BackendKiller {
 // server.
 export async function killBackendsOnce(
   db: Pool,
-  options: Pick<BackendKillOptions, "fraction" | "scope">,
+  options: Pick<BackendKillOptions, "fraction" | "scope" | "onlyApplicationName">,
 ): Promise<{ state: string; terminated: boolean }[]> {
   const transactionFilter =
     options.scope === "in-transaction" ? "AND xact_start IS NOT NULL" : options.scope === "idle" ? "AND state = 'idle'" : "";
@@ -55,9 +61,10 @@ export async function killBackendsOnce(
        AND backend_type = 'client backend'
        AND pid <> pg_backend_pid()
        AND application_name <> $1
+       AND ($3::text IS NULL OR application_name = $3)
        ${transactionFilter}
        AND random() < $2`,
-    [CHAOS_APPLICATION_NAME, options.fraction],
+    [CHAOS_APPLICATION_NAME, options.fraction, options.onlyApplicationName ?? null],
   );
   return res.rows;
 }
@@ -75,7 +82,7 @@ function tally(stats: BackendKillStats, rows: { state: string; terminated: boole
 // One sweep, with stats — the idle-pool-kill Fault's whole body.
 export async function killBackendsOnceWithStats(
   db: Pool,
-  options: Pick<BackendKillOptions, "fraction" | "scope">,
+  options: Pick<BackendKillOptions, "fraction" | "scope" | "onlyApplicationName">,
 ): Promise<BackendKillStats> {
   const stats: BackendKillStats = { sweeps: 0, terminated: 0, terminatedByState: {} };
   tally(stats, await killBackendsOnce(db, options));
