@@ -2,7 +2,7 @@ import type { PoolClient } from "pg";
 import { config } from "../config.js";
 import { pool } from "../db/pool.js";
 import { isLockNotAvailable } from "../db/pgErrors.js";
-import { findExistingHoldByIdempotencyKey, normalizeSeatIds, runTransactionalHold } from "./idempotency.js";
+import { findPriorHoldForKey, normalizeSeatIds, runTransactionalHold } from "./idempotency.js";
 import type { HoldSeatsInput, HoldSeatsResult } from "./types.js";
 
 export type { HoldSeatsResult };
@@ -17,14 +17,9 @@ export type { HoldSeatsResult };
 export async function holdSeatsPessimistic(input: HoldSeatsInput): Promise<HoldSeatsResult> {
   const client: PoolClient = await pool.connect();
   try {
-    const existingHold = await findExistingHoldByIdempotencyKey(client, input.idempotencyKey);
-    if (existingHold) {
-      return {
-        kind: "idempotent_replay",
-        holdId: existingHold.id,
-        seatIds: existingHold.seatIds,
-        heldUntil: existingHold.heldUntil,
-      };
+    const prior = await findPriorHoldForKey(client, input.idempotencyKey);
+    if (prior) {
+      return prior;
     }
 
     // Sorted purely for cross-mechanism consistency, same as
@@ -79,7 +74,7 @@ export async function holdSeatsPessimistic(input: HoldSeatsInput): Promise<HoldS
 
       // now() is stable for the whole transaction, so every row this UPDATE
       // touches gets the identical held_until — required for
-      // findExistingHoldByIdempotencyKey's MIN(held_until) read to be
+      // findPriorHoldForKey's MIN(held_until) read to be
       // meaningful rather than an arbitrary pick among differing values.
       const updateRes = await txClient.query<{ held_until: Date }>(
         `UPDATE seats

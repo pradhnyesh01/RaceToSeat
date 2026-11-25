@@ -13,8 +13,12 @@ A specific physical seat for one specific Event. Seat 14B at the 7pm showing and
 _Avoid_: Venue seat, seat assignment
 
 **Idempotency Key**:
-A client-generated token, globally unique across all users, attached to one attempt to claim Seats — either a Booking directly or a Hold. Two requests carrying the same key represent the same attempt regardless of who submitted them, and must never produce two Bookings or two Holds.
+A client-generated token, globally unique across all users, attached to one attempt to claim Seats — either a Booking directly or a Hold. Two requests carrying the same key represent the same attempt regardless of who submitted them, and must never produce two Bookings or two Holds — including after the first one is gone. A key outlives its Booking or Hold: once that is Cancelled, Confirmed or reaped, the key is kept for a retention window (default 24 hours, `IDEMPOTENCY_RETENTION_SECONDS`), and a request carrying it in that window is a stale duplicate of an attempt that already happened — answered **key released** (HTTP 410), never a replay and never a new Booking or Hold. Only after the window is a key treated as new, so "never two" is a guarantee within the retention window, not forever. A client that really wants the seat again after cancelling or letting a Hold expire uses a new key.
 _Avoid_: Request ID, dedupe key
+
+**Key released**:
+The answer to a request whose Idempotency Key already created a Booking or Hold that no longer exists, within the retention window: HTTP 410 with the reason (`cancelled`, `confirmed` or `expired`) and the id the key had created. Distinct from a replay (the Booking/Hold still exists, so the client gets it back as a 201) and from a conflict (a different attempt took the Seat).
+_Avoid_: Expired key, duplicate
 
 **Booking**:
 A record that one or more Seats were claimed together, atomically, for one user in a single request. Succeeds only if every requested Seat was claimed; if any requested Seat was unavailable, none are booked.

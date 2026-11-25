@@ -1,0 +1,12 @@
+CREATE TABLE
+DO
+                        what                        | us_per_op_avg | us_min | us_max 
+----------------------------------------------------+---------------+--------+--------
+ insert with guard trigger (per 50k)                |          8.54 |   7.53 |   9.37
+ insert without trigger (per 50k)                   |          5.45 |   5.11 |   5.63
+ lookup, single table (per 50k misses)              |          1.69 |   1.60 |   1.84
+ lookup, UNION ALL with tombstones (per 50k misses) |          4.34 |   3.44 |   4.75
+ release: delete + tombstone CTE (per 50k)          |         19.67 |  18.73 |  20.13
+ release: plain delete (per 50k)                    |          7.62 |   7.01 |   8.07
+(6 rows)
+

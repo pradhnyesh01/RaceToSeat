@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.js";
+import { runReaperSweep } from "../src/reaper.js";
 import { createHold, expireHold, resetDb, seedEventWithSeats } from "./testDb.js";
 
 // Shared behavioural contract for hold creation, mirroring bookingContract.ts's
@@ -456,6 +457,53 @@ export function runHoldConcurrencyContractTest(strategyLabel: string, createApp:
         seatIdsByLabel.A1,
       ]);
       expect(holdSeatsRes.rows).toHaveLength(1);
+    });
+  });
+}
+
+// RF1 (ADR-0030): a Hold's Idempotency Key outlives the hold. Hold -> expire
+// -> reap, or hold -> confirm, then retry POST /holds with the same key: no
+// second Hold is created and the answer is 410 key_released (reason
+// "expired" / "confirmed"), not a replay of a hold that no longer exists.
+export function runHoldKeyReleaseContractTests(strategyLabel: string, createApp: () => FastifyInstance): void {
+  describe(`POST /holds (${strategyLabel} strategy) — idempotency key after the hold is gone (RF1)`, () => {
+    beforeEach(resetDb);
+
+    it("answers 410 (expired) and creates no second hold when an expired, reaped hold's key is retried", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+      const first = await app.inject({ method: "POST", url: "/holds", payload });
+      expect(first.statusCode).toBe(201);
+      const { id: holdId } = first.json() as { id: string };
+      await expireHold([seatIdsByLabel.A1!]);
+      await runReaperSweep(pool);
+
+      const retry = await app.inject({ method: "POST", url: "/holds", payload });
+
+      expect(retry.statusCode).toBe(410);
+      expect(retry.json()).toMatchObject({ outcome: "key_released", reason: "expired", released_id: holdId });
+      const holdsRes = await pool.query("SELECT 1 FROM holds WHERE idempotency_key = $1", [payload.idempotency_key]);
+      expect(holdsRes.rows).toHaveLength(0);
+      const seatRes = await pool.query("SELECT status FROM seats WHERE id = $1", [seatIdsByLabel.A1]);
+      expect(seatRes.rows[0]).toMatchObject({ status: "available" });
+    });
+
+    it("answers 410 (confirmed) when a confirmed hold's key is retried, and leaves the Booking alone", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+      const { id: holdId } = (await app.inject({ method: "POST", url: "/holds", payload })).json() as { id: string };
+      expect((await app.inject({ method: "POST", url: `/holds/${holdId}/confirm` })).statusCode).toBe(201);
+
+      const retry = await app.inject({ method: "POST", url: "/holds", payload });
+
+      expect(retry.statusCode).toBe(410);
+      expect(retry.json()).toMatchObject({ outcome: "key_released", reason: "confirmed", released_id: holdId });
+      const seatRes = await pool.query("SELECT status FROM seats WHERE id = $1", [seatIdsByLabel.A1]);
+      expect(seatRes.rows[0]).toMatchObject({ status: "booked" });
+      const bookingsRes = await pool.query("SELECT 1 FROM bookings");
+      expect(bookingsRes.rows).toHaveLength(1);
     });
   });
 }

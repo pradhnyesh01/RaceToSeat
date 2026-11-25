@@ -6,9 +6,17 @@
 // ADR-0014) but only for a multi-seat deadlock abort — a single-seat request
 // to either never retries. retry_exhausted (ADR-0012) is the one kind where
 // it's always meaningful, so it's required there.
+// Why an Idempotency Key's Booking/Hold no longer exists (ADR-0030): a Booking
+// is only ever "cancelled"; a Hold is "confirmed" into a Booking or "expired"
+// and reaped. Carried by the key_released kind of both result types.
+export type KeyReleaseReason = "cancelled" | "confirmed" | "expired";
+
 export type BookSeatResult =
   | { kind: "created"; bookingId: string; createdAt: Date; retries?: number }
   | { kind: "idempotent_replay"; bookingId: string; createdAt: Date; retries?: number }
+  // The key's Booking was cancelled (ADR-0030). Not a replay - there is no
+  // Booking to hand back - and not a new attempt either; HTTP 410.
+  | { kind: "key_released"; reason: KeyReleaseReason; releasedId: string; retries?: number }
   | { kind: "conflict"; retries?: number }
   | { kind: "not_found"; retries?: number }
   | { kind: "retry_exhausted"; retries: number };
@@ -26,6 +34,8 @@ export interface BookSeatInput {
 export type HoldSeatsResult =
   | { kind: "created"; holdId: string; seatIds: string[]; heldUntil: Date }
   | { kind: "idempotent_replay"; holdId: string; seatIds: string[]; heldUntil: Date }
+  // The key's Hold was confirmed or expired and reaped (ADR-0030); HTTP 410.
+  | { kind: "key_released"; reason: KeyReleaseReason; releasedId: string }
   | { kind: "conflict" }
   | { kind: "not_found" };
 

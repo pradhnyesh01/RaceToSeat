@@ -7,6 +7,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
 const { interceptQuery, resetDb, seedBooking, seedEventWithSeats } = await import("../testDb.js");
@@ -18,6 +19,7 @@ afterAll(() => pool.end());
 runBookingContractTests("optimistic", createApp);
 runBookingConcurrencyContractTest("optimistic", createApp);
 runMultiSeatBookingContractTests("optimistic", createApp);
+runIdempotencyKeyReleaseContractTest("optimistic", createApp);
 
 describe("POST /bookings (optimistic strategy) — concurrent cancellation race", () => {
   beforeEach(resetDb);

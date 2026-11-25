@@ -1,5 +1,7 @@
 import type { PoolClient } from "pg";
+import { config } from "../config.js";
 import { pool, withTransaction } from "../db/pool.js";
+import { tombstoneInsertSql } from "../db/tombstones.js";
 import { isLockNotAvailable } from "../db/pgErrors.js";
 import { findExistingBookingByIdempotencyKey, insertBookingForSeats } from "./idempotency.js";
 import type { ConfirmHoldResult } from "./types.js";
@@ -137,9 +139,16 @@ export async function confirmHoldPessimistic(holdId: string): Promise<ConfirmHol
         // identical, deliberate precedent (a naive CASCADE could never also
         // perform the accompanying seat-status reset, so this codebase
         // always deletes both explicitly instead of relying on one).
+        // Also leaves the hold's own idempotency_key a tombstone (reason
+        // "confirmed", ADR-0030), in the same statement: a stale retry of
+        // POST /holds with that key must not mint a second hold now that this
+        // one is gone. The Booking this confirm just created is keyed
+        // "hold-confirm:<id>", which needs nothing here (see ADR-0030).
         await txClient.query(
-          "WITH deleted_hold_seats AS (DELETE FROM hold_seats WHERE hold_id = $1) DELETE FROM holds WHERE id = $1",
-          [holdId],
+          `WITH removed_hold_seats AS (DELETE FROM hold_seats WHERE hold_id = $1),
+                removed_holds AS (DELETE FROM holds WHERE id = $1 RETURNING id, idempotency_key)
+           ${tombstoneInsertSql({ kind: "hold", reason: "confirmed", sourceCte: "removed_holds", retentionParam: 2 })}`,
+          [holdId, config.idempotencyRetentionSeconds],
         );
 
         return { kind: "created", bookingId, createdAt };

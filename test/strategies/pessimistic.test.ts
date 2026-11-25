@@ -7,6 +7,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
 const { resetDb, seedEventWithSeats, withHeldRowLock } = await import("../testDb.js");
@@ -18,6 +19,7 @@ afterAll(() => pool.end());
 runBookingContractTests("pessimistic", createApp);
 runBookingConcurrencyContractTest("pessimistic", createApp);
 runMultiSeatBookingContractTests("pessimistic", createApp);
+runIdempotencyKeyReleaseContractTest("pessimistic", createApp);
 runCrossSeatIsolationContractTest("pessimistic", createApp, withHeldRowLock);
 
 describe("POST /bookings (pessimistic strategy) — multi-seat NOWAIT precedence", () => {

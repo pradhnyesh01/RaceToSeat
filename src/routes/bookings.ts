@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
+import { config } from "../config.js";
 import { pool, withTransaction } from "../db/pool.js";
+import { tombstoneInsertSql } from "../db/tombstones.js";
 import { isInvalidTextRepresentation } from "../db/pgErrors.js";
 import { bookSeat } from "../strategies/index.js";
 import { validateSeatClaimBody } from "./validation.js";
@@ -27,6 +29,18 @@ export function registerBookingsRoutes(app: FastifyInstance): void {
         // original booking's 201, not a 200 — the client can't tell this
         // apart from its first attempt succeeding.
         reply.status(201).send({ id: result.bookingId, created_at: result.createdAt });
+        return;
+      case "key_released":
+        // ADR-0030: this idempotency_key already created a Booking, and that
+        // Booking has since been cancelled. Neither a replay (there is no
+        // Booking to hand back) nor a new attempt: 410, and the client mints
+        // a fresh key if it really wants the seat again.
+        reply.status(410).send({
+          error: "This idempotency key was already used by a booking that has since been cancelled",
+          outcome: "key_released",
+          reason: result.reason,
+          released_id: result.releasedId,
+        });
         return;
       case "conflict":
         reply.status(409).send({ error: "Seat is not available" });
@@ -71,7 +85,15 @@ export function registerBookingsRoutes(app: FastifyInstance): void {
               "UPDATE seats SET status = 'available', booked_by = NULL, version = version + 1 WHERE id = ANY($1)",
               [seatIds],
             );
-            await txClient.query("DELETE FROM bookings WHERE id = $1", [id]);
+            // The key outlives the row (ADR-0030): the same statement that
+            // removes the booking leaves its tombstone, so a stale retry of
+            // this booking's idempotency_key is answered "released" rather
+            // than creating a second booking.
+            await txClient.query(
+              `WITH removed AS (DELETE FROM bookings WHERE id = $1 RETURNING id, idempotency_key)
+               ${tombstoneInsertSql({ kind: "booking", reason: "cancelled", sourceCte: "removed", retentionParam: 2 })}`,
+              [id, config.idempotencyRetentionSeconds],
+            );
             return true;
           },
           (foundResult) => foundResult,
