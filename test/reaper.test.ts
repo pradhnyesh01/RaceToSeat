@@ -4,7 +4,7 @@ const { randomUUID } = await import("node:crypto");
 const { createApp } = await import("../src/app.js");
 const { pool } = await import("../src/db/pool.js");
 const { runReaperSweep, startReaper } = await import("../src/reaper.js");
-const { createHold, expireHold, resetDb, seedEventWithSeats } = await import("./testDb.js");
+const { createHold, expireHold, resetDb, seedEventWithSeats, withHeldRowLock } = await import("./testDb.js");
 
 const { afterAll, afterEach, describe, expect, it, vi } = await import("vitest");
 
@@ -110,5 +110,99 @@ describe("startReaper", () => {
     reaper.stop();
     await vi.advanceTimersByTimeAsync(5000);
     expect(querySpy).toHaveBeenCalledTimes(3);
+  });
+});
+
+// R7 (#57): a row-locked expired seat (a slow or leaked transaction) must not
+// make the sweep hold row locks on the *other* expired seats it visited, nor
+// make the sweep itself wait. See docs/adr/0028.
+describe("runReaperSweep with a row-locked expired seat", () => {
+  const SWEEP_SETTLE_MS = 1000; // well under the pool's 1.5 s statement_timeout
+
+  async function settlesWithin(promise: Promise<unknown>, ms: number): Promise<boolean> {
+    return Promise.race([
+      promise.then(
+        () => true,
+        () => true,
+      ),
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), ms)),
+    ]);
+  }
+
+  it("does not wait on the locked seat, and leaves other expired seats free for a NOWAIT Hold", async () => {
+    await resetDb();
+    // The bait is the last-seeded seat so a sweep that waits on it has
+    // already taken row locks on the earlier expired seats it visited.
+    const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2", "A3"]);
+    const app = createApp();
+    const a1 = seatIdsByLabel.A1!;
+    const a2 = seatIdsByLabel.A2!;
+    const bait = seatIdsByLabel.A3!;
+    await createHold(app, [a1], "user-a1");
+    await createHold(app, [a2], "user-a2");
+    await createHold(app, [bait], "user-bait");
+    await expireHold([a1, a2, bait]);
+
+    await withHeldRowLock(bait, async () => {
+      const sweep = runReaperSweep(pool);
+      // Without the fix the sweep blocks on the bait forever (until the
+      // statement timeout) while holding A1/A2's row locks.
+      expect(await settlesWithin(sweep, SWEEP_SETTLE_MS)).toBe(true);
+      await sweep;
+
+      // The unlocked expired seats were reaped, so a fresh NOWAIT Hold wins.
+      const res = await app.inject({
+        method: "POST",
+        url: "/holds",
+        payload: { seat_ids: [a2], user_id: "user-new", idempotency_key: randomUUID() },
+      });
+      expect(res.statusCode).toBe(201);
+
+      // The bait stays held and expired: left for the next tick.
+      const baitRes = await pool.query("SELECT status FROM seats WHERE id = $1", [bait]);
+      expect(baitRes.rows[0].status).toBe("held");
+    });
+
+    // Lock released: the next sweep reaps the bait.
+    await runReaperSweep(pool);
+    const after = await pool.query("SELECT status FROM seats WHERE id = $1", [bait]);
+    expect(after.rows[0].status).toBe("available");
+    const leftovers = await pool.query("SELECT count(*)::int AS n FROM hold_seats WHERE seat_id = $1", [bait]);
+    expect(leftovers.rows[0].n).toBe(0);
+  });
+
+  it("reaps a multi-seat hold all-or-nothing: one locked seat leaves the whole hold intact", async () => {
+    await resetDb();
+    const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2", "A3"]);
+    const app = createApp();
+    const a1 = seatIdsByLabel.A1!;
+    const a2 = seatIdsByLabel.A2!;
+    const a3 = seatIdsByLabel.A3!;
+    const multi = await createHold(app, [a1, a2]);
+    await createHold(app, [a3], "user-other");
+    await expireHold([a1, a2, a3]);
+
+    await withHeldRowLock(a2, async () => {
+      // Must not violate hold_seats' foreign key on holds, nor strand a
+      // half-reaped hold (A1 reset while A2 stays held under the same hold).
+      await runReaperSweep(pool);
+
+      const seats = await pool.query("SELECT label, status FROM seats WHERE id = ANY($1) ORDER BY label", [
+        [a1, a2, a3],
+      ]);
+      expect(seats.rows).toMatchObject([
+        { label: "A1", status: "held" },
+        { label: "A2", status: "held" },
+        { label: "A3", status: "available" },
+      ]);
+      const hs = await pool.query("SELECT count(*)::int AS n FROM hold_seats WHERE hold_id = $1", [multi.id]);
+      expect(hs.rows[0].n).toBe(2);
+    });
+
+    await runReaperSweep(pool);
+    const seats = await pool.query("SELECT status FROM seats WHERE id = ANY($1)", [[a1, a2, a3]]);
+    expect(seats.rows.every((r) => r.status === "available")).toBe(true);
+    const holds = await pool.query("SELECT count(*)::int AS n FROM holds WHERE id = $1", [multi.id]);
+    expect(holds.rows[0].n).toBe(0);
   });
 });
