@@ -9,6 +9,13 @@ process.env.BOOKING_STRATEGY = "naive";
 
 const { afterEach, describe, expect, it, vi } = await import("vitest");
 
+const DB_TIMEOUT_ENV = [
+  "DB_STATEMENT_TIMEOUT_MS",
+  "DB_IDLE_IN_TRANSACTION_TIMEOUT_MS",
+  "DB_QUERY_TIMEOUT_MS",
+  "DB_CONNECT_TIMEOUT_MS",
+] as const;
+
 describe("config", () => {
   // vitest.config.ts's fileParallelism: false runs every file sequentially
   // in one process with nothing resetting process.env between files (see
@@ -22,6 +29,7 @@ describe("config", () => {
   afterEach(() => {
     delete process.env.HOLD_TTL_SECONDS;
     delete process.env.REAPER_INTERVAL_MS;
+    for (const name of DB_TIMEOUT_ENV) delete process.env[name];
     vi.resetModules();
   });
 
@@ -37,5 +45,33 @@ describe("config", () => {
   it("throws at startup when REAPER_INTERVAL_MS is zero or negative", async () => {
     process.env.REAPER_INTERVAL_MS = "-1";
     await expect(import("../src/config.js")).rejects.toThrow(/REAPER_INTERVAL_MS/);
+  });
+
+  // Issue #56 (R4, ADR-0026). Same { min: 1 } rule as HOLD_TTL_SECONDS: pg treats 0 as "no
+  // timeout", so a zero/negative override would silently turn the bound back off.
+  it.each(DB_TIMEOUT_ENV)("throws at startup when %s is zero or negative", async (name) => {
+    process.env[name] = "0";
+    await expect(import("../src/config.js")).rejects.toThrow(new RegExp(name));
+  });
+
+  it("has bounded defaults, each well below a typical 5 s client timeout", async () => {
+    const { config } = await import("../src/config.js");
+
+    expect(config.dbStatementTimeoutMs).toBeGreaterThan(0);
+    expect(config.dbIdleInTransactionTimeoutMs).toBeGreaterThan(0);
+    // The sum is the longest a stalled transaction can stay open server-side:
+    // one statement cut off by statement_timeout, then idle until it is ended.
+    expect(config.dbStatementTimeoutMs + config.dbIdleInTransactionTimeoutMs).toBeLessThan(5000);
+    expect(config.dbQueryTimeoutMs).toBeLessThan(5000);
+    expect(config.dbConnectTimeoutMs).toBeLessThan(5000);
+  });
+
+  // If the client gave up first, a healthy-but-slow statement would be reported as an
+  // infrastructure timeout and its connection destroyed, when the server was about to answer
+  // with an ordinary, connection-preserving statement_timeout error.
+  it("throws at startup when the client query timeout does not exceed the server statement timeout", async () => {
+    process.env.DB_STATEMENT_TIMEOUT_MS = "2000";
+    process.env.DB_QUERY_TIMEOUT_MS = "2000";
+    await expect(import("../src/config.js")).rejects.toThrow(/DB_QUERY_TIMEOUT_MS/);
   });
 });

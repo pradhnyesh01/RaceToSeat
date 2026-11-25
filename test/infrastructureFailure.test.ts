@@ -3,7 +3,7 @@
 // driven through a route that throws.
 import { describe, expect, it } from "vitest";
 import { createApp } from "../src/app.js";
-import { isInfrastructureFailure } from "../src/db/pgErrors.js";
+import { isInfrastructureFailure, isLockNotAvailable, isTimeoutFailure } from "../src/db/pgErrors.js";
 
 describe("isInfrastructureFailure", () => {
   it.each([
@@ -33,6 +33,40 @@ describe("isInfrastructureFailure", () => {
     ["null", null],
   ])("is false for %s", (_name, err) => {
     expect(isInfrastructureFailure(err)).toBe(false);
+  });
+});
+
+// Issue #56 (finding R4, ADR-0026): a bound that fires is its own outcome.
+describe("isTimeoutFailure", () => {
+  it.each([
+    ["pg: client-side query_timeout", new Error("Query read timeout")],
+    ["pg: statement_timeout / user cancel", Object.assign(new Error("canceling statement due to statement timeout"), { code: "57014" })],
+    ["pg: idle_in_transaction_session_timeout", Object.assign(new Error("terminating connection due to idle-in-transaction timeout"), { code: "25P03" })],
+    ["pg: transaction_timeout", Object.assign(new Error("terminating connection due to transaction timeout"), { code: "25P04" })],
+    ["pg: lock_timeout (55P03, told apart from NOWAIT by its message)", Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" })],
+    ["pg-pool: connectionTimeoutMillis while waiting for a client", new Error("timeout exceeded when trying to connect")],
+    ["pg: connectionTimeoutMillis while opening a connection", new Error("Connection terminated due to connection timeout")],
+    ["wrapped: a timeout as `cause`", new Error("wrapper", { cause: new Error("Query read timeout") })],
+  ])("is true for %s", (_name, err) => {
+    expect(isTimeoutFailure(err)).toBe(true);
+  });
+
+  it.each([
+    ["a NOWAIT conflict", Object.assign(new Error('could not obtain lock on row in relation "seats"'), { code: "55P03" })],
+    ["a torn connection", new Error("Connection terminated unexpectedly")],
+    ["a deadlock abort", Object.assign(new Error("deadlock detected"), { code: "40P01" })],
+    ["a plain bug", new TypeError("x is not a function")],
+    ["null", null],
+  ])("is false for %s", (_name, err) => {
+    expect(isTimeoutFailure(err)).toBe(false);
+  });
+
+  it("a lock_timeout is not a seat conflict: isLockNotAvailable stays NOWAIT-only", () => {
+    const lockTimeout = Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" });
+    const nowait = Object.assign(new Error('could not obtain lock on row in relation "seats"'), { code: "55P03" });
+
+    expect(isLockNotAvailable(lockTimeout)).toBe(false);
+    expect(isLockNotAvailable(nowait)).toBe(true);
   });
 });
 
@@ -67,5 +101,25 @@ describe("the global error handler", () => {
 
     expect(res.statusCode).not.toBe(503);
     expect(res.headers["x-booking-retries"]).toBeUndefined();
+  });
+
+  it.each([
+    ["a client-side query timeout (a partition)", new Error("Query read timeout")],
+    ["a statement_timeout", Object.assign(new Error("canceling statement due to statement timeout"), { code: "57014" })],
+    ["a lock_timeout", Object.assign(new Error("canceling statement due to lock timeout"), { code: "55P03" })],
+    ["a pool connection timeout", new Error("timeout exceeded when trying to connect")],
+  ])("answers %s with a retriable 504 — not a 409 conflict, not a 500, not a 502", async (_name, err) => {
+    const res = await respondTo(err);
+
+    expect(res.statusCode).toBe(504);
+    expect(res.headers["retry-after"]).toBe("1");
+    expect(res.json()).toMatchObject({ outcome: "timeout" });
+    expect(res.headers["x-booking-retries"]).toBeUndefined();
+  });
+
+  it("still answers a torn connection 502 (a timeout did not absorb it)", async () => {
+    const res = await respondTo(new Error("Connection terminated unexpectedly"));
+
+    expect(res.statusCode).toBe(502);
   });
 });

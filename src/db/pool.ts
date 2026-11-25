@@ -2,6 +2,8 @@ import type { PoolClient } from "pg";
 import { Pool } from "pg";
 import { config } from "../config.js";
 import { isDeadlockDetected, isSerializationFailure } from "./pgErrors.js";
+import { poolOptions } from "./poolOptions.js";
+import { destroyConnectionOnQueryTimeout } from "./queryDeadline.js";
 
 // Default pg pool max (10) would serialize most of a 1,000-concurrent-request
 // load test behind pool.connect() queuing rather than real DB concurrency —
@@ -22,7 +24,7 @@ import { isDeadlockDetected, isSerializationFailure } from "./pgErrors.js";
 // seeding/verification queries, so real concurrent connections against the
 // 600 ceiling can run higher than 500 alone would suggest.
 export const pool = new Pool({
-  connectionString: config.databaseUrl,
+  ...poolOptions(),
   max: Number(process.env.PG_POOL_MAX ?? 500),
 });
 
@@ -281,3 +283,9 @@ pool.on("connect", (client) => {
 // has already logged it, so this listener deliberately does nothing more
 // (logging here would double-report every idle tear).
 pool.on("error", () => {});
+
+// Timeouts (issue #56, finding R4, ADR-0026): the bounds themselves are the pool
+// options in poolOptions.ts; this is the one that needs a hook. A query that pg's
+// `query_timeout` gave up on must also take its connection down, or the catch
+// block's ROLLBACK queues behind it forever (queryDeadline.ts has the details).
+pool.on("connect", destroyConnectionOnQueryTimeout);
