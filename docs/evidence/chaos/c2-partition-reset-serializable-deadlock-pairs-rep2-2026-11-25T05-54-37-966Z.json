@@ -1,0 +1,201 @@
+{
+  "label": "c2-partition-reset-serializable-deadlock-pairs-rep2",
+  "ranAt": "2026-11-25T05:54:37.966Z",
+  "args": {
+    "strategy": "serializable",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "partition-reset",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "c2-partition-reset-serializable-deadlock-pairs-rep2",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "6b2cdcd5-e6de-4c3a-b205-e275f2975eaf",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-reset",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-reset",
+    "appliedAtMs": 479,
+    "healedAtMs": 7487,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 45
+  },
+  "stall": {
+    "samples": 138,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 57,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 219,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1026,
+        0,
+        0,
+        0
+      ],
+      [
+        2013,
+        0,
+        0,
+        0
+      ],
+      [
+        3044,
+        0,
+        0,
+        0
+      ],
+      [
+        4035,
+        0,
+        0,
+        0
+      ],
+      [
+        5022,
+        0,
+        0,
+        0
+      ],
+      [
+        6009,
+        0,
+        0,
+        0
+      ],
+      [
+        7045,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 2,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 59,
+    "bookingsCommittedBeforeReplay": 1,
+    "bookingsAnsweredWith201": 1,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-248a86d1",
+  "k6": {
+    "statusTally": {
+      "0": 59,
+      "201": 1
+    },
+    "transportErrors": {
+      "EOF": 59
+    },
+    "durationMs": 810,
+    "maxRequestMs": 476,
+    "p50RequestMs": 469,
+    "p95RequestMs": 476,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T05:54:38.471Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "injectedKills": [],
+    "restarts": 1,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "Error: Connection terminated unexpectedly": 1,
+      "Emitted 'error' event on Client instance at:": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 30,
+      "409": 29,
+      "503": 1
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "59 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

@@ -28,13 +28,34 @@
 //   [--kill-interval-ms 40] [--kill-fraction 0.5]
 //   [--db shared|scratch-no-unique] [--expect-violations] [--label name]
 //   [--app-port 3100] [--proxy-port 5434]
+//
+// Issue #49 (C2) additions, all opt-in so C1 invocations behave as before:
+//   --fault latency-below|latency-above|partition-stall|partition-reset|app-sigkill
+//   --db scratch                (full real schema, nothing dropped: a throwaway DB)
+//   --toxiproxy-api http://localhost:8475   create/delete a per-run `c2-` proxy via the API
+//   [--proxy-upstream racetoseat-postgres:5432] [--request-timeout-ms 60000]
+//   [--latency-below-ms 100] [--latency-above-ms 1500]
+//   [--partition-start-ms 20] [--partition-jitter-ms 400] [--partition-ms 8000]
+//   [--base-latency-ms 0] [--drain-timeout-ms 30000]
+//   [--app-kill-first-ms 20] [--app-kill-interval-ms 1500] [--app-kill-max 1]
+//   (partition / SIGKILL timing is anchored to the first app transaction seen in Postgres)
 import { randomUUID } from "node:crypto";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import "dotenv/config";
+import { startAppKiller, type AppKillStats } from "./appKillFault.js";
 import { killBackendsOnceWithStats, startBackendKiller, type BackendKillStats } from "./faults.js";
+import {
+  NETWORK_FAULT_KINDS,
+  startBaseLatency,
+  startNetworkFault,
+  ToxiproxyClient,
+  type NetworkFaultKind,
+  type NetworkFaultTimeline,
+} from "./networkFaults.js";
+import { sampleOnce, startStallSampler, waitForDrain, waitForFirstTransaction, type DrainResult, type StallSampler, type StallSummary } from "./stallSampler.js";
 import {
   runOracles,
   snapshotBookingsByKey,
@@ -54,16 +75,30 @@ interface Args {
   strategy: string;
   load: LoadPattern;
   concurrency: number;
-  fault: "backend-kill" | "idle-pool-kill" | "none";
+  fault: "backend-kill" | "idle-pool-kill" | "none" | NetworkFaultKind | "app-sigkill";
   killScope: "in-transaction" | "idle" | "any";
   surviveUncaught: boolean;
   killIntervalMs: number;
   killFraction: number;
-  db: "shared" | "scratch-no-unique";
+  db: "shared" | "scratch-no-unique" | "scratch";
   expectViolations: boolean;
   label: string;
   appPort: number;
   proxyPort: number;
+  // --- C2 (issue #49) ---
+  toxiproxyApi: string;
+  proxyUpstream: string;
+  requestTimeoutMs: number;
+  latencyBelowMs: number;
+  latencyAboveMs: number;
+  partitionStartMs: number;
+  partitionJitterMs: number;
+  partitionMs: number;
+  baseLatencyMs: number;
+  drainTimeoutMs: number;
+  appKillFirstMs: number;
+  appKillIntervalMs: number;
+  appKillMax: number;
 }
 
 function parseArgs(argv: string[]): Args {
@@ -85,6 +120,19 @@ function parseArgs(argv: string[]): Args {
     label: "",
     appPort: 3100,
     proxyPort: 5434,
+    toxiproxyApi: "",
+    proxyUpstream: "racetoseat-postgres:5432",
+    requestTimeoutMs: 60_000,
+    latencyBelowMs: 100,
+    latencyAboveMs: 1500,
+    partitionStartMs: 20,
+    partitionJitterMs: 400,
+    partitionMs: 8000,
+    baseLatencyMs: 0,
+    drainTimeoutMs: 30_000,
+    appKillFirstMs: 20,
+    appKillIntervalMs: 1500,
+    appKillMax: 1,
   };
   const oneOf = <T extends string>(flag: string, value: string | undefined, allowed: readonly T[]): T => {
     if (!allowed.includes(value as T)) {
@@ -102,7 +150,8 @@ function parseArgs(argv: string[]): Args {
     if (flag === "--strategy") args.strategy = String(argv[++i]);
     else if (flag === "--load") args.load = oneOf("--load", argv[++i], ["deadlock-pairs", "hammer-seat", "spread-seats"]);
     else if (flag === "--concurrency") args.concurrency = posInt(flag, argv[++i]);
-    else if (flag === "--fault") args.fault = oneOf("--fault", argv[++i], ["backend-kill", "idle-pool-kill", "none"]);
+    else if (flag === "--fault")
+      args.fault = oneOf("--fault", argv[++i], ["backend-kill", "idle-pool-kill", "none", ...NETWORK_FAULT_KINDS, "app-sigkill"]);
     else if (flag === "--kill-scope") args.killScope = oneOf("--kill-scope", argv[++i], ["in-transaction", "idle", "any"]);
     else if (flag === "--survive-uncaught") args.surviveUncaught = true;
     else if (flag === "--kill-interval-ms") args.killIntervalMs = posInt(flag, argv[++i]);
@@ -110,11 +159,24 @@ function parseArgs(argv: string[]): Args {
       const f = Number(argv[++i]);
       if (!(f > 0 && f <= 1)) throw new Error(`--kill-fraction must be in (0, 1], got ${f}`);
       args.killFraction = f;
-    } else if (flag === "--db") args.db = oneOf("--db", argv[++i], ["shared", "scratch-no-unique"]);
+    } else if (flag === "--db") args.db = oneOf("--db", argv[++i], ["shared", "scratch-no-unique", "scratch"]);
     else if (flag === "--expect-violations") args.expectViolations = true;
     else if (flag === "--label") args.label = String(argv[++i]);
     else if (flag === "--app-port") args.appPort = posInt(flag, argv[++i]);
     else if (flag === "--proxy-port") args.proxyPort = posInt(flag, argv[++i]);
+    else if (flag === "--toxiproxy-api") args.toxiproxyApi = String(argv[++i]);
+    else if (flag === "--proxy-upstream") args.proxyUpstream = String(argv[++i]);
+    else if (flag === "--request-timeout-ms") args.requestTimeoutMs = posInt(flag, argv[++i]);
+    else if (flag === "--latency-below-ms") args.latencyBelowMs = posInt(flag, argv[++i]);
+    else if (flag === "--latency-above-ms") args.latencyAboveMs = posInt(flag, argv[++i]);
+    else if (flag === "--partition-start-ms") args.partitionStartMs = posInt(flag, argv[++i]);
+    else if (flag === "--partition-jitter-ms") args.partitionJitterMs = posInt(flag, argv[++i]);
+    else if (flag === "--base-latency-ms") args.baseLatencyMs = posInt(flag, argv[++i]);
+    else if (flag === "--partition-ms") args.partitionMs = posInt(flag, argv[++i]);
+    else if (flag === "--drain-timeout-ms") args.drainTimeoutMs = posInt(flag, argv[++i]);
+    else if (flag === "--app-kill-first-ms") args.appKillFirstMs = posInt(flag, argv[++i]);
+    else if (flag === "--app-kill-interval-ms") args.appKillIntervalMs = posInt(flag, argv[++i]);
+    else if (flag === "--app-kill-max") args.appKillMax = posInt(flag, argv[++i]);
     else throw new Error(`Unknown argument: ${flag}`);
   }
   return args;
@@ -219,6 +281,10 @@ export class AppUnderTest {
   private child: ChildProcess | undefined;
   private stopping = false;
   readonly exits: AppExit[] = [];
+  // Exits caused by the harness's own app-sigkill Fault (issue #49) — kept
+  // apart from `exits` so an injected kill is never reported as a crash.
+  readonly injectedKills: AppExit[] = [];
+  private injectedKillPending = false;
   restarts = 0;
   readonly output: string[] = [];
 
@@ -245,7 +311,13 @@ export class AppUnderTest {
     child.stderr!.on("data", capture);
     child.on("exit", (code, signal) => {
       if (this.stopping || this.child !== child) return;
-      this.exits.push({ at: new Date().toISOString(), code, signal });
+      const record = { at: new Date().toISOString(), code, signal };
+      if (this.injectedKillPending) {
+        this.injectedKillPending = false;
+        this.injectedKills.push(record);
+      } else {
+        this.exits.push(record);
+      }
       // The harness plays process supervisor: bring it back after a short
       // delay so the run continues and recovery can be judged. The crash is
       // already on record in `exits`.
@@ -269,6 +341,34 @@ export class AppUnderTest {
       }
     }
     throw new Error(`App did not become ready on :${this.port} within 30s`);
+  }
+
+  // SIGKILL the server (issue #49). `tsx` runs the real server as its own
+  // child, so the kill goes to the wrapper's direct children first (looked up
+  // by that exact parent pid — never by a name pattern, which could match
+  // another session's server), then the wrapper itself.
+  async injectSigkill(): Promise<boolean> {
+    const child = this.child;
+    if (!child || child.pid === undefined || child.exitCode !== null || child.signalCode !== null) return false;
+    this.injectedKillPending = true;
+    let kids: number[] = [];
+    try {
+      kids = execFileSync("pgrep", ["-P", String(child.pid)], { encoding: "utf8" })
+        .split("\n")
+        .filter((l) => l.trim() !== "")
+        .map(Number);
+    } catch {
+      // pgrep exits 1 when there are no children
+    }
+    for (const pid of kids) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // already gone
+      }
+    }
+    child.kill("SIGKILL");
+    return true;
   }
 
   // After the Fault clears: wait for the supervisor-restart (if one is
@@ -304,6 +404,10 @@ export interface K6Outcome {
   // k6's own reason for each status-0 request ("connection refused", "EOF", ...).
   transportErrors: Record<string, number>;
   maxRequestMs: number;
+  // Requests k6 abandoned at the client request timeout (status 0, k6 error naming a timeout).
+  clientTimeouts: number;
+  p50RequestMs: number;
+  p95RequestMs: number;
 }
 
 // Parsed from k6's per-point JSON output rather than its summary, because the
@@ -337,6 +441,7 @@ export async function runK6(script: string, env: Record<string, string>, appPort
   const transportErrors: Record<string, number> = {};
   let requests = 0;
   let maxRequestMs = 0;
+  const durations: number[] = [];
   const raw = await readFile(outPath, "utf8");
   await rm(outPath);
   for (const line of raw.split("\n")) {
@@ -356,9 +461,15 @@ export async function runK6(script: string, env: Record<string, string>, appPort
       if (status === "0" && error) transportErrors[error] = (transportErrors[error] ?? 0) + 1;
     } else if (point.metric === "http_req_duration") {
       maxRequestMs = Math.max(maxRequestMs, point.data.value);
+      durations.push(point.data.value);
     }
   }
-  return { exitCode, durationMs, requests, statusTally, transportErrors, maxRequestMs };
+  durations.sort((a, b) => a - b);
+  const quantile = (q: number) => (durations.length === 0 ? 0 : Math.round(durations[Math.min(durations.length - 1, Math.floor(q * durations.length))]!));
+  const clientTimeouts = Object.entries(transportErrors)
+    .filter(([error]) => /timeout|deadline/i.test(error))
+    .reduce((sum, [, n]) => sum + n, 0);
+  return { exitCode, durationMs, requests, statusTally, transportErrors, maxRequestMs, clientTimeouts, p50RequestMs: quantile(0.5), p95RequestMs: quantile(0.95) };
 }
 
 // --- recovery replay ----------------------------------------------------------
@@ -379,6 +490,9 @@ async function replayLedger(
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ seat_ids: entry.seatIds, user_id: entry.userId, idempotency_key: entry.idempotencyKey }),
+            // A replay that never answers (a leaked lock, a hung app) must not
+            // hang the harness; it counts as unreachable and the Oracles still judge.
+            signal: AbortSignal.timeout(20_000),
           });
           await res.arrayBuffer();
           tally[res.status] = (tally[res.status] ?? 0) + 1;
@@ -419,8 +533,31 @@ interface RobustnessObservation {
   detail: string;
 }
 
-export function deriveRobustnessObservations(app: AppUnderTest, k6: K6Outcome): RobustnessObservation[] {
+export function deriveRobustnessObservations(
+  app: AppUnderTest,
+  k6: K6Outcome,
+  // Optional: only the network-fault runner (run.ts main, issue #49) samples
+  // stalls/drain; the hold runner (runHolds.ts, issue #50) judges neither.
+  stall?: StallSummary,
+  drain?: DrainResult,
+  args?: Args,
+): RobustnessObservation[] {
   const found: RobustnessObservation[] = [];
+  if (drain?.timedOut && args) {
+    found.push({
+      id: "leaked-transaction-after-fault",
+      detail: `${drain.stuck.length} app transaction(s) still open ${args.drainTimeoutMs}ms after the Fault cleared (oldest ${Math.max(0, ...drain.stuck.map((s) => s.txAgeMs))}ms)`,
+    });
+  }
+  if (stall && args && stall.maxOpenTxAgeMs > args.requestTimeoutMs) {
+    found.push({
+      id: "transaction-outlived-client-timeout",
+      detail: `a transaction stayed open ${stall.maxOpenTxAgeMs}ms (client request timeout ${args.requestTimeoutMs}ms): its row locks outlived every client waiting on it`,
+    });
+  }
+  if (k6.clientTimeouts > 0 && args) {
+    found.push({ id: "client-timeouts", detail: `${k6.clientTimeouts} request(s) hit the client request timeout (${args.requestTimeoutMs}ms)` });
+  }
   if (app.exits.length > 0) {
     found.push({
       id: "app-process-crashed",
@@ -475,13 +612,41 @@ async function main(): Promise<void> {
     targetUrl = scratch.connectionString;
     db = scratch.pool;
     console.log(`Scratch database ${scratch.name} created (schema.sql minus booking_seats/hold_seats UNIQUE(seat_id)).`);
+  } else if (args.db === "scratch") {
+    // Issue #49: a throwaway database with the FULL real schema (nothing
+    // dropped), so concurrent chaos sessions on one Postgres server never
+    // share seat rows, and a run never writes to the shared dev database.
+    scratch = await createScratchDb(baseUrl, []);
+    targetUrl = scratch.connectionString;
+    db = scratch.pool;
+    console.log(`Scratch database ${scratch.name} created (full real schema.sql).`);
   } else {
     db = chaosPool(baseUrl);
   }
 
-  const appUrl = withPort(targetUrl, args.proxyPort);
+  // Every run stamps the app's connections with a per-run application_name
+  // (a connection-string parameter — no src/ change), so the harness can find
+  // exactly the app's own backends: the backend killer is scoped to it, the
+  // stall sampler watches it, and no other session's backends can match.
+  const runTag = randomUUID().slice(0, 8);
+  const appName = `c2-app-${runTag}`;
+  const appUrlObj = new URL(withPort(targetUrl, args.proxyPort));
+  appUrlObj.searchParams.set("application_name", appName);
+  const appUrl = appUrlObj.toString();
   let app: AppUnderTest | undefined;
+  // C2: a per-run Toxiproxy proxy, created and deleted through the API so the
+  // (possibly shared) Toxiproxy server only ever has this run's own `c2-` proxy touched.
+  const tox = args.toxiproxyApi ? new ToxiproxyClient(args.toxiproxyApi) : undefined;
+  const proxyName = `c2-${runTag}`;
+  let proxyCreated = false;
+  let sampler: StallSampler | undefined;
   try {
+    if (tox) {
+      if (!(await tox.isUp())) throw new Error(`Toxiproxy API not reachable at ${args.toxiproxyApi}`);
+      await tox.createProxy(proxyName, `0.0.0.0:${args.proxyPort}`, args.proxyUpstream);
+      proxyCreated = true;
+    }
+
     // The proxy must be up: chaos runs go app -> Toxiproxy -> Postgres.
     const probe = new Pool({ connectionString: appUrl, max: 1, connectionTimeoutMillis: 3000 });
     try {
@@ -518,14 +683,47 @@ async function main(): Promise<void> {
     console.log(`Firing ${args.load} load (${ledger.length} requests) with fault=${args.fault}...`);
     const killer =
       args.fault === "backend-kill"
-        ? startBackendKiller(db, { intervalMs: args.killIntervalMs, fraction: args.killFraction, scope: args.killScope })
+        ? startBackendKiller(db, { intervalMs: args.killIntervalMs, fraction: args.killFraction, scope: args.killScope, onlyApplicationName: appName })
+        : undefined;
+    const isNetworkFault = (NETWORK_FAULT_KINDS as readonly string[]).includes(args.fault);
+    if (isNetworkFault && !tox) throw new Error(`--fault ${args.fault} needs --toxiproxy-api (it injects through a per-run Toxiproxy proxy)`);
+    sampler = startStallSampler(db, appName);
+    const networkFault = isNetworkFault
+      ? await startNetworkFault(tox!, proxyName, args.fault as NetworkFaultKind, {
+          latencyBelowMs: args.latencyBelowMs,
+          latencyAboveMs: args.latencyAboveMs,
+          partitionStartMs: args.partitionStartMs,
+          partitionJitterMs: args.partitionJitterMs,
+          partitionDurationMs: args.partitionMs,
+          waitForLoad: () => waitForFirstTransaction(db, appName),
+          probeOpenTx: async () => (await sampleOnce(db, appName, 0)).openTx,
+          baseLatencyMs: args.baseLatencyMs,
+        })
+      : undefined;
+    const baseLatency = args.fault === "app-sigkill" && tox ? await startBaseLatency(tox, proxyName, args.baseLatencyMs) : undefined;
+    const appKiller =
+      args.fault === "app-sigkill"
+        ? startAppKiller(app, {
+            firstDelayMs: args.appKillFirstMs,
+            intervalMs: args.appKillIntervalMs,
+            maxKills: args.appKillMax,
+            waitForLoad: () => waitForFirstTransaction(db, appName),
+            probeOpenTx: async () => (await sampleOnce(db, appName, 0)).openTx,
+            jitterMs: args.partitionJitterMs,
+          })
         : undefined;
     let k6: K6Outcome;
     let killStats: BackendKillStats | undefined;
+    let networkTimeline: NetworkFaultTimeline | undefined;
+    let appKillStats: AppKillStats | undefined;
     try {
-      k6 = await runK6(seeded.k6Script, seeded.k6Env(runId), args.appPort);
+      k6 = await runK6(seeded.k6Script, { ...seeded.k6Env(runId), REQUEST_TIMEOUT: `${args.requestTimeoutMs}ms` }, args.appPort);
     } finally {
       killStats = await killer?.stop();
+      appKillStats = await appKiller?.stop();
+      // The partition runs on its own clock: this waits for it to heal.
+      networkTimeline = await networkFault?.stop();
+      await baseLatency?.stop();
     }
     if (args.fault === "idle-pool-kill") {
       // Hypothesis 1's literal scenario: a pooled connection that is idle (not
@@ -539,12 +737,34 @@ async function main(): Promise<void> {
     console.log(`Load finished in ${k6.durationMs}ms; k6 statuses: ${JSON.stringify(k6.statusTally)}.`);
     if (killStats) console.log(`Fault: ${killStats.terminated} backend(s) terminated over ${killStats.sweeps} sweeps ${JSON.stringify(killStats.terminatedByState)}.`);
 
-    // Fault cleared. Let the dust settle, then make sure the app is back.
+    // R4 (issue #49): the instant the Fault is gone, how long until every
+    // transaction the app opened has ended? One that never ends is a leaked
+    // lock. Measured before any settling so the number is the true drain time.
+    const drain: DrainResult = await waitForDrain(db, appName, args.drainTimeoutMs);
+    const stall: StallSummary = await sampler.stop();
+    console.log(
+      `Stall: peak ${stall.peakOpenTx} open tx / ${stall.peakLockHolders} lock holders, oldest tx ${stall.maxOpenTxAgeMs}ms; ` +
+        `drain ${drain.timedOut ? `TIMED OUT after ${args.drainTimeoutMs}ms (${drain.stuck.length} stuck)` : `${drain.drainedAfterMs}ms after the Fault cleared`}.`,
+    );
+    // Let the dust settle, then make sure the app is back.
     await sleep(1500);
     await app.ensureUp();
 
     const keys = ledger.map((e) => e.idempotencyKey);
     const before = await snapshotBookingsByKey(db, keys);
+    // Ambiguous outcomes (CONTEXT.md): requests whose client never saw an
+    // answer although the work may have committed anyway. Bookings that already
+    // exist when the replay starts, for requests the client saw no 2xx for.
+    const answered2xx = (k6.statusTally["201"] ?? 0) + (k6.statusTally["200"] ?? 0);
+    const committedBeforeReplay = Object.values(before).reduce((n, rows) => n + rows.length, 0);
+    const ambiguity = {
+      requestsWithoutAnswer: k6.statusTally["0"] ?? 0,
+      bookingsCommittedBeforeReplay: committedBeforeReplay,
+      bookingsAnsweredWith201: answered2xx,
+      // Committed but the client never learned it (or learned only a 5xx): the
+      // Ambiguous outcome the replay + Oracle 3 exist to resolve.
+      committedUnacknowledged: Math.max(0, committedBeforeReplay - answered2xx),
+    };
     console.log("Replaying every Idempotency Key...");
     const replay = await replayLedger(args.appPort, ledger);
     console.log(`Replay statuses: ${JSON.stringify(replay.tally)}${replay.networkErrors ? `, ${replay.networkErrors} unreachable` : ""}.`);
@@ -554,10 +774,10 @@ async function main(): Promise<void> {
     printOracles(oracles);
 
     const correctnessViolation = oracles.some((o) => !o.passed);
-    const robustness = deriveRobustnessObservations(app, k6);
+    const robustness = deriveRobustnessObservations(app, k6, stall, drain, args);
     for (const r of robustness) console.log(`  Robustness observation [${r.id}]: ${r.detail}`);
 
-    const label = args.label || `${args.strategy}-${args.load}-${args.fault}${args.surviveUncaught ? "-survive" : ""}${args.db === "scratch-no-unique" ? "-scratch" : ""}`;
+    const label = args.label || `${args.strategy}-${args.load}-${args.fault}${args.surviveUncaught ? "-survive" : ""}${args.db !== "shared" ? "-scratch" : ""}`;
     const stamp = ranAt.toISOString().replace(/[:.]/g, "-");
     const report = {
       label,
@@ -566,8 +786,30 @@ async function main(): Promise<void> {
       eventId: seeded.eventId,
       requestsIssued: ledger.length,
       fault: { kind: args.fault, scope: args.killScope, intervalMs: args.killIntervalMs, fraction: args.killFraction, stats: killStats },
-      k6: { statusTally: k6.statusTally, transportErrors: k6.transportErrors, durationMs: k6.durationMs, maxRequestMs: Math.round(k6.maxRequestMs) },
-      app: { exits: app.exits, restarts: app.restarts, errorSignatures: errorSignatures(app.output) },
+      // C2 (issue #49): what the network / process Faults actually did, and when.
+      baseLatencyMs: args.baseLatencyMs,
+      networkFault: networkTimeline,
+      appKill: appKillStats,
+      stall,
+      drain,
+      ambiguity,
+      requestTimeoutMs: args.requestTimeoutMs,
+      appName,
+      k6: {
+        statusTally: k6.statusTally,
+        transportErrors: k6.transportErrors,
+        durationMs: k6.durationMs,
+        maxRequestMs: Math.round(k6.maxRequestMs),
+        p50RequestMs: k6.p50RequestMs,
+        p95RequestMs: k6.p95RequestMs,
+        clientTimeouts: k6.clientTimeouts,
+      },
+      app: {
+        exits: app.exits,
+        injectedKills: app.injectedKills,
+        restarts: app.restarts,
+        errorSignatures: errorSignatures(app.output),
+      },
       replay,
       serverTimeouts,
       oracles,
@@ -595,7 +837,9 @@ async function main(): Promise<void> {
       console.log("\nAll four Oracles passed.");
     }
   } finally {
+    await sampler?.stop().catch(() => undefined);
     await app?.stop();
+    if (tox && proxyCreated) await tox.deleteProxy(proxyName).catch((err) => console.error(`failed to delete proxy ${proxyName}:`, err));
     if (scratch) await scratch.drop();
     else await db.end();
   }

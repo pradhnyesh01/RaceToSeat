@@ -1,0 +1,244 @@
+{
+  "label": "c2ctl-latency-above-naive-no-unique-rep2",
+  "ranAt": "2026-11-25T06:08:36.336Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "latency-above",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": true,
+    "label": "c2ctl-latency-above-naive-no-unique-rep2",
+    "appPort": 3201,
+    "proxyPort": 5441,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 800,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "873bb3be-324b-4dd8-8ab6-13e5209169da",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "latency-above",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "networkFault": {
+    "kind": "latency-above",
+    "appliedAtMs": 2,
+    "healedAtMs": 5344,
+    "latencyMs": 800
+  },
+  "stall": {
+    "samples": 100,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 1275,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1024,
+        0,
+        0,
+        0
+      ],
+      [
+        2014,
+        0,
+        0,
+        0
+      ],
+      [
+        3051,
+        0,
+        0,
+        0
+      ],
+      [
+        4032,
+        0,
+        0,
+        0
+      ],
+      [
+        5016,
+        60,
+        60,
+        924
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 109,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 60,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 60
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-55e93019",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "request timeout": 60
+    },
+    "durationMs": 5329,
+    "maxRequestMs": 5001,
+    "p50RequestMs": 4999,
+    "p95RequestMs": 5000,
+    "clientTimeouts": 60
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 60
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat d3569195-4b9f-4c13-9391-fc541ec7742b is claimed by 60 bookings",
+          "seatIds": [
+            "d3569195-4b9f-4c13-9391-fc541ec7742b"
+          ],
+          "bookingIds": [
+            "0e45ae00-2591-48f1-be8f-7cb7ad5e82e6",
+            "11df65d1-5763-4bb8-8a0f-5c124a92dd7e",
+            "158ca776-2db0-4a14-a5ae-079538346a8b",
+            "18685b75-2c0c-4a31-833e-29fb44f81890",
+            "1b28d652-b399-49a8-ba03-863fd81594c5",
+            "1e16afcf-af3d-403d-a0d2-895caf6c6c2f",
+            "2665d753-3ea3-4ea2-927a-31fa2da2edc1",
+            "29289cf6-0e72-4e9c-9485-bf0c4280bbb4",
+            "2a7447c7-980f-4fab-a31b-9d3bacd75aa1",
+            "2b44b23a-cc02-4308-b3db-b90ebec00e6c",
+            "2e2c3cba-4f6b-48dc-861f-4ba5c345065d",
+            "2ec62c51-84ad-4ae6-831f-0cd574b96641",
+            "34360a4c-62ce-47df-b81f-72e8b5f09f55",
+            "37190348-12b9-413e-b03a-740534a020f8",
+            "3dedd29f-2974-4448-a776-7f0227c81a85",
+            "480df190-0fbc-440c-bc5d-ddcfb9c2f3cf",
+            "4b6b63d1-a7a7-4b76-a167-23eb518d2139",
+            "4e346e8a-1bec-41fc-b1f5-28d8dbd78007",
+            "4e392fe9-3b41-48d8-853b-8ecdfdfb8fac",
+            "4f96f837-e24d-41de-8b2e-9b4bab2f7be8",
+            "52dbe935-00ba-4ef7-a2fb-5b715be5cc09",
+            "5a435561-5010-4455-9c5c-21bbf29736cf",
+            "5ad56401-f301-4175-bfdd-91a3186d5aec",
+            "5b95d3f7-fa71-42f4-8ad7-f6da18aec887",
+            "5e9597b3-b2f0-41f9-9e27-18bd15744f95",
+            "5ee522dd-1cd4-475a-9460-a967de336e54",
+            "640c010a-1ed5-4641-96f4-65591214c529",
+            "66ed1904-f62e-4b92-9ddc-c9097650f1a9",
+            "68549a65-7202-4068-8cac-01fe8586643f",
+            "7bd866ae-feac-4a53-96e6-3f335f555e9f",
+            "8037b7dd-864f-4c42-8aa9-4f0148853e30",
+            "827b5cc3-e87b-4e1b-9709-6098a15454fc",
+            "828867ca-e6a0-4142-a6c7-13858dc35fd6",
+            "842c38a0-8dd7-4c76-82b9-87fe553c3398",
+            "917e82b6-d759-4db1-8d31-67d359d31e28",
+            "9542f4d6-33c7-4df5-bf68-d29e7ee45b0a",
+            "97058d10-ea5a-4b64-9bf9-8df1fc7e4889",
+            "a5665f71-2f2c-4ddd-8d7e-31db7c3fd4ec",
+            "a9cf955c-f9ed-493c-b398-b0ae49ce2b5c",
+            "af3f868a-06c2-4349-bf86-be1389c1b439",
+            "b69c6bf0-330d-4f9e-9735-20ddb7c07c28",
+            "b7f02c71-6653-48f0-b99e-356f4817376f",
+            "ca221ad2-fbe1-4ef2-b684-e750da187cd6",
+            "cb656256-79d7-4fe5-b3e6-87f3725a1ec4",
+            "cf5d3921-e9b7-47bb-93eb-4952cfe78876",
+            "d650c0e1-dfb9-4008-948a-3bbac879c493",
+            "d71430f9-08c0-4ae6-b3c9-62d8ad291678",
+            "dab00569-01c7-4509-a262-5ee206be2517",
+            "dd1ece3d-c111-4036-b657-fa9b026c2774",
+            "dd54c8f4-25fc-4f62-a14f-fb7129c72ef8",
+            "df86dc21-0ad3-4a7f-b869-03fe32ac8bc9",
+            "e94ddbdc-9222-4fce-963c-5f2f9794b639",
+            "f041c39b-c834-4f89-84d7-1241a2bd2b74",
+            "f400c43d-193a-4891-817b-54a74e5a76e3",
+            "f4b087fc-e399-470d-9ef6-b6fef41ff4fd",
+            "f4e45c13-dac4-4b90-a37b-c3f03e54b5f3",
+            "f517be33-f7c0-4f23-af56-e0fe5df4d63c",
+            "f8439597-803f-438d-904d-e2f258ca51e5",
+            "f9e43b61-f525-4df5-8950-f458c21f8ff8",
+            "ff11a0ba-e802-4f1f-adee-78495ce41179"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": [
+    {
+      "id": "client-timeouts",
+      "detail": "60 request(s) hit the client request timeout (5000ms)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

@@ -27,6 +27,10 @@ const retriesCount = new Counter("booking_retries");
 
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 const RUN_ID = __ENV.RUN_ID;
+// Client-side request timeout (issue #49, chaos latency Faults): the deadline
+// after which a real client gives up and is left in an Ambiguous outcome.
+// Defaults to k6's own default (60s), so no non-chaos run changes.
+const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || "60s";
 // JSON-encoded array of [seatIdA, seatIdB] pairs. Pair index p is served by
 // VUs (2p + 1) and (2p + 2) (k6 VU numbers are 1-indexed) — the first fires
 // seat_ids: [A, B], the second seat_ids: [B, A], so both orderings of the
@@ -66,7 +70,7 @@ export default function () {
       // Unique per VU within this run, same scheme as hammer-seat.k6.js.
       idempotency_key: `${RUN_ID}-${__VU}`,
     }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { "Content-Type": "application/json" }, timeout: REQUEST_TIMEOUT },
   );
 
   // Unlike hammer-seat/spread-seats, 503 (retry_exhausted) is an expected

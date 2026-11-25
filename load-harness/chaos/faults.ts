@@ -63,6 +63,7 @@ export async function killBackendsOnce(
        AND application_name <> $1
        AND ($3::text IS NULL OR application_name = $3)
        ${transactionFilter}
+       AND ($3::text IS NULL OR application_name = $3)
        AND random() < $2`,
     [CHAOS_APPLICATION_NAME, options.fraction, options.onlyApplicationName ?? null],
   );
