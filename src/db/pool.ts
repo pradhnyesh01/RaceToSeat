@@ -3,6 +3,7 @@ import { Pool } from "pg";
 import { config } from "../config.js";
 import { isDeadlockDetected, isSerializationFailure } from "./pgErrors.js";
 import { poolOptions } from "./poolOptions.js";
+import { RetryBudget, type RetryBudgetOptions } from "./retryBudget.js";
 import { destroyConnectionOnQueryTimeout } from "./queryDeadline.js";
 
 // Default pg pool max (10) would serialize most of a 1,000-concurrent-request
@@ -51,7 +52,7 @@ export async function withTransaction<T>(
   }
 }
 
-export interface WithSerializableTransactionOptions {
+export interface WithSerializableTransactionOptions extends RetryBudgetOptions {
   maxRetries?: number;
 }
 
@@ -125,6 +126,7 @@ export async function withSerializableTransaction<T>(
   options: WithSerializableTransactionOptions = {},
 ): Promise<T> {
   const maxRetries = options.maxRetries ?? config.serializableMaxRetries;
+  const budget = new RetryBudget(options.budgetMs ?? config.retryBudgetMs);
   let attempt = 0;
   while (true) {
     await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
@@ -137,7 +139,7 @@ export async function withSerializableTransaction<T>(
       if (!isSerializationFailure(err) && !isDeadlockDetected(err)) {
         throw err;
       }
-      if (attempt >= maxRetries) {
+      if (attempt >= maxRetries || budget.wouldOverrun()) {
         throw new SerializationRetriesExhaustedError(attempt);
       }
       attempt++;

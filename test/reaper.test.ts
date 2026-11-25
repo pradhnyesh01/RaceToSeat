@@ -115,7 +115,7 @@ describe("startReaper", () => {
 
 // R7 (#57): a row-locked expired seat (a slow or leaked transaction) must not
 // make the sweep hold row locks on the *other* expired seats it visited, nor
-// make the sweep itself wait. See docs/adr/0028.
+// make the sweep itself wait. See docs/adr/0029.
 describe("runReaperSweep with a row-locked expired seat", () => {
   const SWEEP_SETTLE_MS = 1000; // well under the pool's 1.5 s statement_timeout
 

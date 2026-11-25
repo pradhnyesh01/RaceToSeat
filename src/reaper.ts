@@ -19,7 +19,7 @@ import type { Pool } from "pg";
 // safety — the id never changes, so a row that flipped to 'booked' in the
 // meantime would still match "id IN (...)" and get wrongly reset.
 //
-// The sweep never waits on a row lock (R7, issue #57, ADR-0028). A plain
+// The sweep never waits on a row lock (R7, issue #57, ADR-0029). A plain
 // UPDATE blocks on a single row-locked expired seat (a slow or leaked
 // transaction) while keeping the row locks it already took on every other
 // expired seat it visited, so unrelated `NOWAIT` Holds/Confirms on those

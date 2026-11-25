@@ -38,6 +38,13 @@ export const config = {
   // concurrency rather than firing only on a rare race. Overridable per-call
   // for the same test-determinism reason as optimisticMaxRetries.
   serializableMaxRetries: intEnv("SERIALIZABLE_MAX_RETRIES", 5),
+  // Total time budget for serializable's retry loop, alongside the count cap above (issue #59,
+  // finding R6, ADR-0028): no further attempt starts once it is predicted to end past this. The
+  // default is ADR-0026's server-side worst case for a stalled transaction (statement + idle
+  // bound = 3 s), so the two time limits agree and the response stays under the 5 s client
+  // timeout the chaos harness uses. { min: 1 } like the other time bounds: 0 would mean "refuse
+  // every retry", not "no budget".
+  retryBudgetMs: intEnv("RETRY_BUDGET_MS", 3000, { min: 1 }),
   // Governs withDeadlockRetry (ADR-0014). Same default and jittered-backoff
   // tuning rationale as serializableMaxRetries: a deadlock under adversarial
   // multi-seat load scales with concurrency, not a narrow rare race.

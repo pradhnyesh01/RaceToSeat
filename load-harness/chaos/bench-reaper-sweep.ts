@@ -1,4 +1,4 @@
-// Cost of the reaper's sweep statement, before and after R7 (issue #57, ADR-0028).
+// Cost of the reaper's sweep statement, before and after R7 (issue #57, ADR-0029).
 // Not part of the matrix: run by hand with
 //   npx tsx load-harness/chaos/bench-reaper-sweep.ts [--seats 20000] [--multi-seat-share 0.25] [--reps 5]
 // On a throwaway database it seeds N expired `held` seats (a share of them in

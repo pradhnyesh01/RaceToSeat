@@ -424,7 +424,25 @@ firing with p99 within Exhibit C's. Retry loops are unaffected (the bounds are p
 not retriable and never `retry_exhausted`). Exhibit H gained section G. The other six Robustness findings stay
 unfixed (R2 is its own PR; R5-R7, RF1, RF2).
 
-Issue #57 (finding R7) is done: the reaper's sweep no longer waits on a row-locked seat (ADR-0028).
+Issue #59 (finding R6) is decided, split by evidence (ADR-0028): the ticket's hypothesis (retry loops
+multiply slow-link latency) held for `serializable` and not for `optimistic`. A probe reading each
+response's `X-Booking-Retries` (`load-harness/chaos/probe-retry-latency.ts`) showed `optimistic` ×
+`hammer-seat` never entered its CAS loop (every non-504 response had retries 0): the cost is queueing
+behind the winner's row lock, which R4's `statement_timeout` already turns from 26 client timeouts per
+run into 48 answered `504`s at ~2.5 s. Accepted and documented, no code change (Exhibit C/E notes,
+Exhibit H section J). `serializable` × `deadlock-pairs` retries in lockstep (1-5 ms jitter against a
+200 ms round trip) and at 125 ms per chunk 51-52 of 60 clients timed out. `withSerializableTransaction`
+now also stops starting attempts once another is predicted to end past `RETRY_BUDGET_MS` (default 3 s,
+`src/db/retryBudget.ts`; ADR-0026's server-side worst case), ending as the same `retry_exhausted` `503`:
+at 125 ms per chunk 0 client timeouts (was 154 of 180), slowest request 3.4 s (was 5.0 s). The honest
+cost: fewer requests complete (7 of 60 resolved instead of 11 at 100 ms) because fewer retries means
+fewer chances to win; the lockstep collisions themselves are not fixed. Normal-load spot-check
+(`serializable` × `hammer-seat`, 100 concurrent, 5 repeats): 0 `503`, p99 within Exhibit C. The two new
+lines in `src/db/pool.ts` put Exhibit G's pinned anchors at the drift test's 4-line tolerance; the next
+edit above them must re-pin those rows. Exhibit H gained section J. Three Robustness findings remain
+unfixed (R7, RF1, RF2) at that point; R5 shipped separately (#58, ADR-0027).
+
+Issue #57 (finding R7) is done: the reaper's sweep no longer waits on a row-locked seat (ADR-0029).
 `runReaperSweep` still one statement, but its first step is now a `candidates` CTE taking `FOR UPDATE OF s
 SKIP LOCKED`, with the `UPDATE` keeping its own `status = 'held' AND held_until < now()` re-check
 (EvalPlanQual safety unchanged), and a Hold is reaped all-or-nothing (a skipped seat leaves its whole Hold for
@@ -432,7 +450,7 @@ the next tick, since `hold_seats` references `holds` without a cascade and a pie
 foreign key). Measured on the unmodified app (C3, 3 row-locked expired seats among 12): fresh Holds won went
 from 0 of 12 to 12 of 12 and the bait seats were reaped once their locks cleared; 4 backend-kill reps kept
 every guarantee (all seats `available`, zero Hold rows left, all Oracles green, 3 negative controls still
-red). Exhibit H gained section J. The remaining Robustness findings (R6, RF1, RF2) stay unfixed.
+red). Exhibit H gained section K. The remaining Robustness findings (RF1, RF2) stay unfixed.
 
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
