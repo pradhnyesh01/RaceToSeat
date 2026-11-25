@@ -1,0 +1,192 @@
+{
+  "label": "r1-after-partition-stall-naive-deadlock-pairs-rep1",
+  "ranAt": "2026-11-25T08:53:16.365Z",
+  "args": {
+    "strategy": "naive",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r1-after-partition-stall-naive-deadlock-pairs-rep1",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "95af690c-2db8-4fb9-a9a3-f931614d1124",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 425,
+    "healedAtMs": 7455,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 60
+  },
+  "stall": {
+    "samples": 138,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 154,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1004,
+        0,
+        0,
+        0
+      ],
+      [
+        2049,
+        0,
+        0,
+        0
+      ],
+      [
+        3031,
+        0,
+        0,
+        0
+      ],
+      [
+        4008,
+        0,
+        0,
+        0
+      ],
+      [
+        5048,
+        0,
+        0,
+        0
+      ],
+      [
+        6026,
+        0,
+        0,
+        0
+      ],
+      [
+        7013,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 1,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 30,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 30
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-947b904e",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "request timeout": 60
+    },
+    "durationMs": 5356,
+    "maxRequestMs": 5001,
+    "p50RequestMs": 5000,
+    "p95RequestMs": 5001,
+    "clientTimeouts": 60
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 60,
+      "Error: Client has encountered a connection error and is not queryable": 60
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 30,
+      "409": 30
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "client-timeouts",
+      "detail": "60 request(s) hit the client request timeout (5000ms)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

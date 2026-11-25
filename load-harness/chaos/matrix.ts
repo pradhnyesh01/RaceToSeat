@@ -12,7 +12,7 @@
 //
 // Usage: tsx load-harness/chaos/matrix.ts [--mechanisms a,b] [--loads x,y]
 //   [--faults f,g] [--reps 3] [--survive-faults f,g | none] [--only-survive]
-//   [--app-port 3200] [--proxy-port 5440] [--toxiproxy-api http://localhost:8475]
+//   [--label-prefix c2-] [--app-port 3200] [--proxy-port 5440] [--toxiproxy-api http://localhost:8475]
 import { spawn } from "node:child_process";
 import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -33,6 +33,7 @@ const opts = {
   reps: 3,
   surviveFaults: ["partition-stall", "partition-reset"],
   onlySurvive: false,
+  labelPrefix: "c2-",
   appPort: 3200,
   proxyPort: 5440,
   toxiproxyApi: "http://localhost:8475",
@@ -47,6 +48,7 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (flag === "--reps") opts.reps = Number(argv[++i]);
   else if (flag === "--survive-faults") opts.surviveFaults = list();
   else if (flag === "--only-survive") opts.onlySurvive = true;
+  else if (flag === "--label-prefix") opts.labelPrefix = String(argv[++i]);
   else if (flag === "--app-port") opts.appPort = Number(argv[++i]);
   else if (flag === "--proxy-port") opts.proxyPort = Number(argv[++i]);
   else if (flag === "--toxiproxy-api") opts.toxiproxyApi = String(argv[++i]);
@@ -58,7 +60,7 @@ const tsx = fileURLToPath(new URL("../../node_modules/.bin/tsx", import.meta.url
 const runScript = fileURLToPath(new URL("./run.ts", import.meta.url));
 
 function labelFor(fault: string, mechanism: string, load: string, survive: boolean, rep: number): string {
-  return `c2-${fault}-${mechanism}-${load}${survive ? "-survive" : ""}-rep${rep}`;
+  return `${opts.labelPrefix}${fault}-${mechanism}-${load}${survive ? "-survive" : ""}-rep${rep}`;
 }
 
 function done(label: string): boolean {

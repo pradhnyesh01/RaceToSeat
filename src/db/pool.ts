@@ -240,3 +240,44 @@ async function rollbackAfterFailure(client: PoolClient, original: unknown): Prom
     console.error(`ROLLBACK also failed (connection already dead): ${rollbackMessage}; the error it did not replace: ${originalMessage}`);
   }
 }
+
+// Torn-connection handling for every client this pool hands out. Kept at the
+// end of the file on purpose: docs/evidence/exhibit-g-phase6-formal.md pins
+// line numbers in this file (test/formalMapping.test.ts), so nothing may be
+// inserted above them.
+//
+// A torn connection (pg_terminate_backend, TCP reset, proxy teardown) must
+// fail only the request that owned it — never the process (issue #53, R1,
+// ADR-0024). pg emits 'error' on a Client when its socket dies, and Node
+// treats an 'error' event with no listener as an uncaught exception that ends
+// the process. pg-pool installs its own listener only while a client sits idle
+// in the pool and deliberately removes it while a request has the client
+// checked out (pg-pool/index.js: `_acquireClient` removes it, `_release`
+// restores it) — so `pool.on("error")` could never cover this path.
+//
+// The hook attaches one persistent listener per physical connection, at the
+// moment the pool creates it, so every way of getting a client out of this
+// pool is covered at once — `pool.connect()` in the six strategies,
+// pessimisticHold/Confirm and the cancellation route, and `pool.query()`
+// (the reaper sweep) — including call sites added later. The listener only
+// logs; it must not swallow the failure: pg itself rejects the in-flight
+// query (and every later query on that client) with the underlying error, so
+// the owning request flows through the existing error path (a 500) and can
+// never report success, and pg-pool discards the dead client on release
+// because it is no longer queryable.
+pool.on("connect", (client) => {
+  client.on("error", (err) => {
+    console.error(`Torn database connection (request in flight, if any, will fail): ${err.message}`);
+  });
+});
+
+// The idle-client half of the same crash (finding R2, #54): a connection torn
+// while it sits idle in the pool, or in the instant between a request
+// releasing it and the tear landing — a chaos kill sweep aimed at in-flight
+// transactions still hits this window, so R1's "the process never exits"
+// cannot be met without it — makes pg-pool re-emit the client's error as a
+// Pool 'error' event, which is just as fatal without a listener. pg-pool has
+// already removed the dead client by then, and the per-client listener above
+// has already logged it, so this listener deliberately does nothing more
+// (logging here would double-report every idle tear).
+pool.on("error", () => {});

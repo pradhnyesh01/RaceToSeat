@@ -96,6 +96,9 @@ describe("classify", () => {
     ["c3-unmodified-hold-confirm-rep1", { args: { mode: "hold-confirm", fault: "backend-kill" } }, "c3-unmodified"],
     ["c3-survive-hold-confirm-rep1", { args: { mode: "hold-confirm", fault: "backend-kill", surviveUncaught: true } }, "c3-scaffolded"],
     ["c3-negctl-late-confirm", { args: { mode: "hold-expiry", fault: "none", expectViolations: true } }, "c3-control"],
+    ["r1-after-rep1", { args: { fault: "backend-kill" } }, "r1-after"],
+    ["r1-after-partition-stall-naive-hammer-seat-rep1", { args: { fault: "partition-stall" } }, "r1-after"],
+    ["r1-after-hold-confirm-rep1", { args: { mode: "hold-confirm", fault: "backend-kill" } }, "r1-after"],
   ];
   for (const [label, over, group] of cases) {
     it(`${label} → ${group}`, () => {

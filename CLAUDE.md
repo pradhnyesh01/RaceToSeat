@@ -379,6 +379,16 @@ is assumed by the formal model and tested by neither track. Full test suite pass
 skipped that need a local Toxiproxy server) and `npm run typecheck` is clean. Phase 8's writeup
 should cite both exhibits.
 
+Issue #53 (finding R1, the first Phase 6 Robustness fix) is done: a torn checked-out
+connection now fails only its own request instead of ending the process. `src/db/pool.ts`
+registers `pool.on("connect", ...)` to attach a persistent `client.on("error")` to every
+connection (pg-pool removes its own listener on checkout, so `pool.on("error")` alone can't
+cover this) plus a no-op `pool.on("error")` for the idle path, which the fix could not meet its
+acceptance without (ADR-0024; overlaps R2/#54 on purpose). Unmodified-app before/after reruns
+(C1/C2/C3, no `--survive-uncaught`): the app exited in 0 of 67 after-runs (before: every run
+under a connection-tearing Fault); all Oracles green; Exhibit H gained section E with the
+numbers. The other eight Robustness findings (R2-R7, RF1, RF2) remain unfixed.
+
 Issue #55 (finding R3) is done: a dead connection no longer masks the real error, and an
 infrastructure failure is a designed outcome instead of a bare 500. `src/db/pool.ts`'s three
 transaction helpers roll back through a best-effort helper (a failing `ROLLBACK` is logged as
@@ -388,12 +398,12 @@ outcome being unknown); the global error handler answers a connection-level fail
 by `isInfrastructureFailure` in `src/db/pgErrors.ts`) with HTTP **502**, `Retry-After: 1`, body
 `outcome: "infrastructure_failure"`, deliberately not `503` (ADR-0012/0015: that stays
 `retry_exhausted`'s) — ADR-0025 records why and the client retry contract. Scaffolded
-(`--survive-uncaught`, R1 not in this change) before/after reruns: client-visible unclassified
+(`--survive-uncaught`, run before R1 landed) before/after reruns: client-visible unclassified
 500s went to 0 in every measured cell (C1 53 to 0, C2 `partition-reset` 894 to 0, C3 258 to 0),
 the catch-block `ROLLBACK`/`BEGIN` as top logged frame went from 66 of 67 to 0 of 84, and every
 retried Confirm still completed exactly once; all Oracles green, negative controls still red.
-Exhibit H gained section F. The other seven Robustness findings stay unfixed (R4-R7, RF1, RF2,
-plus R1/R2 in their own PRs).
+Exhibit H gained section F. The other seven Robustness findings stay unfixed (R4-R7, RF1, RF2;
+R2 is its own PR).
 
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
