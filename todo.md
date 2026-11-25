@@ -81,16 +81,16 @@ ADRs 0021–0023 are written as the relevant tickets land, not up front.
 - [x] #50 C3: hold/confirm/reaper under fault (`pessimistic`)
 - [ ] #51 C4 (stretch): Postgres restart under load
 - [x] #52 C5: Exhibit H; each Robustness finding filed as its own fix ticket with before/after rerun: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57, RF1 #60, RF2 #61 (original drafts in `docs/phase6-robustness-ticket-drafts.md`)
-  (Exhibit H written; the seven findings are *drafted* in `docs/phase6-robustness-ticket-drafts.md` — GitHub issues not yet filed, pending review)
-  (C5 must reconcile finding numbering: C2 and C3 each used "R5" for different findings — C2's advisory 500 vs C3's stalled reaper — and C2 also has an R6)
+  (Finding numbering reconciled in Exhibit H: C3's "R5" stalled reaper is canonical R7; formal-derived findings are RF1-RF2.)
 
 **Cut order if time runs short** (first dropped first): C4, F4, reaper liveness in F3,
 C2 narrowed to `pessimistic`/`optimistic`/`serializable`, F2. Never cut: F1, C1, the four
 oracles, every negative control.
 
-- [ ] **Deliverable:** Exhibits G and H exist, `npm run formal:check` passes, every negative
+- [x] **Deliverable:** Exhibits G and H exist, `npm run formal:check` passes, every negative
   control is shown to fail, chaos report shows zero Correctness violations, Robustness
   findings listed with follow-up issue links
+  (Done 2026-11-25 except the optional C4. Exhibit G: [docs/evidence/exhibit-g-phase6-formal.md](docs/evidence/exhibit-g-phase6-formal.md); Exhibit H: [docs/evidence/exhibit-h-phase6-chaos.md](docs/evidence/exhibit-h-phase6-chaos.md). Robustness fix tickets #53-#61 are filed and NOT yet fixed. C4 (Postgres restart, #51) was not run, so "a returned COMMIT is durable" is assumed by the formal model and untested by the chaos track.)
 
 ## Phase 7 — Stretch: Scale-Out Angle (optional)
 - [ ] Implement actor-model or per-seat-queue variant (Redis-backed or in-process)

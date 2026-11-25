@@ -342,14 +342,42 @@ GitHub — closed to match. The measurement was re-run after all fixes landed; t
 above are the post-fix run. Full test suite passes unmodified (150 tests) and `npm run typecheck`
 is clean. Phase 5 (todo.md, issues #37-#41) is now complete.
 
-Phase 6 (formal proof + chaos testing) is scoped but not started: a grilling session settled
-two independent tracks (TLA+ model-checked in Docker; Toxiproxy + scripted-kill chaos harness
-judged by four DB-state Oracles) with negative controls for every checker, a measure-first policy
-on unmodified code, and a Correctness violation / Robustness finding split. Full plan, ticket
-slicing (umbrella #42; F1-F5 = #43,#45-#48; C1-C5 = #44,#49-#52) and cut order are in todo.md Phase 6; new glossary terms are in
-CONTEXT.md. Not-yet-verified hypotheses to confirm in ticket C1, not facts: the app registers no
-`pool.on("error")` handler, sets no statement/lock/idle-in-transaction timeouts, and
-`withTransaction`'s catch-block `ROLLBACK` can mask the original error on a dead connection.
+Phase 6 (formal proof + chaos testing, umbrella #42) is complete except the optional C4. It was
+scoped through a grilling session (glossary: Fault, Ambiguous outcome, Oracle, Correctness
+violation, Robustness finding in CONTEXT.md) into two independent tracks, each built tracer-first,
+every checker paired with a negative control shown to fail, and a measure-first policy on
+unmodified production code — `src/` and `db/schema.sql` were not touched by any Phase 6 ticket.
+**Formal track** (`formal/`, F1-F5 = #43, #45-#48): four small-scope TLA+ modules (3 requests, 3
+seats, seat sets of 1-2) model-checked exhaustively by TLC in a pinned Docker image, no local Java
+(`npm run formal:check` / `formal:check:negative`): `SeatBooking` (claim, multi-seat atomicity),
+`DeadlockFreedom` (A/B: unsorted blocking acquisition deadlocks in 3 steps; sorted and NOWAIT
+cannot), `SeatLifecycle` (hold/confirm/expire/reaper/cancel, reaper liveness under fairness), and
+`CrashRecovery` (a crash at any step plus same-key retry, including commit-then-crash). 9 positive
+checks hold and 44 negative controls/witnesses fail for their stated reasons. A hand-audited
+spec-action to SQL mapping, pinned to a commit, is guarded by a database-free drift test
+(`test/formalMapping.test.ts`). See [Exhibit G](docs/evidence/exhibit-g-phase6-formal.md) and
+ADR-0021. **Chaos track** (`load-harness/chaos/`, `npm run chaos` / `chaos:holds`, C1-C5 = #44,
+#49-#52): four Oracles read from stored DB state (never HTTP codes) judged 505 measured runs across
+backend-kill, latency below/above the timeout, partition stall/reset, and app SIGKILL, on all six
+mechanisms plus the pessimistic hold lifecycle: **zero Correctness violations**, 16 of 16
+end-to-end negative controls flagged (including `naive` on a scratch DB without the `UNIQUE`
+constraint, since ADR-0008 stopped it double-booking live). The unmodified app crashes on the first
+torn connection, so unmodified runs judge little; the meaningful evidence is the separately
+reported `--survive-uncaught` scaffolded runs (ADR-0022). See [Exhibit H](docs/evidence/exhibit-h-phase6-chaos.md),
+`aggregate.ts --exhibit h`, ADR-0022/0023. **Not fixed, deliberately (measure first):** nine
+Robustness findings are filed as fix tickets — R1 #53, R2 #54, R3 #55, R4 #56 (no timeouts: a
+partition stalls requests and row locks for its whole duration), R7 #57 (a stalled reaper blocks
+unrelated Holds/Confirms), R5 #58, R6 #59, and two found by model checking rather than any run,
+RF1 #60 (an Idempotency Key lives only as long as its booking/hold row, so a retry after Cancel or
+reap creates a second Booking) and RF2 #61 (a concurrent same-key retry can get a spurious 409);
+note R1 needs a per-checkout `client.on("error")`, not only `pool.on("error")`. The F5 mapping
+audit also noted, unticketed: O1 (a losing attempt briefly row-locks seats it won't get, so a
+concurrent confirm can get a spurious 409), O2 (`unique_constraint`'s `ON CONFLICT` waits rather
+than failing fast), O3 (replaying a Hold returns 201 even if it has since expired). **C4 (Postgres
+restart under load, #51) was not run**, so "a returned COMMIT survives the database being killed"
+is assumed by the formal model and tested by neither track. Full test suite passes (413 tests, 4
+skipped that need a local Toxiproxy server) and `npm run typecheck` is clean. Phase 8's writeup
+should cite both exhibits.
 
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
