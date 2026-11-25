@@ -12,6 +12,7 @@
 #                                         DeadlockSortedWitness-> NoHoldAndWait violated (vacuity guard)
 #                                         DeadlockNowaitWitness-> NoConflictAbort violated (vacuity guard)
 #                                       Lifecycle*           -> F3 (SeatLifecycle.tla): see LC_NEGATIVE below
+#                                       Crash*               -> F4 (CrashRecovery.tla): see CR_NEGATIVE below
 #   formal/check.sh --all               both, in that order
 #
 # Exit 0 only if every selected check behaves as expected. A positive check
@@ -49,11 +50,31 @@ LC_NEGATIVE=(
   LifecycleLiveNoTimeFairness:@temporal LifecycleLiveNoCommitFairness:@temporal
 )
 
+# F4 (CrashRecovery.tla): configs named Crash*. Same name:expect form; "@temporal" as above.
+# CrashFinding* are not controls but documented findings: the invariant is violated on purpose,
+# because the behavior it names is real (README "Findings").
+CR_POSITIVE=(CrashSafety CrashLiveRecovery)
+CR_NEGATIVE=(
+  CrashNoLookup:AmbiguousRetryNotRefused CrashNoKeyDedupe:KeyAtMostOneBooking CrashNoKeyDedupeHold:KeyAtMostOneHold
+  CrashLoseCommitted:CommittedPersists CrashKeepLocks:NoOrphanState CrashKeepUncommitted:SeatStatusAgrees
+  CrashNoExpiryCheck:NoConfirmOnExpired
+  CrashFindingKeyReuse:BookingKeyCreatesAtMostOne CrashFindingHoldKeyReuse:HoldKeyCreatesAtMostOne
+  CrashFindingSpuriousConflict:KeyNeverFalselyRefused
+  CrashWitnessAmbiguousCommit:NoAmbiguousCommit CrashWitnessReplayAmbiguousBooking:NoReplayAfterAmbiguousBooking
+  CrashWitnessReplayAmbiguousHold:NoReplayAfterAmbiguousHold CrashWitnessReplayAmbiguousConfirm:NoReplayAfterAmbiguousConfirm
+  CrashWitnessKeyRace:NoKeyRaceReplay CrashWitnessWaitOnKeyRow:NoWaitOnKeyRow
+  CrashWitnessUnblockedByCrash:@temporal CrashWitnessSeatReuseAfterCrash:NoSeatReuseAfterMidCrash
+  CrashWitnessConfirmCrashMidTxn:NoConfirmCrashMidTxn CrashWitnessReapAfterConfirmCrash:NoReapAfterConfirmCrash
+  CrashWitnessConfirmRetryAfterMidCrash:NoRetryConfirmAfterMidCrash
+  CrashLiveNoFairness:@temporal CrashLiveKeepPending:@stuck
+)
+
 # module_of <config-name>: the TLA+ module a config belongs to.
 module_of() {
   case "$1" in
     Deadlock*) echo DeadlockFreedom.tla ;;
     Lifecycle*) echo SeatLifecycle.tla ;;
+    Crash*) echo CrashRecovery.tla ;;
     *) echo SeatBooking.tla ;;
   esac
 }
@@ -121,11 +142,11 @@ fetch_jar
 
 if [[ "$mode" == positive || "$mode" == --positive || "$mode" == --all ]]; then
   echo "== Positive checks: invariants must hold =="
-  for n in "${POSITIVE[@]}" "${DL_POSITIVE[@]}" "${LC_POSITIVE[@]}"; do run_positive "$n"; done
+  for n in "${POSITIVE[@]}" "${DL_POSITIVE[@]}" "${LC_POSITIVE[@]}" "${CR_POSITIVE[@]}"; do run_positive "$n"; done
 fi
 if [[ "$mode" == --negative-control || "$mode" == --all ]]; then
   echo "== Negative controls: checkers must be shown to fail =="
-  for n in "${NEGATIVE[@]}" "${DL_NEGATIVE[@]}" "${LC_NEGATIVE[@]}"; do run_negative "$n"; done
+  for n in "${NEGATIVE[@]}" "${DL_NEGATIVE[@]}" "${LC_NEGATIVE[@]}" "${CR_NEGATIVE[@]}"; do run_negative "$n"; done
 fi
 
 if [[ $failures -ne 0 ]]; then echo "formal:check FAILED ($failures)"; exit 1; fi
