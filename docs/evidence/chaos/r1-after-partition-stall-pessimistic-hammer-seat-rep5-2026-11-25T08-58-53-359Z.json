@@ -1,0 +1,198 @@
+{
+  "label": "r1-after-partition-stall-pessimistic-hammer-seat-rep5",
+  "ranAt": "2026-11-25T08:58:53.359Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r1-after-partition-stall-pessimistic-hammer-seat-rep5",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 120,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "e2fea6db-457f-4934-8ee1-cb6f5206e90c",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 324,
+    "healedAtMs": 7360,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 1
+  },
+  "stall": {
+    "samples": 136,
+    "peakOpenTx": 52,
+    "peakIdleInTx": 49,
+    "peakLockHolders": 1,
+    "maxOpenTxAgeMs": 7081,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1031,
+        1,
+        1,
+        813
+      ],
+      [
+        2002,
+        1,
+        1,
+        1785
+      ],
+      [
+        3043,
+        1,
+        1,
+        2826
+      ],
+      [
+        4027,
+        1,
+        1,
+        3809
+      ],
+      [
+        5003,
+        1,
+        1,
+        4785
+      ],
+      [
+        6038,
+        1,
+        1,
+        5821
+      ],
+      [
+        7023,
+        1,
+        1,
+        6805
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 1,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-9960a26b",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "request timeout": 60
+    },
+    "durationMs": 5331,
+    "maxRequestMs": 4999,
+    "p50RequestMs": 4998,
+    "p95RequestMs": 4999,
+    "clientTimeouts": 60
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 60,
+      "Error: Connection terminated unexpectedly": 32,
+      "Error: Client has encountered a connection error and is not queryable": 28,
+      "Reaper sweep failed: Error: Connection terminated unexpectedly": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "transaction-outlived-client-timeout",
+      "detail": "a transaction stayed open 7081ms (client request timeout 5000ms): its row locks outlived every client waiting on it"
+    },
+    {
+      "id": "client-timeouts",
+      "detail": "60 request(s) hit the client request timeout (5000ms)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

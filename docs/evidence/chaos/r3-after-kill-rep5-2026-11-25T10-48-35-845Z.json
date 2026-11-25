@@ -1,0 +1,147 @@
+{
+  "label": "r3-after-kill-rep5",
+  "ranAt": "2026-11-25T10:48:35.845Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 60,
+    "fault": "backend-kill",
+    "killScope": "in-transaction",
+    "surviveUncaught": true,
+    "killIntervalMs": 40,
+    "killFraction": 0.3,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r3-after-kill-rep5",
+    "appPort": 3310,
+    "proxyPort": 5460,
+    "toxiproxyApi": "http://localhost:8477",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 60000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "06ca947b-dadc-4636-8137-b9de1579fd60",
+  "requestsIssued": 120,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.3,
+    "stats": {
+      "sweeps": 11,
+      "terminated": 18,
+      "terminatedByState": {
+        "idle in transaction": 18
+      }
+    }
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 9,
+    "peakOpenTx": 38,
+    "peakIdleInTx": 34,
+    "peakLockHolders": 18,
+    "maxOpenTxAgeMs": 21,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 4,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 54,
+    "bookingsAnsweredWith201": 54,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 60000,
+  "appName": "c2-app-9218a517",
+  "k6": {
+    "statusTally": {
+      "201": 54,
+      "409": 49,
+      "502": 17
+    },
+    "transportErrors": {},
+    "durationMs": 462,
+    "maxRequestMs": 132,
+    "p50RequestMs": 121,
+    "p95RequestMs": 131,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "[chaos preload] swallowed uncaughtException: terminating connection due to administrator command": 18,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Client has encountered a connection error and is not query": 17,
+      "Error: Client has encountered a connection error and is not queryable": 17,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: (no error; a designed no-commit result)": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 60,
+      "409": 60
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "infrastructure-failures-classified",
+      "detail": "17 request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)"
+    }
+  ]
+}

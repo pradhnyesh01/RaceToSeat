@@ -379,6 +379,51 @@ is assumed by the formal model and tested by neither track. Full test suite pass
 skipped that need a local Toxiproxy server) and `npm run typecheck` is clean. Phase 8's writeup
 should cite both exhibits.
 
+Issue #53 (finding R1, the first Phase 6 Robustness fix) is done: a torn checked-out
+connection now fails only its own request instead of ending the process. `src/db/pool.ts`
+registers `pool.on("connect", ...)` to attach a persistent `client.on("error")` to every
+connection (pg-pool removes its own listener on checkout, so `pool.on("error")` alone can't
+cover this) plus a no-op `pool.on("error")` for the idle path, which the fix could not meet its
+acceptance without (ADR-0024; overlaps R2/#54 on purpose). Unmodified-app before/after reruns
+(C1/C2/C3, no `--survive-uncaught`): the app exited in 0 of 67 after-runs (before: every run
+under a connection-tearing Fault); all Oracles green; Exhibit H gained section E with the
+numbers. The other eight Robustness findings (R2-R7, RF1, RF2) remain unfixed.
+
+Issue #55 (finding R3) is done: a dead connection no longer masks the real error, and an
+infrastructure failure is a designed outcome instead of a bare 500. `src/db/pool.ts`'s three
+transaction helpers roll back through a best-effort helper (a failing `ROLLBACK` is logged as
+secondary, the original error object is rethrown untouched, and a designed no-commit result such
+as a `409`/`404` survives a failing closing `ROLLBACK`; a failing `COMMIT` is still thrown, its
+outcome being unknown); the global error handler answers a connection-level failure (classified
+by `isInfrastructureFailure` in `src/db/pgErrors.ts`) with HTTP **502**, `Retry-After: 1`, body
+`outcome: "infrastructure_failure"`, deliberately not `503` (ADR-0012/0015: that stays
+`retry_exhausted`'s) — ADR-0025 records why and the client retry contract. Scaffolded
+(`--survive-uncaught`, run before R1 landed) before/after reruns: client-visible unclassified
+500s went to 0 in every measured cell (C1 53 to 0, C2 `partition-reset` 894 to 0, C3 258 to 0),
+the catch-block `ROLLBACK`/`BEGIN` as top logged frame went from 66 of 67 to 0 of 84, and every
+retried Confirm still completed exactly once; all Oracles green, negative controls still red.
+Exhibit H gained section F. The other seven Robustness findings stay unfixed (R4-R7, RF1, RF2;
+R2 is its own PR).
+
+Issue #56 (finding R4) is done: every wait on the database is now bounded (ADR-0026). The pool
+(`src/db/poolOptions.ts`, env-overridable in `src/config.ts`, all `{ min: 1 }`) carries server-side
+`statement_timeout` and `idle_in_transaction_session_timeout` (1.5 s each, startup parameters), a client
+`query_timeout` (2 s, must exceed the statement timeout or the process refuses to start) and
+`connectionTimeoutMillis` (2 s). Two non-obvious parts: `lock_timeout` is deliberately NOT set (it raises
+`55P03`, the code `NOWAIT` conflicts use and the strategies translate to 409; `statement_timeout` already
+bounds a lock wait, and `isLockNotAvailable` additionally excludes a lock-timeout message), and pg's
+`query_timeout` rejects only the query, leaving the connection blocked on it so the catch block's `ROLLBACK`
+would queue behind it (4 s instead of 2 s, and a poisoned client back in the pool) — `src/db/queryDeadline.ts`,
+hooked from `pool.on("connect")` at the end of `pool.ts`, destroys the connection when a query times out. A
+bound that fires answers HTTP **504** (`outcome: "timeout"`, `Retry-After: 1`, same retry contract as 502),
+which ADR-0025 had reserved for exactly this. Measured on unmodified code: a 30 s partition now ends every
+transaction in <= 1.6 s (was 30.1 s) and the slowest request is 2.3 s (was 30.3 s), row locks released during
+the partition; 0 of 60 short-partition runs flag a transaction outliving the client's 5 s timeout (was 92 of
+120), longest transaction 2.1 s; no-Fault `hammer-seat` at concurrency 100 shows zero responses from a bound
+firing with p99 within Exhibit C's. Retry loops are unaffected (the bounds are per statement; a timeout is
+not retriable and never `retry_exhausted`). Exhibit H gained section G. The other six Robustness findings stay
+unfixed (R2 is its own PR; R5-R7, RF1, RF2).
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

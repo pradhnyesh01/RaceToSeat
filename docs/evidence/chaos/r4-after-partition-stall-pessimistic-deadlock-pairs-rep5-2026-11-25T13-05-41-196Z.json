@@ -1,0 +1,184 @@
+{
+  "label": "r4-after-partition-stall-pessimistic-deadlock-pairs-rep5",
+  "ranAt": "2026-11-25T13:05:41.196Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r4-after-partition-stall-pessimistic-deadlock-pairs-rep5",
+    "appPort": 3290,
+    "proxyPort": 5470,
+    "toxiproxyApi": "http://localhost:8485",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "2673fa18-d2f6-4cbe-86a5-ddc00d55923d",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 511,
+    "healedAtMs": 7539,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 0
+  },
+  "stall": {
+    "samples": 139,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 30,
+    "maxOpenTxAgeMs": 193,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1010,
+        0,
+        0,
+        0
+      ],
+      [
+        2041,
+        0,
+        0,
+        0
+      ],
+      [
+        3027,
+        0,
+        0,
+        0
+      ],
+      [
+        4016,
+        0,
+        0,
+        0
+      ],
+      [
+        5009,
+        0,
+        0,
+        0
+      ],
+      [
+        6050,
+        0,
+        0,
+        0
+      ],
+      [
+        7031,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 1,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 30,
+    "bookingsAnsweredWith201": 30,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-2e5d26a8",
+  "k6": {
+    "statusTally": {
+      "201": 30,
+      "409": 30
+    },
+    "transportErrors": {},
+    "durationMs": 2863,
+    "maxRequestMs": 2477,
+    "p50RequestMs": 1802,
+    "p95RequestMs": 2476,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 89,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: (no error; a designed no-commit result)": 13,
+      "ROLLBACK also failed (connection already dead): Query read timeout; the error it did not replace: (no error; a designed no-commit result)": 17,
+      "Reaper sweep failed: Error: Query read timeout": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 30,
+      "409": 30
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": []
+}

@@ -34,7 +34,7 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { countUnitControls, loadChaosReports, renderExhibitH } from "./exhibitH.js";
+import { countUnitControls, loadChaosReports, renderExhibitH, type NoRegressionRow } from "./exhibitH.js";
 
 interface RunReportLike {
   ranAt: string;
@@ -850,6 +850,45 @@ export function parseOutPath(argv: string[], exhibit: Exhibit): string {
 
 const UNIT_CONTROL_FILES = ["oracles.test.ts", "faults.test.ts", "faultScoping.test.ts", "c2.test.ts", "holdOracles.test.ts"];
 
+// Issue #56's no-regression check: ordinary `npm run harness` reports of no-Fault
+// hammer-seat runs, kept in docs/evidence/chaos/r4-nofault/ (a subdirectory, so
+// Exhibit C's top-level most-recent-report-wins aggregation never sees them),
+// each paired with Exhibit C's committed cell for the same mechanism and
+// concurrency. Absent directory = no rows.
+async function loadNoRegressionRows(dir: URL, evidenceDir: URL): Promise<NoRegressionRow[]> {
+  let entries: string[];
+  try {
+    entries = (await readdir(dir)).filter((e) => e.endsWith(".json") && !e.startsWith(".")).sort();
+  } catch {
+    return [];
+  }
+  const exhibitC = await loadCells(evidenceDir);
+  const rows: NoRegressionRow[] = [];
+  for (const entry of entries) {
+    const parsed: unknown = JSON.parse(await readFile(new URL(entry, dir), "utf8"));
+    if (!isCombinedReport(parsed) || parsed.pattern !== "hammer-seat") continue;
+    const cell = toCell(entry, parsed);
+    const tally: Record<string, number> = {};
+    for (const run of parsed.runs) {
+      for (const [status, n] of Object.entries(run.httpStatusTally)) tally[status] = (tally[status] ?? 0) + n;
+    }
+    const c = exhibitC.find((x) => x.strategy === cell.strategy && x.pattern === "hammer-seat" && x.concurrency === cell.concurrency);
+    rows.push({
+      strategy: cell.strategy,
+      concurrency: cell.concurrency,
+      repeats: cell.repeats,
+      requests: cell.requestsTotal,
+      p50Ms: cell.p50Ms,
+      p99Ms: cell.p99Ms,
+      throughputRps: cell.throughputRps,
+      tally,
+      doubleBooked: cell.doubleBooked,
+      exhibitC: c ? { p99Ms: c.p99Ms, throughputRps: c.throughputRps, file: c.file } : undefined,
+    });
+  }
+  return rows;
+}
+
 async function mainExhibitH(evidenceDir: URL, outPath: string) {
   const chaosDir = new URL("chaos/", evidenceDir);
   const reports = await loadChaosReports(chaosDir);
@@ -857,7 +896,8 @@ async function mainExhibitH(evidenceDir: URL, outPath: string) {
     throw new Error(`No chaos report JSON found under ${fileURLToPath(chaosDir)} — run the chaos harness first (see Exhibit H's Reproducing section).`);
   }
   const unitControls = await countUnitControls(new URL("../test/chaos/", import.meta.url), UNIT_CONTROL_FILES);
-  await writeFile(outPath, renderExhibitH({ reports, unitControls }));
+  const noRegression = await loadNoRegressionRows(new URL("r4-nofault/", chaosDir), evidenceDir);
+  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression }));
 
   const measured = reports.filter((r) => !r.report.args.expectViolations);
   const violations = measured.filter((r) => r.report.correctnessViolation);

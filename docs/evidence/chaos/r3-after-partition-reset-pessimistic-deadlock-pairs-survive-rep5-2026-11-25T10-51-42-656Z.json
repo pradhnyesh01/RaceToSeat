@@ -1,0 +1,190 @@
+{
+  "label": "r3-after-partition-reset-pessimistic-deadlock-pairs-survive-rep5",
+  "ranAt": "2026-11-25T10:51:42.656Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "partition-reset",
+    "killScope": "in-transaction",
+    "surviveUncaught": true,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "r3-after-partition-reset-pessimistic-deadlock-pairs-survive-rep5",
+    "appPort": 3311,
+    "proxyPort": 5461,
+    "toxiproxyApi": "http://localhost:8477",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "8e73ea92-4da6-4577-aa9f-9122540dc246",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-reset",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-reset",
+    "appliedAtMs": 453,
+    "healedAtMs": 7464,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 30
+  },
+  "stall": {
+    "samples": 137,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 30,
+    "maxOpenTxAgeMs": 198,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1012,
+        0,
+        0,
+        0
+      ],
+      [
+        2002,
+        0,
+        0,
+        0
+      ],
+      [
+        3047,
+        0,
+        0,
+        0
+      ],
+      [
+        4034,
+        0,
+        0,
+        0
+      ],
+      [
+        5020,
+        0,
+        0,
+        0
+      ],
+      [
+        6002,
+        0,
+        0,
+        0
+      ],
+      [
+        7053,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 3,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 24,
+    "bookingsAnsweredWith201": 14,
+    "committedUnacknowledged": 10
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-19b47b96",
+  "k6": {
+    "statusTally": {
+      "201": 14,
+      "502": 46
+    },
+    "transportErrors": {},
+    "durationMs": 792,
+    "maxRequestMs": 457,
+    "p50RequestMs": 428,
+    "p95RequestMs": 457,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "[chaos preload] swallowed uncaughtException: Connection terminated unexpectedly": 46,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Connection terminated unexpectedly": 16,
+      "Error: Connection terminated unexpectedly": 46,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: Connection terminated unexpectedly": 30,
+      "Reaper sweep failed: Error: Connection terminated unexpectedly": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 30,
+      "409": 30
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "infrastructure-failures-classified",
+      "detail": "46 request(s) answered HTTP 502 (the designed infrastructure-failure outcome, ADR-0025: outcome unknown, retry with the same key)"
+    }
+  ]
+}

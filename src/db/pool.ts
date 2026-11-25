@@ -2,6 +2,8 @@ import type { PoolClient } from "pg";
 import { Pool } from "pg";
 import { config } from "../config.js";
 import { isDeadlockDetected, isSerializationFailure } from "./pgErrors.js";
+import { poolOptions } from "./poolOptions.js";
+import { destroyConnectionOnQueryTimeout } from "./queryDeadline.js";
 
 // Default pg pool max (10) would serialize most of a 1,000-concurrent-request
 // load test behind pool.connect() queuing rather than real DB concurrency —
@@ -22,7 +24,7 @@ import { isDeadlockDetected, isSerializationFailure } from "./pgErrors.js";
 // seeding/verification queries, so real concurrent connections against the
 // 600 ceiling can run higher than 500 alone would suggest.
 export const pool = new Pool({
-  connectionString: config.databaseUrl,
+  ...poolOptions(),
   max: Number(process.env.PG_POOL_MAX ?? 500),
 });
 
@@ -41,10 +43,10 @@ export async function withTransaction<T>(
   await client.query("BEGIN");
   try {
     const result = await fn(client);
-    await client.query(shouldCommit(result) ? "COMMIT" : "ROLLBACK");
+    await finishTransaction(client, shouldCommit(result) ? "COMMIT" : "ROLLBACK");
     return result;
   } catch (err) {
-    await client.query("ROLLBACK");
+    await rollbackAfterFailure(client, err);
     throw err;
   }
 }
@@ -128,10 +130,10 @@ export async function withSerializableTransaction<T>(
     await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
     try {
       const result = await fn(client, attempt);
-      await client.query(shouldCommit(result) ? "COMMIT" : "ROLLBACK");
+      await finishTransaction(client, shouldCommit(result) ? "COMMIT" : "ROLLBACK");
       return result;
     } catch (err) {
-      await client.query("ROLLBACK");
+      await rollbackAfterFailure(client, err);
       if (!isSerializationFailure(err) && !isDeadlockDetected(err)) {
         throw err;
       }
@@ -181,10 +183,10 @@ export async function withDeadlockRetry<T>(
     await client.query("BEGIN");
     try {
       const result = await fn(client, attempt);
-      await client.query(shouldCommit(result) ? "COMMIT" : "ROLLBACK");
+      await finishTransaction(client, shouldCommit(result) ? "COMMIT" : "ROLLBACK");
       return result;
     } catch (err) {
-      await client.query("ROLLBACK");
+      await rollbackAfterFailure(client, err);
       if (!isDeadlockDetected(err)) {
         throw err;
       }
@@ -197,15 +199,93 @@ export async function withDeadlockRetry<T>(
   }
 }
 
-// An idle pooled connection that dies (backend killed, network torn down)
-// makes the Pool emit 'error'; with no listener Node treats that as an
-// uncaught exception and the process exits with no request in flight at all
-// (finding R2, issue #54). pg-pool has already removed the dead client from
-// the pool by the time this fires, so logging it once is the whole job — the
-// next pool.connect() simply opens a fresh connection. This covers only
-// clients sitting idle in the pool: pg-pool detaches its own listener when a
-// client is checked out, so a connection that errors mid-request is a
-// separate path (finding R1, issue #53) and is not handled here.
-pool.on("error", (err) => {
-  console.error("Idle pooled connection errored and was discarded:", err.message);
+// Ending a transaction without losing the outcome that ended it (issue #55,
+// finding R3, ADR-0025). Appended here, below everything the formal mapping
+// (Exhibit G) pins by line number, for the same reason the torn-connection
+// hook is.
+//
+// Two situations, deliberately different:
+//
+//  - `finishTransaction("COMMIT")`: a failure here is NOT tolerated. If the
+//    connection dies around COMMIT the client cannot know whether the write
+//    landed, so the error must reach the caller (it becomes the infrastructure
+//    outcome, whose contract is "retry with the same key").
+//  - `finishTransaction("ROLLBACK")`: this is a *designed* outcome (a lost race,
+//    an unknown id — `shouldCommit` was false) whose answer was already decided
+//    by reads inside the transaction; nothing needed persisting. If the
+//    ROLLBACK itself cannot be sent the connection is dead, and Postgres
+//    releases a dead backend's locks and discards its open transaction on its
+//    own. So the 409/404 stands; turning it into an infrastructure error would
+//    tell the client a lie about a request whose answer is known.
+async function finishTransaction(client: PoolClient, statement: "COMMIT" | "ROLLBACK"): Promise<void> {
+  if (statement === "COMMIT") {
+    await client.query("COMMIT");
+    return;
+  }
+  await rollbackAfterFailure(client, undefined);
+}
+
+// Best-effort ROLLBACK from a catch block (or a designed no-commit): it must
+// release locks when it can, and must never replace the error being handled.
+// A ROLLBACK that throws means the connection is already dead (it was the
+// cause of the original failure, or died since); that is logged next to the
+// original's message — both appear in the operator's log, the statement that
+// actually failed stays the one the caller sees — and then ignored. The
+// caller always rethrows the original itself.
+async function rollbackAfterFailure(client: PoolClient, original: unknown): Promise<void> {
+  try {
+    await client.query("ROLLBACK");
+  } catch (rollbackErr) {
+    const rollbackMessage = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+    const originalMessage =
+      original === undefined ? "(no error; a designed no-commit result)" : original instanceof Error ? original.message : String(original);
+    console.error(`ROLLBACK also failed (connection already dead): ${rollbackMessage}; the error it did not replace: ${originalMessage}`);
+  }
+}
+
+// Torn-connection handling for every client this pool hands out. Kept at the
+// end of the file on purpose: docs/evidence/exhibit-g-phase6-formal.md pins
+// line numbers in this file (test/formalMapping.test.ts), so nothing may be
+// inserted above them.
+//
+// A torn connection (pg_terminate_backend, TCP reset, proxy teardown) must
+// fail only the request that owned it — never the process (issue #53, R1,
+// ADR-0024). pg emits 'error' on a Client when its socket dies, and Node
+// treats an 'error' event with no listener as an uncaught exception that ends
+// the process. pg-pool installs its own listener only while a client sits idle
+// in the pool and deliberately removes it while a request has the client
+// checked out (pg-pool/index.js: `_acquireClient` removes it, `_release`
+// restores it) — so `pool.on("error")` could never cover this path.
+//
+// The hook attaches one persistent listener per physical connection, at the
+// moment the pool creates it, so every way of getting a client out of this
+// pool is covered at once — `pool.connect()` in the six strategies,
+// pessimisticHold/Confirm and the cancellation route, and `pool.query()`
+// (the reaper sweep) — including call sites added later. The listener only
+// logs; it must not swallow the failure: pg itself rejects the in-flight
+// query (and every later query on that client) with the underlying error, so
+// the owning request flows through the existing error path (a 500) and can
+// never report success, and pg-pool discards the dead client on release
+// because it is no longer queryable.
+pool.on("connect", (client) => {
+  client.on("error", (err) => {
+    console.error(`Torn database connection (request in flight, if any, will fail): ${err.message}`);
+  });
 });
+
+// The idle-client half of the same crash (finding R2, #54): a connection torn
+// while it sits idle in the pool, or in the instant between a request
+// releasing it and the tear landing — a chaos kill sweep aimed at in-flight
+// transactions still hits this window, so R1's "the process never exits"
+// cannot be met without it — makes pg-pool re-emit the client's error as a
+// Pool 'error' event, which is just as fatal without a listener. pg-pool has
+// already removed the dead client by then, and the per-client listener above
+// has already logged it, so this listener deliberately does nothing more
+// (logging here would double-report every idle tear).
+pool.on("error", () => {});
+
+// Timeouts (issue #56, finding R4, ADR-0026): the bounds themselves are the pool
+// options in poolOptions.ts; this is the one that needs a hook. A query that pg's
+// `query_timeout` gave up on must also take its connection down, or the catch
+// block's ROLLBACK queues behind it forever (queryDeadline.ts has the details).
+pool.on("connect", destroyConnectionOnQueryTimeout);

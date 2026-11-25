@@ -1,0 +1,138 @@
+{
+  "label": "r1-after-hold-expiry-reaperstall-rep1",
+  "ranAt": "2026-11-25T09:02:08.591Z",
+  "args": {
+    "mode": "hold-expiry",
+    "concurrency": 12,
+    "fault": "backend-kill",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "attemptsPerHold": 3,
+    "holdTtlSeconds": 8,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 3,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "r1-after-hold-expiry-reaperstall-rep1",
+    "appPort": 3300
+  },
+  "scratchDatabase": "racetoseat_chaos_a5e9c3dd",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 2
+  },
+  "eventId": "94422838-83b7-4c5d-985b-729de83416a1",
+  "holdsSeeded": 12,
+  "reaperStallSeats": 3,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "onlyApplicationName": "racetoseat-c3-app",
+    "stats": {
+      "sweeps": 151,
+      "terminated": 21,
+      "terminatedByState": {
+        "active": 11,
+        "idle in transaction": 10
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "409": 516,
+      "410": 34,
+      "500": 16
+    },
+    "transportErrors": {},
+    "durationMs": 3542,
+    "maxRequestMs": 80
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 6,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to administrator command": 3,
+      "Error: Client has encountered a connection error and is not queryable": 2,
+      "error: terminating connection due to administrator command": 3,
+      "severity: 'FATAL',": 9,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 12,
+      "Error: Connection terminated unexpectedly": 11,
+      "Reaper sweep failed: error: terminating connection due to administrator command": 6
+    }
+  },
+  "confirmRetry": {
+    "tally": {
+      "404": 12
+    },
+    "bookedBeforeRetry": 0,
+    "createdByRetry": 0,
+    "unanswered": 0,
+    "heldLiveAtAnswer": 0
+  },
+  "seatStatusAtHeal": {
+    "available": 15
+  },
+  "finalState": {
+    "seats": {
+      "available": 15
+    },
+    "confirmKeyBookings": 0,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 16x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    },
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "6 reaper sweep(s) failed and were logged (the reaper survives a failed sweep — server.ts/reaper.ts catch it)"
+    }
+  ]
+}
