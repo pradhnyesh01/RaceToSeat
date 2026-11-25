@@ -1,0 +1,197 @@
+{
+  "label": "r7-negctl-reaper-off",
+  "ranAt": "2026-11-25T14:24:06.829Z",
+  "args": {
+    "mode": "hold-expiry",
+    "concurrency": 12,
+    "fault": "none",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "attemptsPerHold": 3,
+    "holdTtlSeconds": 8,
+    "reaperIntervalMs": 3600000,
+    "reaperStallSeats": 0,
+    "sabotage": "none",
+    "expectViolations": true,
+    "label": "r7-negctl-reaper-off",
+    "appPort": 3380
+  },
+  "scratchDatabase": "racetoseat_chaos_ea0d945c",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "ef394355-0800-409b-9072-3fb69c1d5c93",
+  "holdsSeeded": 12,
+  "reaperStallSeats": 0,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "onlyApplicationName": "racetoseat-c3-app"
+  },
+  "k6": {
+    "statusTally": {
+      "409": 621,
+      "410": 39
+    },
+    "transportErrors": {},
+    "durationMs": 3567,
+    "maxRequestMs": 69
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {}
+  },
+  "confirmRetry": {
+    "tally": {
+      "410": 12
+    },
+    "bookedBeforeRetry": 0,
+    "createdByRetry": 0,
+    "unanswered": 0,
+    "heldLiveAtAnswer": 0
+  },
+  "seatStatusAtHeal": {
+    "held": 12
+  },
+  "finalState": {
+    "seats": {
+      "held": 12
+    },
+    "confirmKeyBookings": 0,
+    "holdRowsRemaining": 12
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 860255ef-ba34-4da9-886e-68b02f26dc6e is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "860255ef-ba34-4da9-886e-68b02f26dc6e"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 05087db7-ff0a-4316-aa3e-5888f73e79b6 is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "05087db7-ff0a-4316-aa3e-5888f73e79b6"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 8eae7a6d-4dab-46d8-b855-57711c25dd0e is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "8eae7a6d-4dab-46d8-b855-57711c25dd0e"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 3e2c6538-3536-49e5-8386-7cb33eb6bcb1 is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "3e2c6538-3536-49e5-8386-7cb33eb6bcb1"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 54b4bf28-544e-4e5a-9a96-2badc9904efb is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "54b4bf28-544e-4e5a-9a96-2badc9904efb"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 6960f09b-9c63-410e-b277-2240bacddc01 is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "6960f09b-9c63-410e-b277-2240bacddc01"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 003136e5-45c0-4d77-9064-faa7719dbfdc is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "003136e5-45c0-4d77-9064-faa7719dbfdc"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 2babdf6f-6bac-47cf-bd3d-3a480822f89e is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "2babdf6f-6bac-47cf-bd3d-3a480822f89e"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 7a0f1e79-c032-4255-b903-8c7f7e9c266c is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "7a0f1e79-c032-4255-b903-8c7f7e9c266c"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 2f6cc2ef-c6f1-479f-96f8-7cf8561d2a65 is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "2f6cc2ef-c6f1-479f-96f8-7cf8561d2a65"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 461b02f5-3c20-41c3-9973-6538195458be is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "461b02f5-3c20-41c3-9973-6538195458be"
+          ]
+        },
+        {
+          "kind": "expired-hold-not-reaped",
+          "detail": "seat 5bfe85cc-b6e7-4581-adb6-c70b7631438a is 'held' past its expiry (+2s grace) and was never released",
+          "seatIds": [
+            "5bfe85cc-b6e7-4581-adb6-c70b7631438a"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

@@ -440,7 +440,17 @@ fewer chances to win; the lockstep collisions themselves are not fixed. Normal-l
 (`serializable` × `hammer-seat`, 100 concurrent, 5 repeats): 0 `503`, p99 within Exhibit C. The two new
 lines in `src/db/pool.ts` put Exhibit G's pinned anchors at the drift test's 4-line tolerance; the next
 edit above them must re-pin those rows. Exhibit H gained section J. Three Robustness findings remain
-unfixed (R7, RF1, RF2); R5 shipped separately (#58, ADR-0027).
+unfixed (R7, RF1, RF2) at that point; R5 shipped separately (#58, ADR-0027).
+
+Issue #57 (finding R7) is done: the reaper's sweep no longer waits on a row-locked seat (ADR-0029).
+`runReaperSweep` still one statement, but its first step is now a `candidates` CTE taking `FOR UPDATE OF s
+SKIP LOCKED`, with the `UPDATE` keeping its own `status = 'held' AND held_until < now()` re-check
+(EvalPlanQual safety unchanged), and a Hold is reaped all-or-nothing (a skipped seat leaves its whole Hold for
+the next tick, since `hold_seats` references `holds` without a cascade and a piecemeal reap would fail on the
+foreign key). Measured on the unmodified app (C3, 3 row-locked expired seats among 12): fresh Holds won went
+from 0 of 12 to 12 of 12 and the bait seats were reaped once their locks cleared; 4 backend-kill reps kept
+every guarantee (all seats `available`, zero Hold rows left, all Oracles green, 3 negative controls still
+red). Exhibit H gained section K. The remaining Robustness findings (RF1, RF2) stay unfixed.
 
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
