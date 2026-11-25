@@ -1,0 +1,215 @@
+{
+  "label": "c2-partition-stall-advisory-hammer-seat-rep4",
+  "ranAt": "2026-11-25T06:15:42.937Z",
+  "args": {
+    "strategy": "advisory",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "c2-partition-stall-advisory-hammer-seat-rep4",
+    "appPort": 3200,
+    "proxyPort": 5440,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 120,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "72e46256-1d99-4f5e-b8e4-6220c077b77b",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 353,
+    "healedAtMs": 7380,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 1
+  },
+  "stall": {
+    "samples": 135,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 1,
+    "maxOpenTxAgeMs": 7110,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1030,
+        1,
+        1,
+        800
+      ],
+      [
+        2023,
+        1,
+        1,
+        1793
+      ],
+      [
+        3013,
+        1,
+        1,
+        2782
+      ],
+      [
+        4009,
+        1,
+        1,
+        3778
+      ],
+      [
+        5042,
+        1,
+        1,
+        4812
+      ],
+      [
+        6028,
+        1,
+        1,
+        5798
+      ],
+      [
+        7014,
+        1,
+        1,
+        6784
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 1,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 1,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-f3b18a14",
+  "k6": {
+    "statusTally": {
+      "0": 1,
+      "409": 59
+    },
+    "transportErrors": {
+      "request timeout": 1
+    },
+    "durationMs": 5354,
+    "maxRequestMs": 4999,
+    "p50RequestMs": 310,
+    "p95RequestMs": 312,
+    "clientTimeouts": 1
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T06:15:50.321Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "injectedKills": [],
+    "restarts": 1,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "Error: Connection terminated unexpectedly": 1,
+      "Emitted 'error' event on BoundPool instance at:": 1,
+      "_events: [Object: null prototype] { error: [Function (anonymous)] },": 1,
+      "_connectionError: false,": 1,
+      "error: [Function: bound _handleErrorEvent],": 1,
+      "errorMessage: [Function: bound _handleErrorMessage],": 1,
+      "_hadError: false,": 1,
+      "_closeAfterHandlingError: false,": 1,
+      "error: [Function: reportStreamError],": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "transaction-outlived-client-timeout",
+      "detail": "a transaction stayed open 7110ms (client request timeout 5000ms): its row locks outlived every client waiting on it"
+    },
+    {
+      "id": "client-timeouts",
+      "detail": "1 request(s) hit the client request timeout (5000ms)"
+    },
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "1 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

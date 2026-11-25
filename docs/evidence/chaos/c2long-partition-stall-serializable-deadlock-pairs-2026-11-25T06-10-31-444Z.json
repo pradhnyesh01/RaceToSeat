@@ -1,0 +1,342 @@
+{
+  "label": "c2long-partition-stall-serializable-deadlock-pairs",
+  "ranAt": "2026-11-25T06:10:31.444Z",
+  "args": {
+    "strategy": "serializable",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "partition-stall",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "c2long-partition-stall-serializable-deadlock-pairs",
+    "appPort": 3201,
+    "proxyPort": 5441,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 60000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 100,
+    "partitionMs": 30000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "146d7ede-9ef1-4755-8767-397336d4f482",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-stall",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-stall",
+    "appliedAtMs": 286,
+    "healedAtMs": 30311,
+    "partitionDurationMs": 30000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 60
+  },
+  "stall": {
+    "samples": 562,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 22,
+    "maxOpenTxAgeMs": 30092,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1029,
+        60,
+        22,
+        819
+      ],
+      [
+        2014,
+        60,
+        22,
+        1804
+      ],
+      [
+        3053,
+        60,
+        22,
+        2843
+      ],
+      [
+        4042,
+        60,
+        22,
+        3832
+      ],
+      [
+        5020,
+        60,
+        22,
+        4810
+      ],
+      [
+        6008,
+        60,
+        22,
+        5797
+      ],
+      [
+        7047,
+        60,
+        22,
+        6836
+      ],
+      [
+        8027,
+        60,
+        22,
+        7816
+      ],
+      [
+        9009,
+        60,
+        22,
+        8799
+      ],
+      [
+        10047,
+        60,
+        22,
+        9837
+      ],
+      [
+        11031,
+        60,
+        22,
+        10820
+      ],
+      [
+        12014,
+        60,
+        22,
+        11804
+      ],
+      [
+        13048,
+        60,
+        22,
+        12837
+      ],
+      [
+        14034,
+        60,
+        22,
+        13824
+      ],
+      [
+        15024,
+        60,
+        22,
+        14813
+      ],
+      [
+        16010,
+        60,
+        22,
+        15799
+      ],
+      [
+        17044,
+        60,
+        22,
+        16833
+      ],
+      [
+        18024,
+        60,
+        22,
+        17814
+      ],
+      [
+        19003,
+        60,
+        22,
+        18792
+      ],
+      [
+        20040,
+        60,
+        22,
+        19830
+      ],
+      [
+        21028,
+        60,
+        22,
+        20817
+      ],
+      [
+        22014,
+        60,
+        22,
+        21804
+      ],
+      [
+        23051,
+        60,
+        22,
+        22841
+      ],
+      [
+        24033,
+        60,
+        22,
+        23823
+      ],
+      [
+        25011,
+        60,
+        22,
+        24800
+      ],
+      [
+        26001,
+        60,
+        22,
+        25791
+      ],
+      [
+        27044,
+        60,
+        22,
+        26833
+      ],
+      [
+        28021,
+        60,
+        22,
+        27811
+      ],
+      [
+        29003,
+        60,
+        22,
+        28792
+      ],
+      [
+        30031,
+        60,
+        22,
+        29820
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 12,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 60000,
+  "appName": "c2-app-78792da4",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "EOF": 60
+    },
+    "durationMs": 30619,
+    "maxRequestMs": 30294,
+    "p50RequestMs": 30293,
+    "p95RequestMs": 30294,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T06:11:01.766Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "injectedKills": [],
+    "restarts": 1,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "Error: Connection terminated unexpectedly": 1,
+      "Emitted 'error' event on Client instance at:": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 29,
+      "409": 29,
+      "503": 2
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    },
+    {
+      "id": "slow-or-hung-request",
+      "detail": "slowest request took 30294ms (> 10s)"
+    }
+  ]
+}

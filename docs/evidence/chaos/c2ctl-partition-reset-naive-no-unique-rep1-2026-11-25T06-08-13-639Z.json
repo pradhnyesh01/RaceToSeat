@@ -1,0 +1,219 @@
+{
+  "label": "c2ctl-partition-reset-naive-no-unique-rep1",
+  "ranAt": "2026-11-25T06:08:13.639Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "partition-reset",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": true,
+    "label": "c2ctl-partition-reset-naive-no-unique-rep1",
+    "appPort": 3201,
+    "proxyPort": 5441,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 150,
+    "partitionMs": 7000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "d306de40-edf1-482a-b4d7-7d925427408e",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "partition-reset",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "networkFault": {
+    "kind": "partition-reset",
+    "appliedAtMs": 336,
+    "healedAtMs": 7344,
+    "partitionDurationMs": 7000,
+    "baseLatencyMs": 40,
+    "openTxWhenApplied": 60
+  },
+  "stall": {
+    "samples": 137,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 66,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1014,
+        0,
+        0,
+        0
+      ],
+      [
+        2050,
+        0,
+        0,
+        0
+      ],
+      [
+        3019,
+        0,
+        0,
+        0
+      ],
+      [
+        4051,
+        0,
+        0,
+        0
+      ],
+      [
+        5023,
+        0,
+        0,
+        0
+      ],
+      [
+        6051,
+        0,
+        0,
+        0
+      ],
+      [
+        7016,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 2,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-8324e291",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "EOF": 60
+    },
+    "durationMs": 646,
+    "maxRequestMs": 329,
+    "p50RequestMs": 326,
+    "p95RequestMs": 329,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [
+      {
+        "at": "2026-11-25T06:08:13.996Z",
+        "code": 1,
+        "signal": null
+      }
+    ],
+    "injectedKills": [],
+    "restarts": 1,
+    "errorSignatures": {
+      "throw er; // Unhandled 'error' event": 1,
+      "Error: Connection terminated unexpectedly": 1,
+      "Emitted 'error' event on Client instance at:": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 10,
+      "409": 50
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 49a3e67a-09e0-4c1e-833c-071cf5712d1e is claimed by 10 bookings",
+          "seatIds": [
+            "49a3e67a-09e0-4c1e-833c-071cf5712d1e"
+          ],
+          "bookingIds": [
+            "05d76cca-3dba-400b-a804-01a27a47bce3",
+            "1c2c154a-1eda-4b13-88b4-763c6a75cc63",
+            "46ce6ee4-e632-4455-b157-98fd3f62756f",
+            "84a8bd74-8b3d-4e92-9081-6a933bb644eb",
+            "8c484b2b-5426-4530-a2a6-46913e7db1bb",
+            "999d5bd9-3847-4dd2-8677-6b8c418c21c9",
+            "cad0cf8b-a597-4a20-ae50-af1ef776ff64",
+            "d381ec38-63eb-42b1-bb16-f9f3d1f185fd",
+            "e3164958-7d38-413b-9bac-147e77ea1550",
+            "eab5ce15-866a-484e-80c8-9430998790b5"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": [
+    {
+      "id": "app-process-crashed",
+      "detail": "the app process exited 1 time(s) during the run (code=1 signal=null)"
+    },
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

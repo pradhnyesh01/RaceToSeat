@@ -1,0 +1,179 @@
+{
+  "label": "c2ctl-app-sigkill-naive-no-unique-rep1",
+  "ranAt": "2026-11-25T06:08:23.925Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "app-sigkill",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": true,
+    "label": "c2ctl-app-sigkill-naive-no-unique-rep1",
+    "appPort": 3201,
+    "proxyPort": 5441,
+    "toxiproxyApi": "http://localhost:8475",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 150,
+    "partitionMs": 8000,
+    "baseLatencyMs": 40,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "d1b6f8b5-4032-420c-a327-3c861453f897",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "app-sigkill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 40,
+  "appKill": {
+    "kills": 1,
+    "killedAtMs": [
+      404
+    ],
+    "restartMs": [
+      653
+    ],
+    "openTxAtKill": [
+      60
+    ]
+  },
+  "stall": {
+    "samples": 21,
+    "peakOpenTx": 60,
+    "peakIdleInTx": 60,
+    "peakLockHolders": 60,
+    "maxOpenTxAgeMs": 170,
+    "timeline": [
+      [
+        1,
+        0,
+        0,
+        0
+      ],
+      [
+        1009,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 3,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 60,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-582c0088",
+  "k6": {
+    "statusTally": {
+      "0": 60
+    },
+    "transportErrors": {
+      "EOF": 60
+    },
+    "durationMs": 711,
+    "maxRequestMs": 389,
+    "p50RequestMs": 388,
+    "p95RequestMs": 389,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [
+      {
+        "at": "2026-11-25T06:08:24.335Z",
+        "code": null,
+        "signal": "SIGKILL"
+      }
+    ],
+    "restarts": 1,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 10,
+      "409": 50
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat d6d31cbb-8727-48cd-a67b-b163309b0cf1 is claimed by 10 bookings",
+          "seatIds": [
+            "d6d31cbb-8727-48cd-a67b-b163309b0cf1"
+          ],
+          "bookingIds": [
+            "067c4f30-7693-477c-8d84-2d68ae3a61d8",
+            "4f0b84cc-458a-4878-879d-470052b7062b",
+            "616efc42-23a6-4834-837e-ccce995f7995",
+            "82b215f5-0951-48a7-95e3-f56684e84856",
+            "82c03795-da55-42f5-a433-880c54be9698",
+            "87858fbe-5a1f-43c5-ad87-8bbd4f1cd2e6",
+            "c1aa5066-c248-4fd9-8f22-55075ffa1350",
+            "c2e5dec0-d1d0-4b20-baa7-efe127ed25b2",
+            "de13604a-742d-40cb-8b81-712534ba0f86",
+            "fc34537f-c00e-482d-8932-7670bf2cfb64"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": [
+    {
+      "id": "requests-without-answer",
+      "detail": "60 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

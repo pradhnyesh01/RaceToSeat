@@ -71,6 +71,17 @@ describe("backend-kill Fault driver", () => {
     expect((await scratch.pool.query("SELECT 1 AS ok")).rows[0]!.ok).toBe(1);
   });
 
+  it("appName scope (issue #49) kills only the named app's backends, even in the same database", async () => {
+    const mine = await victim({ inTransaction: true, applicationName: "c2-app-mine" });
+    const theirs = await victim({ inTransaction: true, applicationName: "c2-app-theirs" });
+    const bystander = await victim({ inTransaction: true });
+    await killBackendsOnce(scratch.pool, { fraction: 1, scope: "any", appName: "c2-app-mine" });
+    await new Promise((r) => setTimeout(r, 200));
+    expect(await alive(mine.pid)).toBe(false);
+    expect(await alive(theirs.pid)).toBe(true);
+    expect(await alive(bystander.pid)).toBe(true);
+  });
+
   it("fraction below 1 can spare a backend (it is a probability, not a flag)", async () => {
     const v = await victim({ inTransaction: true });
     for (let i = 0; i < 5; i += 1) await killBackendsOnce(scratch.pool, { fraction: 0.0000001, scope: "in-transaction" });

@@ -22,6 +22,10 @@ const retriesCount = new Counter("booking_retries");
 const BASE_URL = __ENV.BASE_URL || "http://localhost:3000";
 const SEAT_ID = __ENV.SEAT_ID;
 const RUN_ID = __ENV.RUN_ID;
+// Client-side request timeout (issue #49, chaos latency Faults): the deadline
+// after which a real client gives up and is left in an Ambiguous outcome.
+// Defaults to k6's own default (60s), so no non-chaos run changes.
+const REQUEST_TIMEOUT = __ENV.REQUEST_TIMEOUT || "60s";
 const CONCURRENCY = Number(__ENV.CONCURRENCY || 1000);
 
 if (!SEAT_ID) throw new Error("SEAT_ID env var is required");
@@ -55,7 +59,7 @@ export default function () {
       // unique column, so no UUID format is required.
       idempotency_key: `${RUN_ID}-${__VU}`,
     }),
-    { headers: { "Content-Type": "application/json" } },
+    { headers: { "Content-Type": "application/json" }, timeout: REQUEST_TIMEOUT },
   );
 
   check(res, {
