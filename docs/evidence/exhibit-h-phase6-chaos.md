@@ -8,18 +8,18 @@ Every number below is recomputed from the per-run JSON reports in `docs/evidence
 
 |  |  |
 |---|---|
-| Report files read (`docs/evidence/chaos/*.json`) | **521** |
+| Report files read (`docs/evidence/chaos/*.json`) | **588** — 521 pre-fix (everything below except section E), 67 post-fix `r1-after-*` reruns (issue #53, section E) |
 | Measured runs (every run that is not a negative control) | **505** — 481 under a Fault (326 on unmodified code, 155 with the `--survive-uncaught` scaffold), 24 no-Fault baselines/reruns |
 | **Correctness violations** in measured runs (any Oracle failing) | **0** |
 | Negative controls that went red as required | **16 of 16** end-to-end (`expectViolations`); the control's control on the real schema stayed green in 1 of 1 |
-| Robustness findings (canonical numbering) | **7** chaos-observed (R1–R7) + **2** formal-derived (RF1–RF2, found by model checking, not by a chaos run); none fixed; filed as fix tickets #53–#61 (drafts in `docs/phase6-robustness-ticket-drafts.md`) |
-| Production code changed by any chaos ticket | None: `src/` and `db/schema.sql` untouched (measure-first policy, ADR-0022) |
+| Robustness findings (canonical numbering) | **7** chaos-observed (R1–R7) + **2** formal-derived (RF1–RF2, found by model checking, not by a chaos run); R1 fixed by #53 (section E); the other eight are not fixed and filed as fix tickets #54–#61 (drafts in `docs/phase6-robustness-ticket-drafts.md`) |
+| Production code changed | None by the chaos tickets themselves (C1–C5: `src/` and `db/schema.sql` untouched, measure-first policy, ADR-0022). The first fix, #53, changes `src/db/pool.ts` only (ADR-0024); `db/schema.sql` is still untouched |
 
 **Read the zero with its caveat.** The unmodified application dies on the first torn connection (R1/R2): 135 of 143 unmodified runs under a connection-tearing Fault (backend-kill, idle-pool-kill, partition-stall, partition-reset) ended with the process exiting, and in the four C1 unmodified backend-kill runs 299 of 300, 119 of 120, 114 of 120, 110 of 120 requests (respectively) got no answer. In 46 of 60 unmodified `partition-stall` runs *every* request went unanswered (the partition outlasted the client timeout). So **the unmodified runs mostly judge little**: "all four Oracles pass" is honest there, but largely because almost nothing ran before the process was gone, and the harness's restart plus full key replay then produced a clean state. The meaningful evidence that the Oracles hold *across many Faults and ongoing traffic* is the `--survive-uncaught` scaffolded runs — which are reported separately (ADR-0022) and never merged with the unmodified ones. Neither is evidence about a production deployment with a process supervisor: the harness restart is a stand-in for one.
 
 ## Method
 
-- **App under test**: `tsx src/server.ts` unmodified, as a child process, one mechanism per process (`BOOKING_STRATEGY`, ADR-0002). Its `DATABASE_URL` points at Toxiproxy where a network Fault is injected, straight at Postgres for backend-kill. The harness's own driver/Oracle connections always go straight to Postgres, so a Fault on the app's path never blinds the checker. **No production code changed in any chaos ticket** (`src/`, `db/schema.sql` untouched).
+- **App under test**: `tsx src/server.ts` unmodified, as a child process, one mechanism per process (`BOOKING_STRATEGY`, ADR-0002). Its `DATABASE_URL` points at Toxiproxy where a network Fault is injected, straight at Postgres for backend-kill. The harness's own driver/Oracle connections always go straight to Postgres, so a Fault on the app's path never blinds the checker. **No production code changed in any chaos ticket** (`src/`, `db/schema.sql` untouched) — the pre-fix evidence. Section E's after-runs are against the code with #53's fix (`src/db/pool.ts`).
 - **Isolation**: C2 and C3 runs each use a throwaway database (`racetoseat_chaos_<hex>`: the real `db/schema.sql` applied verbatim, created and dropped within the run), a per-run `application_name`, per-run Toxiproxy proxy, and distinct app/proxy port ranges. The backend killer is scoped by database and `application_name`. C1's runs used the shared dev database.
 - **Loads** (existing k6 scripts, unmodified except for an optional `REQUEST_TIMEOUT` env): `hammer-seat` (60 clients, one seat), `deadlock-pairs` (60 requests = 30 disjoint 2-seat pairs × both orderings in C2; 60 pairs/120 requests in C1), C3's `hold-expiry` (12 seats, every Hold already expired, then 5 Confirms + 5 fresh `POST /holds` per seat race the reaper) and `hold-confirm` (Confirms against live Holds). 60 clients keeps the load generator under macOS's 128-deep listen backlog (see Test environment).
 - **Per run**: the Fault is applied; the load drains; the Fault clears; the app is restarted if it crashed (the crash stays on record); **every Idempotency Key is re-sent** (the Ambiguous-outcome recovery path); then the four Oracles run against stored state. A stall observer samples the app's backends every 50 ms (open transactions, row-lock holders, oldest age) and measures how long after the Fault clears every app transaction takes to end ("drain").
@@ -305,13 +305,57 @@ A request and its row locks stall for as long as the partition lasts; nothing gi
 
 The 20 dedicated no-Fault advisory reruns (`c2adv-*`, R5) and the no-Fault `naive` control twin are summarised under R5 and in the controls table.
 
+### E. After the R1 fix (#53): the same Faults against the fixed code
+
+Issue #53 (R1) added one hook to `src/db/pool.ts` (ADR-0024: a persistent per-connection `client.on("error")` attached from `pool.on("connect")`, which covers every checkout path including `pool.query` and the reaper, plus a no-op `pool.on("error")` for the idle path). The runs below are the issue's own before/after reruns of the *unmodified* app (no `--survive-uncaught`), labelled `r1-after-*` and kept in their own group so nothing in A–D or the findings table below mixes them in. **67 after-runs: the app exited in 0 of them; Correctness violations: 0.**
+
+**E1. C1 backend-kill** (`pessimistic` × `deadlock-pairs`, 60 pairs = 120 requests, `--concurrency 60`).
+
+| code | runs | runs where the app exited | requests with no answer (sum) | no answer per run | HTTP 500s | backends killed | Oracles clean |
+|---|---|---|---|---|---|---|---|
+| before: `unmodified-kill-rep1..3` | 3 | 3 | 343 of 360 | 119 / 114 / 110 | 0 | 25 | 3/3 |
+| **after**: `r1-after-rep1..6` | 6 | 0 | 0 of 720 | 0 / 0 / 0 / 0 / 0 / 0 | 103 | 119 | 6/6 |
+
+Before the fix the first killed connection ended the process and ~everything behind it went unanswered; after it, every request is answered (a request cut mid-transaction gets an HTTP 500 — R3, not fixed here — and its Idempotency Key is replayed by the harness afterwards, as before). The 500s are the requests that were mid-flight on a killed connection (103 of them against 119 backends killed, since a kill that lands between statements or on an idle-in-transaction client may fail no request).
+
+**E2. C2 partition** (`--base-latency-ms 40 --partition-ms 7000`, client timeout 5 s, 5 reps per cell; the "landed" column is C2's definition: app transactions were open when the Fault was applied).
+
+| Fault | cell (5 reps each) | crashed before | crashed **after** | Fault landed on in-flight tx (before → after) | HTTP 500s (before → after) | Oracles clean after |
+|---|---|---|---|---|---|---|
+| `partition-stall` | `pessimistic` × `deadlock-pairs` | 5/5 | **0/5** | 5/5 → 2/5 | 0 → 0 | 5/5 |
+| `partition-stall` | `naive` × `hammer-seat` | 5/5 | **0/5** | 3/5 → 5/5 | 0 → 0 | 5/5 |
+| `partition-stall` | `pessimistic` × `hammer-seat` | 5/5 | **0/5** | 4/5 → 3/5 | 0 → 0 | 5/5 |
+| `partition-stall` | `naive` × `deadlock-pairs` | 5/5 | **0/5** | 5/5 → 4/5 | 0 → 0 | 5/5 |
+| `partition-reset` | `pessimistic` × `deadlock-pairs` | 4/5 | **0/5** | 3/5 → 2/5 | 0 → 150 | 5/5 |
+| `partition-reset` | `naive` × `hammer-seat` | 4/5 | **0/5** | 2/5 → 4/5 | 0 → 300 | 5/5 |
+| `partition-reset` | `pessimistic` × `hammer-seat` | 3/5 | **0/5** | 2/5 → 3/5 | 0 → 295 | 5/5 |
+| `partition-reset` | `naive` × `deadlock-pairs` | 4/5 | **0/5** | 3/5 → 2/5 | 0 → 120 | 5/5 |
+
+14 of 20 after-run `partition-stall` runs still left *every* request unanswered: that is R4 (no timeouts — the partition outlasts the 5 s client timeout), which R1's fix does not touch and which is not an improvement. What changed is that the process survives the heal (0 exits, 0 restarts) instead of crashing when the stalled connections are torn down.
+
+**E3. C3 hold flow** (backend-kill on `pessimistic`; the one-shot row is `--concurrency 100 --attempts-per-hold 1 --kill-interval-ms 10`, no committed pre-fix run used these exact flags, so it has no "before" row; the earlier hold-confirm rows crashed on the first kill the same way).
+
+| group | runs | kills | k6 outcomes (sum) | app exits | swallowed | reaper sweeps killed | Confirms completed only by retry | Oracles 1–4 + 2 ext. clean |
+|---|---|---|---|---|---|---|---|---|
+| before: hold-expiry (confirms + fresh Holds race the reaper) | 6 | 48 | 0:600 409:284 410:76 | 6 | 0 | 0 | 0 | 6/6 |
+| before: hold-expiry + reaper stalled on 3 locked expired seats | 3 | 15 | 0:346 409:15 410:12 500:1 | 3 | 0 | 7 | 0 | 3/3 |
+| before: hold-confirm, 3 concurrent attempts per Hold | 9 | 51 | 0:874 201:181 409:24 500:1 | 9 | 0 | 0 | 170 | 9/9 |
+| **after**: hold-expiry (confirms + fresh Holds race the reaper) | 5 | 125 | 201:60 409:2,020 410:166 500:114 | 0 | 0 | 0 | 0 | 5/5 |
+| **after**: hold-expiry + reaper stalled on 3 locked expired seats | 3 | 66 | 409:1,581 410:123 500:46 | 0 | 0 | 18 | 0 | 3/3 |
+| **after**: hold-confirm, 3 concurrent attempts per Hold | 8 | 46 | 201:834 409:83 500:43 | 0 | 0 | 0 | 0 | 8/8 |
+| **after**: hold-confirm, one-shot (1 attempt per Hold, kill every 10 ms) | 5 | 228 | 201:302 500:198 | 0 | 0 | 0 | 198 | 5/5 |
+
+In the one-shot rows every Confirm that a kill cut was completed exactly once by the key retry (Oracle 3 extension, "a live Hold's retried Confirm yields exactly one Booking"). In the reaper-stall rows (`--reaper-stall-seats 3` + backend-kill) the reaper kept sweeping after connections it was using were killed ("reaper sweeps killed" counts its logged, survived failures) and after heal 3 of 3 runs had every expired seat `available` (Oracle 4).
+
+**What did not improve** (measured, not hidden): the HTTP 500 count went *up* — requests that used to vanish with the process now fail individually with an unclassified 500 (R3); `partition-stall` still stalls every request for the whole partition (R4); a stalled reaper still blocks Holds/Confirms on its locked seats (R7); and `partition-reset` "landed" counts are partial, as before. During development, a first C1 attempt that carried only the per-checkout listener (no `pool.on("error")`; not kept as a report) still crashed once in 3 runs, through the idle path: a kill sweep aimed at in-transaction backends lands on a client the request has just released, which is R2's route — so R2's idle-path guard ships in the same change, and ticket #54 keeps its own acceptance criteria (idle-pool-kill rerun, partition-stall heal-only cases, regression test).
+
 ## Robustness findings — canonical numbering (R1–R7)
 
-C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); none is fixed here, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in `docs/phase6-robustness-ticket-drafts.md`).
+C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); R1 has since been fixed (#53, section E) and the other six are not, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in `docs/phase6-robustness-ticket-drafts.md`).
 
 |  | Finding | Class | Earlier numbering | Evidence recomputed from the reports |
 |---|---|---|---|---|
-| R1 | App process exits when a checked-out connection errors (unhandled `Client` `'error'`) | Robustness | C1 R1 · C2 R1 · C3 R1 | 134/142 unmodified runs under a connection-tearing Fault crashed (the idle-pool run is under R2; C1 backend-kill (`pessimistic`, `deadlock-pairs`): 4/4; C2 `partition-stall` (six mechanisms): 60/60; C2 `partition-reset` (six mechanisms): 52/60; C3 backend-kill on the hold flow (`pessimistic`): 18/18); 125 died on an unhandled `Client` event. `pool.on("error")` alone would not fix it: pg-pool removes its listener on checkout (`pg-pool/index.js:344`; C1 read the source, the fix was not tried) |
+| [R1](https://github.com/pradhnyesh01/RaceToSeat/issues/53) (fixed) | App process exits when a checked-out connection errors (unhandled `Client` `'error'`) | Robustness | C1 R1 · C2 R1 · C3 R1 | **Fixed by #53 (ADR-0024; section E): 0/67 unmodified runs crashed afterwards.** Before the fix: 134/142 unmodified runs under a connection-tearing Fault crashed (the idle-pool run is under R2; C1 backend-kill (`pessimistic`, `deadlock-pairs`): 4/4; C2 `partition-stall` (six mechanisms): 60/60; C2 `partition-reset` (six mechanisms): 52/60; C3 backend-kill on the hold flow (`pessimistic`): 18/18); 125 died on an unhandled `Client` event. `pool.on("error")` alone would not fix it: pg-pool removes its listener on checkout (`pg-pool/index.js:344`; C1 read the source) — the fix is a per-connection `client.on("error")` attached from `pool.on("connect")`, plus a `pool.on("error")` for the idle path |
 | R2 | App process exits when an idle pooled connection errors (unhandled `BoundPool` `'error'`) | Robustness | C1 R2 · C2 R2 (C3: not re-tested) | Idle-pool kill, no request in flight: 1/1 crashed on `BoundPool`. 9 `partition-stall` runs died *only* via `BoundPool` (the heal found nothing but idle pooled connections). C3 did not re-test |
 | R3 | `ROLLBACK` on a dead connection masks the original error; infrastructure failure surfaces as an unclassified HTTP 500 | Robustness | C1 R3 · C2 R3 · C3 R3 | On scaffolded runs 3,600 requests were answered an unclassified HTTP 500 to clients, and the app logged 6,449 dead-connection errors — more than clients saw, because 2,872 of them were logged during scaffolded `partition-stall` runs, where clients had already timed out and saw 0 5xx. The top frame of the logged error is the catch-block `ROLLBACK`/`BEGIN` on the dead client (`pool.ts:47`/`:134`/`:181`/`:187`/`:41`) — **not derivable from the JSON** (see Record consistency check) |
 | R4 | No timeouts anywhere: a partition stalls requests, transactions and row locks for its whole duration | Robustness | C1 R4 (impact pending) · C2 R4 (impact measured) · C3 R4 | 92/120 partition-stall runs flagged a transaction outliving the client timeout; longest app transaction 7.4s under a 7 s partition and 30.1s under a 30 s one; 0 transactions leaked after heal in the 420-run matrix (longest drain 134 ms). Server settings in every report: `statement_timeout`, `lock_timeout`, `idle_in_transaction_session_timeout`, `idle_session_timeout` all 0 |
@@ -319,7 +363,7 @@ C2 and C3 each independently labelled a different finding "R5". This exhibit use
 | R6 | Retry loops amplify latency under a slow link (`optimistic`, `serializable`) | Robustness (performance) | C2 R6 (unchanged) | At 100 ms/chunk (below the 5 s timeout) `optimistic` × `hammer-seat` timed out 130/300; `serializable` × `deadlock-pairs` timed out 37/300 and answered 206× 503; every other cell: 0 timeouts |
 | R7 | A stalled reaper sweep holds row locks on other expired seats and blocks unrelated Hold/Confirm | Robustness | **C3 R5 → R7** (renumbered; C2's R5 kept the number) | Reaper stalled on 3 row-locked expired seats, no Fault: 0 of 12 fresh Hold attempts won (baseline 12 of 12), 623×409 (baseline 527). Under backend-kill 31 reaper sweeps were killed mid-flight (7 unmodified, 24 scaffolded); all seats were reaped after heal. The "blocked sweep leaves NOWAIT on 5 other expired seats failing with 55P03" probe was verified directly by C3, not recorded in a report |
 
-Notes: **R1/R2** — a per-checkout `client.on('error')` is needed; `pool.on('error')` covers R2 only. **R3** also affects `withSerializableTransaction` (`pool.ts:134`) and `withDeadlockRetry` (`pool.ts:181`, `:187`), not just `withTransaction` (`pool.ts:47`); the unclassified 500 is the global error handler (`src/app.ts:10`). **R5** is not Fault-dependent and rare; Oracle 1 is a statement about stored state and the `UNIQUE(seat_id)` constraint (ADR-0008) kept it correct — what failed was the HTTP answer. It is, though, a mechanism leaning on its backstop while its own check is racy, which ADR-0013 says openly about `serializable` and not yet about `advisory`. **R6** is a design trade-off of ADR-0009/0011/0013 recorded because it is where "below the timeout" is not below it. **R7** needs a leaked or slow lock (R4) to persist indefinitely.
+Notes: **R1/R2** — a per-checkout `client.on('error')` is needed; `pool.on('error')` covers R2 only. #53's fix ships both (one hook in `src/db/pool.ts`), so R2's idle path is guarded too, though #54's own before/after criteria are still open. **R3** also affects `withSerializableTransaction` (`pool.ts:134`) and `withDeadlockRetry` (`pool.ts:181`, `:187`), not just `withTransaction` (`pool.ts:47`); the unclassified 500 is the global error handler (`src/app.ts:10`). **R5** is not Fault-dependent and rare; Oracle 1 is a statement about stored state and the `UNIQUE(seat_id)` constraint (ADR-0008) kept it correct — what failed was the HTTP answer. It is, though, a mechanism leaning on its backstop while its own check is racy, which ADR-0013 says openly about `serializable` and not yet about `advisory`. **R6** is a design trade-off of ADR-0009/0011/0013 recorded because it is where "below the timeout" is not below it. **R7** needs a leaked or slow lock (R4) to persist indefinitely.
 
 ### Formal-derived findings (RF1–RF2) — kept apart from R1–R7
 
@@ -417,6 +461,12 @@ docker run -d --name c2-toxiproxy --network racetoseat_default \
 npx tsx load-harness/chaos/matrix.ts --reps 5          # C2 matrix (resumable; ~1 h)
 npm run chaos:holds -- --mode hold-expiry --survive-uncaught --kill-fraction 0.3   # C3
 npm run chaos -- --survive-uncaught --kill-fraction 0.3                            # C1
+# R1 fix reruns (section E), after #53:
+npm run chaos -- --concurrency 60 --label r1-after-rep1                            # C1, repeat for rep2..
+npx tsx load-harness/chaos/matrix.ts --label-prefix r1-after- --mechanisms pessimistic,naive \
+  --faults partition-stall,partition-reset --survive-faults none --reps 5           # C2 cells
+npm run chaos:holds -- --mode hold-confirm --concurrency 100 --attempts-per-hold 1 --kill-interval-ms 10 --label r1-after-hold-confirm-oneshot-rep1
+npm run chaos:holds -- --mode hold-expiry --reaper-stall-seats 3 --label r1-after-hold-expiry-reaperstall-rep1
 npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json
 npx vitest run test/chaos                              # the unit controls
 ```

@@ -1,0 +1,150 @@
+{
+  "label": "r1-after-rep5",
+  "ranAt": "2026-11-25T08:52:51.234Z",
+  "args": {
+    "strategy": "pessimistic",
+    "load": "deadlock-pairs",
+    "concurrency": 60,
+    "fault": "backend-kill",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "shared",
+    "expectViolations": false,
+    "label": "r1-after-rep5",
+    "appPort": 3100,
+    "proxyPort": 5434,
+    "toxiproxyApi": "",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 60000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "0a1d5326-9179-4f3b-961c-e665ebe2cc76",
+  "requestsIssued": 120,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "stats": {
+      "sweeps": 12,
+      "terminated": 17,
+      "terminatedByState": {
+        "idle in transaction": 16,
+        "active": 1
+      }
+    }
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 10,
+    "peakOpenTx": 23,
+    "peakIdleInTx": 19,
+    "peakLockHolders": 17,
+    "maxOpenTxAgeMs": 26,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 4,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 60,
+    "bookingsAnsweredWith201": 60,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 60000,
+  "appName": "c2-app-b3cc52af",
+  "k6": {
+    "statusTally": {
+      "201": 60,
+      "409": 43,
+      "500": 17
+    },
+    "transportErrors": {},
+    "durationMs": 471,
+    "maxRequestMs": 132,
+    "p50RequestMs": 121,
+    "p95RequestMs": 131,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 2,
+      "Error: Connection terminated unexpectedly": 1,
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to administrator command": 15,
+      "Error: Client has encountered a connection error and is not queryable": 15,
+      "error: terminating connection due to administrator command": 1,
+      "severity: 'FATAL',": 1
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 60,
+      "409": 60
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 17x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    }
+  ]
+}

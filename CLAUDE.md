@@ -379,6 +379,16 @@ is assumed by the formal model and tested by neither track. Full test suite pass
 skipped that need a local Toxiproxy server) and `npm run typecheck` is clean. Phase 8's writeup
 should cite both exhibits.
 
+Issue #53 (finding R1, the first Phase 6 Robustness fix) is done: a torn checked-out
+connection now fails only its own request instead of ending the process. `src/db/pool.ts`
+registers `pool.on("connect", ...)` to attach a persistent `client.on("error")` to every
+connection (pg-pool removes its own listener on checkout, so `pool.on("error")` alone can't
+cover this) plus a no-op `pool.on("error")` for the idle path, which the fix could not meet its
+acceptance without (ADR-0024; overlaps R2/#54 on purpose). Unmodified-app before/after reruns
+(C1/C2/C3, no `--survive-uncaught`): the app exited in 0 of 67 after-runs (before: every run
+under a connection-tearing Fault); all Oracles green; Exhibit H gained section E with the
+numbers. The other eight Robustness findings (R2-R7, RF1, RF2) remain unfixed.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

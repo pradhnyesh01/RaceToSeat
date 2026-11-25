@@ -1,0 +1,134 @@
+{
+  "label": "r1-after-hold-expiry-rep3",
+  "ranAt": "2026-11-25T09:01:02.368Z",
+  "args": {
+    "mode": "hold-expiry",
+    "concurrency": 12,
+    "fault": "backend-kill",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "attemptsPerHold": 3,
+    "holdTtlSeconds": 8,
+    "reaperIntervalMs": 1000,
+    "reaperStallSeats": 0,
+    "sabotage": "none",
+    "expectViolations": false,
+    "label": "r1-after-hold-expiry-rep3",
+    "appPort": 3300
+  },
+  "scratchDatabase": "racetoseat_chaos_8314d6c6",
+  "applicationNamesSeen": {
+    "racetoseat-c3-app": 10,
+    "racetoseat-chaos": 1
+  },
+  "eventId": "56bae556-8c91-4acd-8948-4abdc7f2f185",
+  "holdsSeeded": 12,
+  "reaperStallSeats": 0,
+  "fault": {
+    "kind": "backend-kill",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5,
+    "postLoadFaultMs": 3000,
+    "onlyApplicationName": "racetoseat-c3-app",
+    "stats": {
+      "sweeps": 149,
+      "terminated": 37,
+      "terminatedByState": {
+        "idle in transaction": 28,
+        "active": 9
+      }
+    }
+  },
+  "k6": {
+    "statusTally": {
+      "201": 12,
+      "409": 397,
+      "410": 30,
+      "500": 35
+    },
+    "transportErrors": {},
+    "durationMs": 3584,
+    "maxRequestMs": 78
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "reaperSweepFailures": 0,
+    "errorSignatures": {
+      "error: terminating connection due to administrator command": 3,
+      "severity: 'FATAL',": 3,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 28,
+      "Error: Connection terminated unexpectedly": 25,
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to administrator command": 11,
+      "Error: Client has encountered a connection error and is not queryable": 7
+    }
+  },
+  "confirmRetry": {
+    "tally": {
+      "404": 12
+    },
+    "bookedBeforeRetry": 0,
+    "createdByRetry": 0,
+    "unanswered": 0,
+    "heldLiveAtAnswer": 0
+  },
+  "seatStatusAtHeal": {
+    "held": 12
+  },
+  "finalState": {
+    "seats": {
+      "available": 12
+    },
+    "confirmKeyBookings": 0,
+    "holdRowsRemaining": 0
+  },
+  "sabotage": null,
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state: no Booking from an expired Hold",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery: a live Hold's retried Confirm yields exactly one Booking",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "unclassified-server-errors",
+      "detail": "requests answered with 35x HTTP 500 (not a designed outcome — only 201/409/404/503 are)"
+    }
+  ]
+}
