@@ -1,6 +1,8 @@
 # Phase 6 Robustness-finding fix tickets — drafts for review
 
-**Status: drafts, not filed.** Written by C5 (issue #52) from the evidence consolidated in [Exhibit H](evidence/exhibit-h-phase6-chaos.md). Nothing here has been filed as a GitHub issue and no finding has been fixed — per ADR-0022 the chaos tickets measured unmodified code, and per #52 each Robustness finding becomes its own ticket with its own before/after rerun. When you approve a draft, file it in the same shape as #38–#52 (title, `ready-for-agent` label, the sections below), then replace the `draft Rn` references in **Blocked by** with the real issue numbers and add the issue links to Exhibit H's findings table.
+**Status: FILED as GitHub issues #53–#61** (R1 #53, R2 #54, R3 #55, R4 #56, R7 #57, R5 #58, R6 #59, RF1 #60, RF2 #61); the issues are now the source of truth and this file is kept as the audit trail of their original drafts. The text below is the original draft status.
+
+**(Original) Status: drafts, not filed.** Written by C5 (issue #52) from the evidence consolidated in [Exhibit H](evidence/exhibit-h-phase6-chaos.md). Nothing here has been filed as a GitHub issue and no finding has been fixed — per ADR-0022 the chaos tickets measured unmodified code, and per #52 each Robustness finding becomes its own ticket with its own before/after rerun. When you approve a draft, file it in the same shape as #38–#52 (title, `ready-for-agent` label, the sections below), then replace the `draft Rn` references in **Blocked by** with the real issue numbers and add the issue links to Exhibit H's findings table.
 
 Finding numbers are the **canonical** list from Exhibit H (C2 and C3 had each used "R5" for different findings): R1–R4 as in C1; **R5** = `advisory` stale-snapshot 500 (C2's R5); **R6** = retry-loop latency amplification (C2's R6); **R7** = stalled reaper blocks unrelated Hold/Confirm (C3's "R5").
 

@@ -670,7 +670,7 @@ function renderHeadline(all: LoadedChaosReport[]): string {
       ["Measured runs (every run that is not a negative control)", `**${fmtInt(measured.length)}** — ${fmtInt(withFault.length)} under a Fault (${fmtInt(unmodFault.length)} on unmodified code, ${fmtInt(scaffoldFault.length)} with the \`--survive-uncaught\` scaffold), ${fmtInt(measured.length - withFault.length)} no-Fault baselines/reruns`],
       ["**Correctness violations** in measured runs (any Oracle failing)", `**${violations.length}**${violations.length ? ` (${violations.map((v) => v.report.label).join(", ")})` : ""}`],
       ["Negative controls that went red as required", `**${flagged.length} of ${controls.length}** end-to-end (\`expectViolations\`); the control's control on the real schema stayed green in ${twins.filter((t) => !t.report.correctnessViolation).length} of ${twins.length}`],
-      ["Robustness findings (canonical numbering)", `**${CANONICAL_FINDINGS.length}** chaos-observed (R1–R7) + **${FORMAL_FINDINGS.length}** formal-derived (RF1–RF2, found by model checking, not by a chaos run); none fixed, none filed (drafts in \`docs/phase6-robustness-ticket-drafts.md\`)`],
+      ["Robustness findings (canonical numbering)", `**${CANONICAL_FINDINGS.length}** chaos-observed (R1–R7) + **${FORMAL_FINDINGS.length}** formal-derived (RF1–RF2, found by model checking, not by a chaos run); none fixed; filed as fix tickets #53–#61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`)`],
       ["Production code changed by any chaos ticket", "None: `src/` and `db/schema.sql` untouched (measure-first policy, ADR-0022)"],
     ],
   );
@@ -1122,7 +1122,7 @@ The 20 dedicated no-Fault advisory reruns (\`c2adv-*\`, R5) and the no-Fault \`n
 
 ## Robustness findings — canonical numbering (R1–R7)
 
-C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); none is fixed here, per the measure-first policy; each has a ready-to-file ticket draft in \`docs/phase6-robustness-ticket-drafts.md\`. Issue links are not yet filled in because the drafts are awaiting review.
+C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); none is fixed here, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`).
 
 ${renderFindings(ev)}
 
@@ -1130,7 +1130,7 @@ Notes: **R1/R2** — a per-checkout \`client.on('error')\` is needed; \`pool.on(
 
 ### Formal-derived findings (RF1–RF2) — kept apart from R1–R7
 
-The formal track's crash / ambiguous-commit / idempotent-retry model (F4, #47, merged to \`main\` as 2f47207) exposed two behaviours of the *real* implementation that no chaos run observed. They are numbered **RF1–RF2** so they cannot be mistaken for chaos evidence: nothing in this table is computed from \`docs/evidence/chaos/*.json\`; the evidence is a TLC counterexample, documented in \`formal/README.md\` ("Findings: behavior the model exposes in the real implementation") and cited here. They are Robustness-class: neither fails a chaos Oracle, neither is a Correctness violation, and the "violated on purpose" configs in \`formal/check.sh\` pin them. Not filed and not fixed; each has a draft in \`docs/phase6-robustness-ticket-drafts.md\`. The formal exhibit (G, F5) will present the model side; this exhibit only records that the two findings exist and why the chaos track could not have found them.
+The formal track's crash / ambiguous-commit / idempotent-retry model (F4, #47, merged to \`main\` as 2f47207) exposed two behaviours of the *real* implementation that no chaos run observed. They are numbered **RF1–RF2** so they cannot be mistaken for chaos evidence: nothing in this table is computed from \`docs/evidence/chaos/*.json\`; the evidence is a TLC counterexample, documented in \`formal/README.md\` ("Findings: behavior the model exposes in the real implementation") and cited here. They are Robustness-class: neither fails a chaos Oracle, neither is a Correctness violation, and the "violated on purpose" configs in \`formal/check.sh\` pin them. Not fixed; filed as RF1 #60 and RF2 #61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`). The formal exhibit (G, F5) will present the model side; this exhibit only records that the two findings exist and why the chaos track could not have found them.
 
 ${renderFormalFindings()}
 
@@ -1183,6 +1183,6 @@ npx vitest run test/chaos                              # the unit controls
 
 ## Next step
 
-Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are drafted as fix tickets in \`docs/phase6-robustness-ticket-drafts.md\`, awaiting review before they are filed (the umbrella's "every Robustness finding is listed with a follow-up issue link" closes once they are). Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out.
+Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are filed as fix tickets #53–#61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`), which satisfies the umbrella's "every Robustness finding is listed with a follow-up issue link". Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out.
 `;
 }
