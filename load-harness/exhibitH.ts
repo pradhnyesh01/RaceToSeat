@@ -110,7 +110,9 @@ export type ChaosGroup =
   | "r6"
   | "r7-after"
   | "rf1-before"
-  | "rf1-after";
+  | "rf1-after"
+  | "rf2-before"
+  | "rf2-after";
 
 export interface LoadedChaosReport {
   file: string;
@@ -156,6 +158,11 @@ export function classify(report: ChaosReport): ChaosGroup {
   // belongs among the pre-fix aggregates.
   if (l.startsWith("rf1-before")) return "rf1-before";
   if (l.startsWith("rf1-after")) return "rf1-after";
+  // RF2 (#61, ADR-0031): `rf2-before` reruns two C2 cells (pessimistic x hammer-seat / deadlock-pairs x
+  // latency-above) on the parent commit, `rf2-after` on the code that re-reads the key before a 409.
+  // Both are against code that already has R1-R7 and RF1, so neither belongs among the pre-fix aggregates.
+  if (l.startsWith("rf2-before")) return "rf2-before";
+  if (l.startsWith("rf2-after")) return "rf2-after";
   // R5 (#58): `r5-before` reruns the same cells on the code *without* the fix,
   // `r5-after` with it (ADR-0027). Neither belongs among the pre-fix aggregates.
   if (l.startsWith("r5-before")) return "r5-before";
@@ -457,12 +464,12 @@ export const FORMAL_FINDINGS: FormalFinding[] = [
   },
   {
     id: "RF2",
-    title: "A concurrent same-key book/hold retry can be answered 409 although the original's key row is already committed (key lookup happens before `BEGIN`)",
-    klass: "Robustness (formal-derived)",
+    title: "A concurrent same-key book/hold retry can be answered 409 although the original's key row is already committed (the key lookup happens before `BEGIN`). **Fixed by #61 (ADR-0031, section M): a refused claim re-reads its key on a fresh read before it is answered 409**",
+    klass: "Robustness (formal-derived), fixed",
     evidence:
-      "`bookSeatPessimistic` / `holdSeatsPessimistic` look the key up *before* `BEGIN` (`pessimistic.ts:25`, `pessimisticHold.ts:20`). If the original commits between that lookup and the retry's `FOR UPDATE NOWAIT`, the retry's lock succeeds, sees the seat taken and answers 409 `conflict` instead of replaying; `resolveIdempotencyKeyRace` does not catch it (it fires on a unique violation, reachable under `pessimistic` only for a same-key retry wanting *different* seats). If the original's ack was also lost, the client's only answer is a 409 for a request that succeeded; a *further* retry replays correctly. TLC: `CrashFindingSpuriousConflict` (`KeyNeverFalselyRefused` violated, trace 7). The confirm path is **not** affected (`ConfirmNeverFalselyRefused` holds): `confirmHoldPessimistic` repeats its key lookup inside the transaction. The same pre-`BEGIN` lookup also appears in `naive.ts:37` and `advisory.ts:37`; whether it yields a spurious 409 there depends on each mechanism's conflict path and was **not modeled** (F4 models `pessimistic` only)",
+      "**As found:** `bookSeatPessimistic` / `holdSeatsPessimistic` looked the key up *before* `BEGIN`. If the original committed between that lookup and the retry's `FOR UPDATE NOWAIT`, the retry's lock succeeded, saw the seat taken and answered 409 `conflict` instead of replaying; `resolveIdempotencyKeyRace` did not catch it (it fires on a unique violation, reachable under `pessimistic` only for a same-key retry wanting *different* seats). If the original's ack was also lost, the client's only answer was a 409 for a request that succeeded; a *further* retry replayed correctly. TLC: `CrashFindingSpuriousConflict` (`KeyNeverFalselyRefused` violated, trace 7). The confirm path was never affected (`ConfirmNeverFalselyRefused`): `confirmHoldPessimistic` repeats its key lookup inside the transaction. **Survey (ADR-0031):** the same window existed in `naive` (its unlocked status read), `advisory`, `optimistic` (also after waiting on the original's row lock) and `serializable`, each reproduced by a deterministic test that failed before the fix; `unique_constraint` cannot answer a spurious 409 (its same-key INSERT precedes the seat claim) and its test passes before and after. **After #61 (ADR-0031):** every conflict result is re-read against the key once, on a fresh read, before it is answered (`replayInsteadOfConflict`), returning a replay or RF1's `410 key_released`; the model gained a `Recheck` step, `CrashFindingSpuriousConflict` is a positive check, and the old behavior is the negative control `CrashNoRecheck` (`CrashRecheckTakenOnly` shows the re-read must also follow a lock-failure refusal; `formal/README.md` \"Findings\"; section M)",
     whyChaosMissesIt:
-      "the Oracles read stored state after the Fault clears; the Booking *exists*, exactly once, so Oracles 1–3 pass. The wrong answer is an HTTP status the client saw, which ADR-0022 deliberately never treats as evidence, and the chaos loads do not issue a same-key retry that overlaps the original's commit",
+      "the Oracles read stored state after the Fault clears; the Booking *exists*, exactly once, so Oracles 1–3 pass. The wrong answer is an HTTP status the client saw, which ADR-0022 deliberately never treats as evidence, and the chaos loads do not issue a same-key retry that overlaps the original's commit. No Oracle was added: the fix is pinned by deterministic tests on the real code path (`runIdempotencyKeyRaceContractTests`, run by all six mechanisms, and `runHoldKeyRaceContractTests`) and by the model, and section M only shows the re-read did not regress the Ambiguous-outcome resolution the Oracles do judge",
     draftSlug: "RF2",
   },
 ];
@@ -784,12 +791,12 @@ function renderHeadline(all: LoadedChaosReport[], fileCount: number, r5BeforeCou
   return mdTable(
     ["", ""],
     [
-      ["Report files read (`docs/evidence/chaos/*.json`)", `**${fmtInt(fileCount)}** — ${fmtInt(all.length)} pre-fix (everything below except sections E, G, H, I, J, K and L), ${fmtInt(fileCount - all.length - r5BeforeCount)} post-fix reruns (\`r1-after-*\`, issue #53, section E; \`r4-after-*\`, issue #56, section G; \`r2-after-*\`, issue #54, section H; \`r5-after-*\`, issue #58, section I; \`r6-*\`, issue #59, section J; \`r7-after-*\`/\`r7-negctl-*\`, issue #57, section K; \`rf1-*\`, issue #60, section L) and ${fmtInt(r5BeforeCount)} \`r5-before-*\` reruns of the same cells on the code without #58's fix (section I)`],
+      ["Report files read (`docs/evidence/chaos/*.json`)", `**${fmtInt(fileCount)}** — ${fmtInt(all.length)} pre-fix (everything below except sections E, G, H, I, J, K, L and M), ${fmtInt(fileCount - all.length - r5BeforeCount)} post-fix reruns (\`r1-after-*\`, issue #53, section E; \`r4-after-*\`, issue #56, section G; \`r2-after-*\`, issue #54, section H; \`r5-after-*\`, issue #58, section I; \`r6-*\`, issue #59, section J; \`r7-after-*\`/\`r7-negctl-*\`, issue #57, section K; \`rf1-*\`, issue #60, section L; \`rf2-*\`, issue #61, section M) and ${fmtInt(r5BeforeCount)} \`r5-before-*\` reruns of the same cells on the code without #58's fix (section I)`],
       ["Measured runs (every run that is not a negative control)", `**${fmtInt(measured.length)}** — ${fmtInt(withFault.length)} under a Fault (${fmtInt(unmodFault.length)} on unmodified code, ${fmtInt(scaffoldFault.length)} with the \`--survive-uncaught\` scaffold), ${fmtInt(measured.length - withFault.length)} no-Fault baselines/reruns`],
       ["**Correctness violations** in measured runs (any Oracle failing)", `**${violations.length}**${violations.length ? ` (${violations.map((v) => v.report.label).join(", ")})` : ""}`],
       ["Negative controls that went red as required", `**${flagged.length} of ${controls.length}** end-to-end (\`expectViolations\`); the control's control on the real schema stayed green in ${twins.filter((t) => !t.report.correctnessViolation).length} of ${twins.length}`],
-      ["Robustness findings (canonical numbering)", `**${CANONICAL_FINDINGS.length}** chaos-observed (R1–R7) + **${FORMAL_FINDINGS.length}** formal-derived (RF1–RF2, found by model checking, not by a chaos run); R1 fixed by #53 (section E), R2 by #54 (section H), R3 by #55 (section F), R4 by #56 (section G), R5 by #58 (section I), R6 decided by #59 (section J), R7 by #57 (section K), RF1 by #60 (section L); the one left (RF2) is not fixed and filed as fix ticket #61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`)`],
-      ["Production code changed", "None by the chaos tickets themselves (C1–C5: `src/` and `db/schema.sql` untouched, measure-first policy, ADR-0022). The fixes so far change `src/` only — #53 `src/db/pool.ts` (ADR-0024), #55 `src/db/pool.ts`, `src/db/pgErrors.ts`, `src/app.ts` (ADR-0025), #56 adds the timeouts of ADR-0026 (`src/config.ts`, `src/db/poolOptions.ts`, `src/db/queryDeadline.ts`, `src/db/pgErrors.ts`, `src/app.ts`, a hook appended to `src/db/pool.ts`); #58 splits `advisory.ts`'s lock-and-read statement in two (`src/strategies/advisory.ts`, ADR-0027); #57 rewrites the reaper's sweep statement to skip row-locked seats (`src/reaper.ts`, ADR-0029); #59 adds a time budget to `withSerializableTransaction`'s retry loop (`src/db/retryBudget.ts`, `src/config.ts`, two lines in `src/db/pool.ts`, ADR-0028); #54 changes no production code (the `pool.on(\"error\")` listener that closes R2 shipped with #53; #54 adds its regression test and the idle-path evidence); #60 (RF1) is the first fix to touch `db/schema.sql` and the key path of every mechanism: a tombstone table and a `BEFORE INSERT` guard trigger, `findPrior{Booking,Hold}ForKey` in `src/strategies/idempotency.ts`, a tombstone written by the statements that release a row (`src/routes/bookings.ts`, `src/strategies/pessimisticConfirm.ts`, `src/reaper.ts`, `src/db/tombstones.ts`), `410 key_released` in two routes, two config values (ADR-0030)"],
+      ["Robustness findings (canonical numbering)", `**${CANONICAL_FINDINGS.length}** chaos-observed (R1–R7) + **${FORMAL_FINDINGS.length}** formal-derived (RF1–RF2, found by model checking, not by a chaos run); R1 fixed by #53 (section E), R2 by #54 (section H), R3 by #55 (section F), R4 by #56 (section G), R5 by #58 (section I), R6 decided by #59 (section J), R7 by #57 (section K), RF1 by #60 (section L), RF2 by #61 (section M); all nine are fixed or decided (filed as fix tickets #53–#61, drafts in \`docs/phase6-robustness-ticket-drafts.md\`)`],
+      ["Production code changed", "None by the chaos tickets themselves (C1–C5: `src/` and `db/schema.sql` untouched, measure-first policy, ADR-0022). The fixes so far change `src/` only — #53 `src/db/pool.ts` (ADR-0024), #55 `src/db/pool.ts`, `src/db/pgErrors.ts`, `src/app.ts` (ADR-0025), #56 adds the timeouts of ADR-0026 (`src/config.ts`, `src/db/poolOptions.ts`, `src/db/queryDeadline.ts`, `src/db/pgErrors.ts`, `src/app.ts`, a hook appended to `src/db/pool.ts`); #58 splits `advisory.ts`'s lock-and-read statement in two (`src/strategies/advisory.ts`, ADR-0027); #57 rewrites the reaper's sweep statement to skip row-locked seats (`src/reaper.ts`, ADR-0029); #59 adds a time budget to `withSerializableTransaction`'s retry loop (`src/db/retryBudget.ts`, `src/config.ts`, two lines in `src/db/pool.ts`, ADR-0028); #54 changes no production code (the `pool.on(\"error\")` listener that closes R2 shipped with #53; #54 adds its regression test and the idle-path evidence); #60 (RF1) is the first fix to touch `db/schema.sql` and the key path of every mechanism: a tombstone table and a `BEFORE INSERT` guard trigger, `findPrior{Booking,Hold}ForKey` in `src/strategies/idempotency.ts`, a tombstone written by the statements that release a row (`src/routes/bookings.ts`, `src/strategies/pessimisticConfirm.ts`, `src/reaper.ts`, `src/db/tombstones.ts`), `410 key_released` in two routes, two config values (ADR-0030); #61 (RF2) re-reads the key before a conflict is answered, in `src/strategies/idempotency.ts` and the five strategies that can answer one (ADR-0031)"],
     ],
   );
 }
@@ -1291,7 +1298,7 @@ function renderFormalFindings(): string {
   return mdTable(
     ["", "Finding", "Class", "Evidence (TLC counterexample; cited from `formal/README.md`, not recomputed)", "Why no chaos run could see it"],
     FORMAL_FINDINGS.map((f) => [
-      f.id === "RF1" ? "[RF1](https://github.com/pradhnyesh01/RaceToSeat/issues/60) (fixed)" : f.id === "RF2" ? "[RF2](https://github.com/pradhnyesh01/RaceToSeat/issues/61)" : f.id,
+      f.id === "RF1" ? "[RF1](https://github.com/pradhnyesh01/RaceToSeat/issues/60) (fixed)" : f.id === "RF2" ? "[RF2](https://github.com/pradhnyesh01/RaceToSeat/issues/61) (fixed)" : f.id,
       f.title,
       f.klass,
       f.evidence,
@@ -1595,6 +1602,90 @@ function r6Row(variant: string, rs: ChaosReport[]): string[] {
   ];
 }
 
+// Section M: the RF2 fix (#61, ADR-0031). A same-key retry racing the original's commit used to be
+// told 409; the fix re-reads the key before any conflict is answered. The chaos Oracles read stored
+// state and the loads never issue a retry that overlaps the original's commit, so - as with RF1 -
+// they cannot show the bug fixed (the deterministic tests and the model do); what they show is that
+// the extra read on the conflict path did not regress the Ambiguous outcome. `latency-above` for
+// `pessimistic` x `hammer-seat` and x `deadlock-pairs`: the client times out on every request, the
+// commits land unacknowledged, and the replay resolves them purely by Idempotency Key. The replay
+// must end with exactly one Booking per distinct seat set (1 for hammer-seat; one per disjoint pair,
+// = requests / 2, for deadlock-pairs). `rf2-before` = the parent commit, `rf2-after` = this change.
+function renderRf2After(
+  before: ChaosReport[],
+  after: ChaosReport[],
+  nr: { before: NoRegressionRow[]; after: NoRegressionRow[] } | undefined,
+): string {
+  if (after.length === 0) return "_No `rf2-after-*` reports present._";
+  const replay = (r: ChaosReport, k: string): number => r.replay?.tally?.[k] ?? 0;
+  const expectedBookings = (r: ChaosReport): number =>
+    r.args.load === "deadlock-pairs" ? Math.floor((r.requestsIssued ?? 0) / 2) : 1;
+  const exactlyOne = (r: ChaosReport): boolean => replay(r, "201") === expectedBookings(r);
+  const loads = [...new Set(after.map((r) => r.args.load ?? ""))].sort();
+  const rows: string[][] = [];
+  for (const load of loads) {
+    for (const [variant, rs] of [["before (parent commit)", before], ["**after (#61)**", after]] as const) {
+      const m = rs.filter((r) => r.args.load === load);
+      if (m.length === 0) continue;
+      rows.push([
+        variant,
+        `\`${load}\``,
+        String(m.length),
+        ["504", "0", "201", "409"].map((k) => fmtInt(sum(m.map((r) => tallyOf(r, k))))).join(" / "),
+        `${fmtInt(sum(m.map((r) => replay(r, "201"))))} / ${fmtInt(sum(m.map((r) => replay(r, "409"))))}`,
+        `${m.filter(exactlyOne).length}/${m.length}`,
+        fmtInt(sum(m.map((r) => replay(r, "410")))),
+        fmtInt(sum(m.map((r) => r.app.exits.length))),
+        oraclesClean(m),
+      ]);
+    }
+  }
+  const violations = after.filter((r) => r.correctnessViolation);
+  const cost = nr && nr.after.length > 0 ? renderRf2NoRegression(nr) : "_No `rf2-nofault` reports present._";
+  return `Issue #61 (RF2) makes every mechanism re-read the Idempotency Key, once and on a fresh read, before a \`conflict\` is answered 409 (ADR-0031): a same-key retry whose original committed after the retry's own key lookup is replayed (or answered \`410 key_released\`), not refused. ADR-0031 surveys all six mechanisms; five could answer the spurious 409 (\`pessimistic\`, \`advisory\`, \`naive\`, \`optimistic\`, \`serializable\`), \`unique_constraint\` cannot. The chaos Oracles read stored state after a Fault clears and the chaos loads never issue a retry that overlaps the original's commit, so **they cannot show the bug fixed or the fix working**: the deterministic tests (\`runIdempotencyKeyRaceContractTests\` in all six strategy test files; \`runHoldKeyRaceContractTests\`), each failing before the fix with 409 where 201 and the original's id was expected, and the TLC check \`CrashFindingSpuriousConflict\` (positive now, with \`CrashNoRecheck\` as its control) do. What the chaos cells can show is that the extra read on the conflict path did not regress the Ambiguous outcome. The cells are \`pessimistic\` × \`hammer-seat\` and × \`deadlock-pairs\` under \`latency-above\` (800 ms per protocol chunk against a 5 s client timeout; with R4's bounds in place every first-pass request is answered \`504\`, the commits land anyway, and the client learns the outcome only by replaying every request with the same Idempotency Key), 5 repetitions each, unmodified code, on the parent commit (\`rf2-before-*\`) and on this change (\`rf2-after-*\`), each on a Postgres and Toxiproxy of its own. No Oracle was added.
+
+${mdTable(
+    ["variant", "load", "runs", "first pass, client sees 504 / none / 201 / 409", "replay with the same keys: 201 / 409", "runs where the replay ended with exactly one Booking per distinct seat set", "replay answers 410", "app exits", "Oracles 1–4 green"],
+    rows,
+  )}
+
+**Correctness violations in the after-runs: ${violations.length}.** The replay's \`201\` count is the number of Bookings the keys resolve to (Oracle 3 reads the same thing from stored state): one for \`hammer-seat\`, one per disjoint pair for \`deadlock-pairs\`. No replay answers \`410\` (that would be a tombstone found for a key never cancelled) and the unchanged replay path answers \`409\` to every loser, as before: the re-read finds no committed row under a *different* key.
+
+**What the fix costs.** One extra indexed statement on the **conflict path only** (the same \`UNION ALL\` lookup every mechanism already runs first; ADR-0030 measured it at about 2.6 µs server-side). Created, replayed, 404 and 503 outcomes pay nothing. In \`hammer-seat\` every loser is a conflict, so that is the worst case for the extra read, and it is what this table measures: no-Fault \`hammer-seat\` at concurrency 100, 5 repeats per report, the parent commit and this change run in alternation against the same Postgres (\`unique_constraint\`, which this change does not touch, is the noise control: its own before/after difference is the floor).
+
+${cost}`;
+}
+
+function renderRf2NoRegression(nr: { before: NoRegressionRow[]; after: NoRegressionRow[] }): string {
+  const mechs = uniq([...nr.before, ...nr.after].map((r) => r.strategy)).sort();
+  const avg = (rs: NoRegressionRow[], f: (r: NoRegressionRow) => number): number => (rs.length ? sum(rs.map(f)) / rs.length : NaN);
+  const pct = (a: number, b: number): string => (Number.isFinite(a) && Number.isFinite(b) && b !== 0 ? `${a >= b ? "+" : "−"}${Math.abs(((a - b) / b) * 100).toFixed(1)}%` : "—");
+  const rows: string[][] = [];
+  for (const mech of mechs) {
+    const b = nr.before.filter((r) => r.strategy === mech);
+    const a = nr.after.filter((r) => r.strategy === mech);
+    const bp50 = avg(b, (r) => r.p50Ms), ap50 = avg(a, (r) => r.p50Ms);
+    const bp99 = avg(b, (r) => r.p99Ms), ap99 = avg(a, (r) => r.p99Ms);
+    const brps = avg(b, (r) => r.throughputRps), arps = avg(a, (r) => r.throughputRps);
+    const reqs = (rs: NoRegressionRow[]) => sum(rs.map((r) => r.requests));
+    const t = (rs: NoRegressionRow[], k: string) => sum(rs.map((r) => r.tally[k] ?? 0));
+    rows.push([
+      `\`${mech}\`${mech === "unique_constraint" ? " *(unchanged: noise control)*" : ""}`,
+      `${sum(b.map((r) => r.repeats))} / ${sum(a.map((r) => r.repeats))}`,
+      `${fmtInt(reqs(b))} / ${fmtInt(reqs(a))}`,
+      `${t(b, "201")} / ${t(b, "409")} / ${t(b, "503")} / ${t(b, "other")} → ${t(a, "201")} / ${t(a, "409")} / ${t(a, "503")} / ${t(a, "other")}`,
+      [...b, ...a].some((r) => r.doubleBooked) ? "**YES**" : "no",
+      `${bp50.toFixed(1)} → ${ap50.toFixed(1)} (${pct(ap50, bp50)})`,
+      `${bp99.toFixed(1)} → ${ap99.toFixed(1)} (${pct(ap99, bp99)})`,
+      `${brps.toFixed(0)} → ${arps.toFixed(0)} (${pct(arps, brps)})`,
+    ]);
+  }
+  return mdTable(
+    ["mechanism", "repeats before / after", "requests before / after", "201 / 409 / 503 / other, before → after", "double-booked?", "mean p50 ms, before → after", "mean p99 ms, before → after", "mean throughput req/s, before → after"],
+    rows,
+  );
+}
+
 const R6_HEADER = ["variant", "runs", "requests", "client timeouts", "201 / 409 / 503 / 504", "median p95 / slowest request (ms)", "Oracles clean"];
 
 // Section L: the RF1 fix (#60, ADR-0030). The chaos Oracles never cancel a Booking and replay its
@@ -1787,13 +1878,17 @@ export interface ExhibitHInputs {
   r5NoRegression?: { before: NoRegressionRow[]; after: NoRegressionRow[] };
   // R6 (#59) no-regression rows (serializable only); read from `chaos/r6-nofault/`.
   r6NoRegression?: NoRegressionRow[];
+  // RF2 (#61) no-regression rows: the same no-Fault hammer-seat runs (concurrency 100, all six
+  // mechanisms) on the parent commit (`before`) and on the fix (`after`), same session; read from
+  // `chaos/rf2-nofault/{before,after}/`.
+  rf2NoRegression?: { before: NoRegressionRow[]; after: NoRegressionRow[] };
 }
 
-export function renderExhibitH({ reports: allReports, unitControls, noRegression = [], r5NoRegression, r6NoRegression = [] }: ExhibitHInputs): string {
+export function renderExhibitH({ reports: allReports, unitControls, noRegression = [], r5NoRegression, r6NoRegression = [], rf2NoRegression }: ExhibitHInputs): string {
   // Everything except section E and the headline's file count describes the
   // pre-fix evidence; the post-fix `r1-after` reruns (issue #53) are kept out
   // of it so no earlier number moves.
-  const all = allReports.filter((x) => !["r1-after", "r2-after", "r4-after", "r5-before", "r5-after", "r6", "r7-after", "rf1-before", "rf1-after"].includes(x.group));
+  const all = allReports.filter((x) => !["r1-after", "r2-after", "r4-after", "r5-before", "r5-after", "r6", "r7-after", "rf1-before", "rf1-after", "rf2-before", "rf2-after"].includes(x.group));
   const afterReports = reportsOf(inGroups(allReports, "r1-after"));
   const r4AfterReports = reportsOf(inGroups(allReports, "r4-after"));
   const r5BeforeReports = reportsOf(inGroups(allReports, "r5-before"));
@@ -1801,6 +1896,8 @@ export function renderExhibitH({ reports: allReports, unitControls, noRegression
   const r7AfterReports = inGroups(allReports, "r7-after");
   const rf1BeforeReports = reportsOf(inGroups(allReports, "rf1-before"));
   const rf1AfterReports = reportsOf(inGroups(allReports, "rf1-after"));
+  const rf2BeforeReports = reportsOf(inGroups(allReports, "rf2-before"));
+  const rf2AfterReports = reportsOf(inGroups(allReports, "rf2-after"));
   const afterCrashed = afterReports.filter(crashed).length;
   const c2u = reportsOf(inGroups(all, "c2-unmodified"));
   const c2s = reportsOf(inGroups(all, "c2-scaffolded"));
@@ -1974,6 +2071,10 @@ ${renderR7After(all, r7AfterReports)}
 
 ${renderRf1After(rf1BeforeReports, rf1AfterReports)}
 
+### M. After the RF2 fix (#61) — a refused claim re-reads its Idempotency Key before it is answered 409
+
+${renderRf2After(rf2BeforeReports, rf2AfterReports, rf2NoRegression)}
+
 ## Robustness findings — canonical numbering (R1–R7)
 
 C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); R1 has since been fixed (#53, section E) and the other six are not, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`).
@@ -1984,7 +2085,7 @@ Notes: **R1/R2** — a per-checkout \`client.on('error')\` is needed; \`pool.on(
 
 ### Formal-derived findings (RF1–RF2) — kept apart from R1–R7
 
-The formal track's crash / ambiguous-commit / idempotent-retry model (F4, #47, merged to \`main\` as 2f47207) exposed two behaviours of the *real* implementation that no chaos run observed. They are numbered **RF1–RF2** so they cannot be mistaken for chaos evidence: nothing in this table is computed from \`docs/evidence/chaos/*.json\`; the evidence is a TLC counterexample, documented in \`formal/README.md\` ("Findings: behavior the model exposes in the real implementation") and cited here. They are Robustness-class: neither fails a chaos Oracle, neither is a Correctness violation, and the "violated on purpose" configs in \`formal/check.sh\` pinned them. **RF1 has since been fixed (#60, ADR-0030, section L); its two configs are now positive checks and RF2's stays violated on purpose.** Filed as RF1 #60 and RF2 #61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`). The formal exhibit (G, F5) will present the model side; this exhibit only records that the two findings exist and why the chaos track could not have found them.
+The formal track's crash / ambiguous-commit / idempotent-retry model (F4, #47, merged to \`main\` as 2f47207) exposed two behaviours of the *real* implementation that no chaos run observed. They are numbered **RF1–RF2** so they cannot be mistaken for chaos evidence: nothing in this table is computed from \`docs/evidence/chaos/*.json\`; the evidence is a TLC counterexample, documented in \`formal/README.md\` ("Findings: behavior the model exposes in the real implementation") and cited here. They are Robustness-class: neither fails a chaos Oracle, neither is a Correctness violation, and the "violated on purpose" configs in \`formal/check.sh\` pinned them until each was fixed. **RF1 has since been fixed (#60, ADR-0030, section L) and RF2 too (#61, ADR-0031, section M); both findings' configs are now positive checks and their old behavior is kept as negative controls.** Filed as RF1 #60 and RF2 #61 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`). The formal exhibit (G, F5) will present the model side; this exhibit only records that the two findings exist and why the chaos track could not have found them.
 
 ${renderFormalFindings()}
 
@@ -2015,7 +2116,7 @@ ${renderClaims(claims)}
 - **One load shape per Fault family.** C1: \`deadlock-pairs\` only. C2: \`hammer-seat\` and \`deadlock-pairs\`, 60 clients, one short burst; the k6 client does not retry, so retry-storm behaviour under a Fault is not modelled. No \`spread-seats\` or isolation-pattern run under any Fault.
 - **C2's \`hammer-seat\` window is narrow** (losing requests fail in a few ms), so some timed Faults missed it: the "landed" counts in the tables show how many (e.g. \`partition-stall\` ${c2u.filter((r) => r.args.fault === "partition-stall" && landed(r)).length}/${c2u.filter((r) => r.args.fault === "partition-stall").length} unmodified). A "landed 0/n" cell would be vacuous; none occurs, but several are partial.
 - **App-SIGKILL is one kill per run**, and the restart (~650 ms) is the harness's, not a supervisor's.
-- **The two formal-derived findings (RF1, RF2) are invisible to these runs by construction.** The Oracles read *stored state after the Fault clears* (ADR-0022): a Booking recreated after Cancel under a reused key (RF1, as found) leaves one row, not two, and a spurious 409 on a same-key retry (RF2) is an HTTP answer about a Booking that does exist exactly once — HTTP responses are never evidence here. RF1 has since been fixed (#60, section L), pinned by deterministic tests and the model rather than by any Oracle. The chaos loads also never cancel a Booking and replay its key, and never issue a same-key retry that overlaps the original's commit. A clean chaos run therefore says nothing about either; they were found by model checking (F4) and are not reproduced by any run in this exhibit.
+- **The two formal-derived findings (RF1, RF2) are invisible to these runs by construction.** The Oracles read *stored state after the Fault clears* (ADR-0022): a Booking recreated after Cancel under a reused key (RF1, as found) leaves one row, not two, and a spurious 409 on a same-key retry (RF2) is an HTTP answer about a Booking that does exist exactly once — HTTP responses are never evidence here. RF1 and RF2 have since been fixed (#60, section L; #61, section M), each pinned by deterministic tests and the model rather than by any Oracle. The chaos loads also never cancel a Booking and replay its key, and never issue a same-key retry that overlaps the original's commit. A clean chaos run therefore says nothing about either; they were found by model checking (F4) and are not reproduced by any run in this exhibit.
 - **Holds under Fault: only \`pessimistic\`** (ADR-0017), only backend-kill, only 12–100 Holds per run. \`POST /holds\` retries have no ledger of fresh-hold keys, so there is no "exactly one Hold per key" Oracle yet.
 - **Control strength.** The end-to-end controls show the pipeline *detects* a violation under each Fault; for partition/SIGKILL the violation can come from the replay race rather than the faulted load. The C3 controls corrupt the scratch DB directly and prove the pipeline, not \`pessimistic\`.
 - **Unmodified vs scaffolded.** Unmodified runs mostly judge little (above); scaffolded runs judge a program that, as shipped, would have crashed. Neither is a production deployment with a process supervisor and timeouts.
@@ -2066,12 +2167,16 @@ npm run chaos:holds -- --mode hold-confirm --concurrency 40 --fault none --hold-
 # RF1 fix reruns (section L), after #60 (ADR-0030); before = the same command on the parent commit, label prefix rf1-before-:
 npx tsx load-harness/chaos/matrix.ts --mechanisms naive,unique_constraint,pessimistic,optimistic,advisory,serializable --loads hammer-seat --faults latency-above --reps 3 --survive-faults none --label-prefix rf1-after- --toxiproxy-api http://localhost:8475
 npx vitest run test/idempotencyKeyRetention.test.ts     # RF1's deterministic evidence (book -> cancel -> retry, hold -> reap -> retry, the insert guard)
+# RF2 fix reruns (section M), after #61 (ADR-0031); before = the same command in a checkout of the parent commit, label prefix rf2-before-:
+npx tsx load-harness/chaos/matrix.ts --mechanisms pessimistic --loads hammer-seat,deadlock-pairs --faults latency-above --reps 5 --survive-faults none --label-prefix rf2-after- --toxiproxy-api http://localhost:8475
+BOOKING_STRATEGY=<mechanism> npm run harness -- --base-url http://localhost:3000 --pattern hammer-seat --concurrency 100 --repeat 5   # cost; parent commit and fix alternated, 8 rounds, six mechanisms; move the reports to docs/evidence/chaos/rf2-nofault/{before,after}/
+npx vitest run test/strategies   # RF2's deterministic evidence: runIdempotencyKeyRaceContractTests (all six mechanisms) and runHoldKeyRaceContractTests
 npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json
 npx vitest run test/chaos                              # the unit controls
 \`\`\`
 
 ## Next step
 
-Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are filed as fix tickets #53–#61 (RF1 #60 is fixed, section L) (drafts in \`docs/phase6-robustness-ticket-drafts.md\`), which satisfies the umbrella's "every Robustness finding is listed with a follow-up issue link". Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out.
+Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are filed as fix tickets #53–#61 (RF1 #60 is fixed, section L; RF2 #61 is fixed, section M) (drafts in \`docs/phase6-robustness-ticket-drafts.md\`), which satisfies the umbrella's "every Robustness finding is listed with a follow-up issue link". Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out.
 `;
 }

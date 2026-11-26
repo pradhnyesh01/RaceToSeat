@@ -3,7 +3,7 @@ import type { FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.js";
 import { runReaperSweep } from "../src/reaper.js";
-import { createHold, expireHold, resetDb, seedEventWithSeats } from "./testDb.js";
+import { createHold, expireHold, interceptQuery, resetDb, seedEventWithSeats } from "./testDb.js";
 
 // Shared behavioural contract for hold creation, mirroring bookingContract.ts's
 // runBookingContractTests shape and seam (HTTP in, HTTP + DB state out) —
@@ -504,6 +504,134 @@ export function runHoldKeyReleaseContractTests(strategyLabel: string, createApp:
       expect(seatRes.rows[0]).toMatchObject({ status: "booked" });
       const bookingsRes = await pool.query("SELECT 1 FROM bookings");
       expect(bookingsRes.rows).toHaveLength(1);
+    });
+  });
+}
+
+// RF2 (issue #61, ADR-0031), the Hold half of runIdempotencyKeyRaceContractTests
+// (bookingContract.ts): a same-key POST /holds retry that races the original's
+// commit replays it instead of being told 409. Same staging: the original
+// (a real POST /holds through the same app) commits right after the retry's own
+// key lookup returned empty.
+export function runHoldKeyRaceContractTests(
+  strategyLabel: string,
+  createApp: () => FastifyInstance,
+  withHeldSeat: <T>(lockSeatId: string, fn: () => Promise<T>) => Promise<T>,
+): void {
+  describe(`POST /holds (${strategyLabel} strategy) — same-key retry racing the original (RF2)`, () => {
+    beforeEach(resetDb);
+
+    async function retryWhileOriginalCommitsAfterLookup(app: FastifyInstance, originalPayload: object, retryPayload: object) {
+      let original: Awaited<ReturnType<FastifyInstance["inject"]>> | undefined;
+      const intercept = interceptQuery(
+        "SELECT 'live'",
+        async () => {
+          original = await app.inject({ method: "POST", url: "/holds", payload: originalPayload });
+        },
+        (result) => (result as { rows: unknown[] }).rows.length === 0,
+      );
+      let retry;
+      try {
+        retry = await app.inject({ method: "POST", url: "/holds", payload: retryPayload });
+      } finally {
+        intercept.restore();
+      }
+      expect(intercept.wasTriggered()).toBe(true);
+      return { original: original!, retry };
+    }
+
+    it("replays the original Hold when it commits between the retry's key lookup and its lock", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+
+      const { original, retry } = await retryWhileOriginalCommitsAfterLookup(app, payload, payload);
+
+      expect(original.statusCode).toBe(201);
+      expect(retry.statusCode).toBe(201);
+      expect(retry.json()).toMatchObject({
+        id: (original.json() as { id: string }).id,
+        seat_ids: [seatIdsByLabel.A1],
+      });
+      expect((await pool.query("SELECT 1 FROM holds")).rows).toHaveLength(1);
+    });
+
+    it("still answers 409 when the winner of the same seat carries a DIFFERENT key", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const winner = { seat_ids: [seatIdsByLabel.A1], user_id: "user-2", idempotency_key: randomUUID() };
+      const loser = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+
+      const { original, retry } = await retryWhileOriginalCommitsAfterLookup(app, winner, loser);
+
+      expect(original.statusCode).toBe(201);
+      expect(retry.statusCode).toBe(409);
+      expect((await pool.query("SELECT idempotency_key FROM holds")).rows).toEqual([{ idempotency_key: winner.idempotency_key }]);
+    });
+
+    it("still answers 409 with no replay while the original is in flight (its seat lock held, nothing committed)", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+
+      const retry = await withHeldSeat(seatIdsByLabel.A1!, () => app.inject({ method: "POST", url: "/holds", payload }));
+
+      expect(retry.statusCode).toBe(409);
+      expect((await pool.query("SELECT 1 FROM holds")).rows).toHaveLength(0);
+    });
+
+    it("replays a COMMITTED original even while a concurrent Confirm of that very Hold holds the seat's lock", async () => {
+      // The lock-failure half: the Hold exists (key committed), and an in-flight Confirm
+      // (or any transaction) holds its seats' row locks, so the retry's NOWAIT fails. The
+      // retry's lookup is made to miss by keeping the original uncommitted until after it.
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const seatId = seatIdsByLabel.A1!;
+      const app = createApp();
+      const key = randomUUID();
+
+      const original = await pool.connect();
+      await original.query("BEGIN");
+      const { rows } = await original.query<{ id: string }>("INSERT INTO holds (idempotency_key) VALUES ($1) RETURNING id", [key]);
+      const holdId = rows[0]!.id;
+      await original.query("INSERT INTO hold_seats (hold_id, seat_id) VALUES ($1, $2)", [holdId, seatId]);
+      await original.query(
+        "UPDATE seats SET status = 'held', booked_by = 'user-1', held_until = now() + interval '5 minutes', version = version + 1 WHERE id = $1",
+        [seatId],
+      );
+
+      let retryAnswered!: () => void;
+      const retryDone = new Promise<void>((resolve) => (retryAnswered = resolve));
+      let holder: Promise<unknown> | undefined;
+      const intercept = interceptQuery(
+        "SELECT 'live'",
+        async () => {
+          await original.query("COMMIT");
+          original.release();
+          await new Promise<void>((held) => {
+            holder = withHeldSeat(seatId, async () => {
+              held();
+              await retryDone;
+            });
+          });
+        },
+        (result) => (result as { rows: unknown[] }).rows.length === 0,
+      );
+      let retry;
+      try {
+        retry = await app.inject({
+          method: "POST",
+          url: "/holds",
+          payload: { seat_ids: [seatId], user_id: "user-1", idempotency_key: key },
+        });
+      } finally {
+        intercept.restore();
+        retryAnswered();
+        await holder;
+      }
+
+      expect(intercept.wasTriggered()).toBe(true);
+      expect(retry.statusCode).toBe(201);
+      expect(retry.json()).toMatchObject({ id: holdId });
     });
   });
 }

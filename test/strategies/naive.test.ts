@@ -6,6 +6,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyRaceContractTests,
   runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
@@ -18,6 +19,7 @@ runBookingContractTests("naive", createApp);
 runBookingConcurrencyContractTest("naive", createApp);
 runMultiSeatBookingContractTests("naive", createApp);
 runIdempotencyKeyReleaseContractTest("naive", createApp);
+runIdempotencyKeyRaceContractTests("naive", createApp);
 
 // Holds naive's own write statement — the UPDATE seats SET status = 'booked'
 // ... it runs once its (unguarded) availability read passes — open and

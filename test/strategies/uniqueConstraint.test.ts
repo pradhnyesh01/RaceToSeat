@@ -7,6 +7,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyRaceContractTests,
   runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
@@ -19,6 +20,7 @@ runBookingContractTests("unique_constraint", createApp);
 runBookingConcurrencyContractTest("unique_constraint", createApp);
 runMultiSeatBookingContractTests("unique_constraint", createApp);
 runIdempotencyKeyReleaseContractTest("unique_constraint", createApp);
+runIdempotencyKeyRaceContractTests("unique_constraint", createApp);
 
 // Holds this mechanism's own distinguishing write — the INSERT INTO
 // booking_seats ... ON CONFLICT (seat_id) DO NOTHING that is the sole

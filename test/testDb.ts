@@ -138,8 +138,11 @@ export function interceptQuery(
   const originalConnect = pool.connect.bind(pool);
   let triggered = false;
 
-  (pool as unknown as { connect: typeof pool.connect }).connect = (async () => {
-    const client = await originalConnect();
+  // Both call shapes pg-pool's connect() has: promise-returning, and callback-taking (which
+  // pool.query() itself uses internally — a promise-only patch would leave every pool.query()
+  // made while an intercept is active waiting forever for a callback that never fires, e.g.
+  // pessimistic's 404-before-409 existence check on its NOWAIT-failure path).
+  const wrap = (client: PoolClient): PoolClient => {
     const originalQuery = client.query.bind(client);
     (client as unknown as { query: unknown }).query = async (...queryArgs: unknown[]) => {
       const result = await (originalQuery as (...args: unknown[]) => Promise<unknown>)(...queryArgs);
@@ -154,7 +157,17 @@ export function interceptQuery(
       return result;
     };
     return client;
-  }) as typeof pool.connect;
+  };
+
+  (pool as unknown as { connect: unknown }).connect = ((callback?: unknown) => {
+    if (typeof callback === "function") {
+      return (originalConnect as unknown as (cb: unknown) => void)(
+        (err: Error | undefined, client: PoolClient | undefined, done: () => void) =>
+          (callback as (...args: unknown[]) => void)(err, client && wrap(client), done),
+      );
+    }
+    return originalConnect().then(wrap);
+  }) as unknown;
 
   return {
     restore: () => {

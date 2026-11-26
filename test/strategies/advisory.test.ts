@@ -7,6 +7,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyRaceContractTests,
   runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
@@ -20,6 +21,7 @@ runBookingContractTests("advisory", createApp);
 runBookingConcurrencyContractTest("advisory", createApp);
 runMultiSeatBookingContractTests("advisory", createApp);
 runIdempotencyKeyReleaseContractTest("advisory", createApp);
+runIdempotencyKeyRaceContractTests("advisory", createApp, withHeldSeatLock);
 
 // Holds the exact advisory-lock key the strategy would derive for
 // `lockSeatId` open in an uncommitted transaction on a separate connection,

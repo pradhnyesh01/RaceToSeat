@@ -1,7 +1,12 @@
 import type { PoolClient } from "pg";
 import { SerializationRetriesExhaustedError, pool, withSerializableTransaction } from "../db/pool.js";
 import { isUniqueViolation } from "../db/pgErrors.js";
-import { findPriorBookingForKey, normalizeSeatIds, resolveIdempotencyKeyRace } from "./idempotency.js";
+import {
+  findPriorBookingForKey,
+  normalizeSeatIds,
+  replayInsteadOfConflict,
+  resolveIdempotencyKeyRace,
+} from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -44,7 +49,7 @@ export async function bookSeatSerializable(
     const seatIds = normalizeSeatIds(input.seatIds);
 
     try {
-      return await withSerializableTransaction(
+      const result = await withSerializableTransaction<BookSeatResult>(
         client,
         async (txClient, attempt) => {
           // The whole requested set's existence is checked in one query
@@ -99,6 +104,10 @@ export async function bookSeatSerializable(
         (result) => result.kind === "created",
         { maxRetries: options.maxRetries },
       );
+      // RF2 (ADR-0031): the transaction's snapshot may postdate a same-key original's commit
+      // (it sees the seat booked and answers conflict) - re-read the key, on `client` after the
+      // transaction ended (a plain READ COMMITTED statement, outside SSI), before answering 409.
+      return await replayInsteadOfConflict(client, input.idempotencyKey, result);
     } catch (err) {
       if (err instanceof SerializationRetriesExhaustedError) {
         return { kind: "retry_exhausted", retries: err.retries };

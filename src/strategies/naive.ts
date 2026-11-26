@@ -1,7 +1,12 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
 import { isUniqueViolation } from "../db/pgErrors.js";
-import { findPriorBookingForKey, normalizeSeatIds, runDeadlockRetryBooking } from "./idempotency.js";
+import {
+  findPriorBookingForKey,
+  normalizeSeatIds,
+  replayInsteadOfConflict,
+  runDeadlockRetryBooking,
+} from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -54,7 +59,12 @@ export async function bookSeatNaive(input: BookSeatInput): Promise<BookSeatResul
       return { kind: "not_found" };
     }
     if (seatRes.rows.some((seat) => seat.status !== "available")) {
-      return { kind: "conflict" };
+      // RF2 (ADR-0031): this unlocked read, not the transaction below, is where a same-key
+      // retry whose original committed after the lookup above is refused - re-read the key
+      // before answering 409. (The in-transaction conflict further down cannot be spurious:
+      // the same-key bookings INSERT precedes the booking_seats one, so it trips on the
+      // original's key first and resolves to a replay.)
+      return await replayInsteadOfConflict(client, input.idempotencyKey, { kind: "conflict" });
     }
 
     return await runDeadlockRetryBooking(

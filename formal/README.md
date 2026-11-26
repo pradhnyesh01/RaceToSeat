@@ -276,7 +276,8 @@ over every combination (15,588 initial states). A client can confirm only a Hold
 | Spec action | Implementation |
 |---|---|
 | `Begin` | the fast-path `findPrior{Booking,Hold}ForKey` (`idempotency.ts`): a committed row with this key → replay; an unexpired **tombstone** for it (its Booking/Hold was released: `KeyReleased`) → `410 key_released` (RF1 fix, ADR-0030). No transaction either way |
-| `Lock` | `SELECT … FOR UPDATE NOWAIT` (`pessimistic.ts`, `pessimisticHold.ts`): a seat locked by another open transaction, or not `available` → 409 |
+| `Lock` | `SELECT … FOR UPDATE NOWAIT` (`pessimistic.ts`, `pessimisticHold.ts`): a seat locked by another open transaction, or not `available` → *refused* (`pc = refused`), not yet answered |
+| `Recheck` | **RF2 fix (#61, ADR-0031).** Before a refusal is answered 409 the key is read once more, on a fresh read taken after the refusal was observed (`replayInsteadOfConflict` / `replayHoldInsteadOfConflict`): a committed row with it → `late_replay`; a tombstone → `released` (410); neither → 409 |
 | `InsertKey` | `INSERT INTO bookings\|holds (idempotency_key)`: an uncommitted same-key row **blocks** the insert (unique-index wait); a committed one → unique violation → `resolveIdempotencyKeyRace` → replay; a tombstoned key (released since this attempt's lookup) → the `BEFORE INSERT` guard trigger raises a unique violation → the same fallback → `race_released` (410) |
 | `Commit` | `COMMIT` — the rows and the `seats` UPDATE become visible together; durable from here |
 | `Ack` | the 201 reaches the client |
@@ -298,6 +299,7 @@ at any time, so a retry may follow a crashed attempt, overlap an in-flight one, 
 | `NoOrphanState` | **fault assumption 1** — a dead backend leaves no row lock and no in-flight key row |
 | `CommittedPersists` | **fault assumption 2** — whatever committed (acknowledged *or* ambiguous) is still there unless Cancel / Confirm / the Reaper legitimately removed it |
 | `CleanConflict`, `AmbiguousRetryNotRefused`, `ConfirmNeverFalselyRefused` | a retry that overlapped no other same-key attempt is never answered 409/404 while a committed row carries its key — after an ambiguous commit it **replays**; a confirm is never falsely refused even when it overlaps |
+| `KeyNeverFalselyRefused` | **RF2 (#61), now positive** (`CrashFindingSpuriousConflict`): *no* book / hold attempt is answered 409 while a committed row carries its key at the moment the 409 is decided, whether or not it overlapped another same-key attempt. Stronger than `CleanConflict` (which exempts overlapping retries); it was false before the re-read, see Findings |
 | `KeyReuseOnlyAfterRelease` | the weak statement of key lifetime: a second durable Booking/Hold for one key exists only after the first was cancelled / reaped / confirmed (what the UNIQUE column alone gives) |
 | `BookingKeyCreatesAtMostOne`, `HoldKeyCreatesAtMostOne` | **RF1 (#60), now positive** (`CrashFindingKeyReuse`, `CrashFindingHoldKeyReuse`): the strong, history-based statement — a key creates at most one Booking/Hold *ever* (within the retention window, which is not modeled). It was false before the tombstone; see Findings |
 
@@ -319,6 +321,8 @@ about Postgres, which is exactly what chaos tickets C1/C3/C4 test empirically.
 | `CrashForgetKeysHold` | same, for Holds (hold, expire, reap, retry: a second Hold) | `HoldKeyCreatesAtMostOne` | 11 |
 | `CrashNoInsertGuard` | tombstones and the lookup, but no insert-time guard (`GuardMode = off`): the lookup-then-insert window — a same-key retry passes its lookup, the original books, commits and is cancelled, and only then does the retry insert | `BookingKeyCreatesAtMostOne` | 10 |
 | `CrashNoInsertGuardHold` | same, for Holds | `HoldKeyCreatesAtMostOne` | 11 |
+| `CrashNoRecheck` | **RF2 as it was**: a refusal is answered 409 straight from the lock observation, the key last read at `Begin` (`RecheckMode = none`) | `KeyNeverFalselyRefused` | 7 |
+| `CrashRecheckTakenOnly` | the re-read only follows a refusal caused by a *taken seat*, not one caused by a lock another transaction holds (`RecheckMode = taken`) | `KeyNeverFalselyRefused` | 9 |
 | `CrashLiveNoFairness` | no fairness: a retry may simply never start | `RetryAfterCrashAnswers` (exit 13) | 9 |
 | `CrashLiveKeepPending` | a crashed backend's in-flight key row is never released: the retry waits forever | TLC `Deadlock reached` (exit 11) | 7 |
 
@@ -338,7 +342,7 @@ against duplicates and the **first** line of defence for the *answer* a retry ge
 ## Vacuity guards (`CrashWitness*.cfg`, must be violated)
 
 `NoAmbiguousCommit` (durable and unacknowledged is reachable) · `NoReplayAfterAmbiguousBooking` / `…Hold` /
-`…Confirm` (a retry replays after an ambiguous commit, for each endpoint) · `NoKeyRaceReplay` (the
+`…Confirm` (a retry replays after an ambiguous commit, for each endpoint) · `NoLateReplay` / `NoLateReplayWhileLocked` (the RF2 re-read turns a refusal into a replay, including while another transaction holds the seats' locks) · `NoKeyRaceReplay` (the
 lookup-then-insert race ends in a unique violation resolved to a replay) · `NoReleasedBooking` / `NoReleasedHold` (a stale retry after Cancel / Confirm / reap is answered *released*) · `NoReleasedRace` (…including when it only learns so at the insert, through the guard) · `NoWaitOnKeyRow` (an insert really
 waits on another transaction's in-flight same-key row) · `NoUnblockedByCrash` (a PROPERTY: a waiter is
 released by the holder's crash *before commit* and then proceeds) · `NoSeatReuseAfterMidCrash` (a crash with
@@ -365,8 +369,8 @@ Checked at a reduced scope (see Bounds). Controls: `CrashLiveNoFairness` and `Cr
 
 Two findings came out of this model. Neither broke a chaos Oracle (ADR-0022 reads stored state after the Fault
 clears), so neither is a Correctness violation; they are Robustness-class observations about what a retry can be
-told. **RF1 is fixed (#60, ADR-0030) and its configs are now positive checks; RF2 is open and stays violated on
-purpose** (`CrashFindingSpuriousConflict`).
+told. **Both are now fixed — RF1 by #60 (ADR-0030), RF2 by #61 (ADR-0031) — and both finding configs are positive
+checks**; the old behavior of each is kept as negative controls.
 
 1. **RF1 — idempotency record lifetime was row lifetime (FIXED, #60, ADR-0030).** The key's only home was the
    `bookings` / `holds` row (`idempotency_key … UNIQUE`), and ADR-0020 deletes that row on Cancel, Confirm and
@@ -391,18 +395,30 @@ purpose** (`CrashFindingSpuriousConflict`).
    infinite-retention abstraction; a key reused after retention is by design a new attempt. The confirm path
    is unchanged (it never consults tombstones: a confirm retried after its Booking was cancelled still answers
    404, because the Hold id is a resolved capability, not a client key).
-2. **RF2 — a concurrent same-key book/hold attempt can be told 409 although its key's row is committed**
-   (`CrashFindingSpuriousConflict`, trace 7). `bookSeatPessimistic` / `holdSeatsPessimistic` do their key lookup
-   *before* `BEGIN`; if the original commits between that lookup and the retry's `FOR UPDATE NOWAIT`, the retry's
-   lock succeeds, sees the seat taken, and answers 409 (`conflict`) — not a replay. (If the original is still in
-   flight, `NOWAIT` fails immediately: also 409, but then no row is committed yet.) If the original's ack is lost
-   too, the client's only answer is a 409 for a request that succeeded; it takes *another* retry — which then
-   overlaps nothing and replays (`CleanConflict`) — to learn the truth. `resolveIdempotencyKeyRace` (unique
-   violation → replay) does not catch it: under `pessimistic` that path is reachable only when a same-key retry
-   wants *different* seats (`CrashWitnessKeyRace`), because for the same seats `NOWAIT` / the status check refuses
-   first. **The confirm path is not affected** (`ConfirmNeverFalselyRefused` holds): `confirmHoldPessimistic`
-   repeats the key lookup *inside* the transaction, after its locks, when the Hold's rows are gone — that is the
-   `CLockGone` branch, and it is what the book/hold paths lack.
+2. **RF2 — a concurrent same-key book/hold attempt could be told 409 although its key's row is committed
+   (FIXED, #61, ADR-0031).** `bookSeatPessimistic` / `holdSeatsPessimistic` did their key lookup *before* `BEGIN`;
+   if the original committed between that lookup and the retry's `FOR UPDATE NOWAIT`, the retry's lock
+   succeeded, saw the seat taken, and answered 409 (`conflict`) — not a replay (`CrashNoRecheck`, trace 7, the
+   old `CrashFindingSpuriousConflict`). (If the original is still in flight, `NOWAIT` fails immediately: also
+   409, but then no row is committed yet, and that stays.) If the original's ack was lost too, the client's only
+   answer was a 409 for a request that succeeded; it took *another* retry — which then overlapped nothing and
+   replayed (`CleanConflict`) — to learn the truth. `resolveIdempotencyKeyRace` (unique violation → replay) does
+   not catch it: under `pessimistic` that path is reachable only when a same-key retry wants *different* seats
+   (`CrashWitnessKeyRace`), because for the same seats `NOWAIT` / the status check refuses first. The confirm path
+   was never affected (`ConfirmNeverFalselyRefused`): `confirmHoldPessimistic` repeats the key lookup *inside*
+   the transaction, after its locks, when the Hold's rows are gone — the `CLockGone` branch.
+   **The decision (ADR-0031):** re-read the key once, on a fresh read, before *any* refusal is answered
+   (`Recheck`; `RecheckMode`), rather than copying confirm's in-transaction lookup. The model is why: with the
+   re-read applied only to a refusal caused by a taken seat — what a lookup after a *successful* `NOWAIT` could
+   cover — `KeyNeverFalselyRefused` is still violated (`CrashRecheckTakenOnly`, trace 9): a retry's `NOWAIT` can
+   fail on a lock an unrelated transaction holds (a concurrent Confirm of that Hold, or a losing attempt's
+   transient lock, O1) while its key is already committed. So the re-read follows both kinds of refusal. With it
+   `KeyNeverFalselyRefused` holds over the whole graph (`CrashFindingSpuriousConflict`, now a positive check, the
+   name kept so the ticket's references resolve); `CrashWitnessLateReplay` / `…Locked` show the new answer is
+   reached, in the locked case too. Not modeled: the other five mechanisms (the model is `pessimistic`'s); ADR-0031
+   surveys them by code and by deterministic test, and `unique_constraint` is the one that cannot answer a
+   spurious 409. A crash at the `refused` step is not a separate action: the attempt holds no locks and has
+   written nothing there, so it is a crash at `begun`.
 
 Positive results worth stating plainly: a retry after an ambiguous commit replays for all three endpoints
 (`CrashWitnessReplay*`); crash before commit leaves no row, lock or pending key behind (`NoOrphanState`);
@@ -435,9 +451,9 @@ reduced for the safety run.**
 
 | Run | Distinct states | Notes |
 |---|---|---|
-| `CrashSafety` (also `CrashFindingKeyReuse`, `CrashFindingHoldKeyReuse`: same graph, different invariant) | 406,434 (1,235,303 generated; 521,770 / 1,602,484 before #60 — the tombstone forbids the key-reuse histories, so the graph shrank) | symmetry over attempts, seats and keys (`SYMMETRY Sym`; sound for safety only) |
+| `CrashSafety` (also `CrashFindingKeyReuse`, `CrashFindingHoldKeyReuse`, `CrashFindingSpuriousConflict`: same graph, different invariant) | 484,716 (1,478,347 generated; 406,434 / 1,235,303 before #61 — the `refused` step adds a state per refusal; 521,770 / 1,602,484 before #60) | symmetry over attempts, seats and keys (`SYMMETRY Sym`; sound for safety only) |
 | same, **no symmetry** | 33,000,288 (100,376,208 generated), 6 min 29 s — **F4's figure, not recomputed after #60** | exhaustive cross-check of the reduction; not part of `check.sh` |
-| `CrashLiveRecovery` | 251,397 (572,904 generated; 354,291 / 833,760 before #60) | **reduced**: 2 seats, 1 key, 1 Fault, `Cancel` off, no symmetry (TLC's symmetry reduction is unsound for liveness). 3 attempts kept — the recovery shape needs a crashed attempt, a retry and a possible third party. |
+| `CrashLiveRecovery` | 317,793 (752,034 generated; 251,397 / 572,904 before #61; 354,291 / 833,760 before #60) | **reduced**: 2 seats, 1 key, 1 Fault, `Cancel` off, no symmetry (TLC's symmetry reduction is unsound for liveness). 3 attempts kept — the recovery shape needs a crashed attempt, a retry and a possible third party. |
 
 The liveness scope was reduced because the full graph carries a liveness check's per-state cost; the
 reduction removes dimensions orthogonal to recovery (extra seat and key identities, `Cancel`, a second Fault)
