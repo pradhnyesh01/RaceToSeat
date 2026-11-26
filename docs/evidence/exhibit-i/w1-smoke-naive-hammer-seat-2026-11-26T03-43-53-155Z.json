@@ -1,0 +1,149 @@
+{
+  "label": "w1-smoke-naive-hammer-seat",
+  "ranAt": "2026-11-26T03:43:53.155Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "none",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": false,
+    "label": "w1-smoke-naive-hammer-seat",
+    "outDir": "docs/evidence/exhibit-i",
+    "appPort": 3100,
+    "proxyPort": 5434,
+    "toxiproxyApi": "",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "008096d2-ddd7-4dac-9042-8888162010f9",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 9,
+    "peakOpenTx": 6,
+    "peakIdleInTx": 1,
+    "peakLockHolders": 5,
+    "maxOpenTxAgeMs": 43,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 3,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 9,
+    "bookingsAnsweredWith201": 9,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-ab20806a",
+  "k6": {
+    "statusTally": {
+      "201": 9,
+      "409": 51
+    },
+    "transportErrors": {},
+    "durationMs": 470,
+    "maxRequestMs": 89,
+    "p50RequestMs": 84,
+    "p95RequestMs": 88,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 9,
+      "409": 51
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 8f51f4d5-1808-4e1c-9387-1b4cc2d68b90 is claimed by 9 bookings",
+          "seatIds": [
+            "8f51f4d5-1808-4e1c-9387-1b4cc2d68b90"
+          ],
+          "bookingIds": [
+            "042cbfc4-3029-4bea-89fd-b9d547e7bc14",
+            "25961465-0f89-4ab6-845c-5ed5803d79f2",
+            "3f27a45e-3270-407d-aadc-405daa8e583d",
+            "6f6c8c81-3fbd-49b1-8690-5587b65d9468",
+            "719b5d51-fcc1-4abe-a9f9-06474d54eccc",
+            "a7a666d8-0e6b-4eeb-a534-a91c3910a7b8",
+            "aede96e1-6b28-4258-b3ae-ed8c3402ca96",
+            "c3c5507b-f90e-4842-a263-e6b514669d8a",
+            "e0281b6a-f393-41e7-a908-631c21f54348"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

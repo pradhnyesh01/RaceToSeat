@@ -1,0 +1,130 @@
+{
+  "label": "w1-smoke-optimistic-hammer-seat",
+  "ranAt": "2026-11-26T03:43:59.703Z",
+  "args": {
+    "strategy": "optimistic",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "none",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": false,
+    "label": "w1-smoke-optimistic-hammer-seat",
+    "outDir": "docs/evidence/exhibit-i",
+    "appPort": 3100,
+    "proxyPort": 5434,
+    "toxiproxyApi": "",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "802b6439-86d5-4514-877a-0d3946decb38",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 9,
+    "peakOpenTx": 54,
+    "peakIdleInTx": 50,
+    "peakLockHolders": 2,
+    "maxOpenTxAgeMs": 35,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 3,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 1,
+    "bookingsAnsweredWith201": 1,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-caf69184",
+  "k6": {
+    "statusTally": {
+      "201": 1,
+      "409": 59
+    },
+    "transportErrors": {},
+    "durationMs": 423,
+    "maxRequestMs": 83,
+    "p50RequestMs": 80,
+    "p95RequestMs": 82,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": []
+}

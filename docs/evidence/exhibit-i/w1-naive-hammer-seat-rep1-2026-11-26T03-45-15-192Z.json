@@ -1,0 +1,157 @@
+{
+  "label": "w1-naive-hammer-seat-rep1",
+  "ranAt": "2026-11-26T03:45:15.192Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "none",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": false,
+    "label": "w1-naive-hammer-seat-rep1",
+    "outDir": "docs/evidence/exhibit-i",
+    "appPort": 3100,
+    "proxyPort": 5434,
+    "toxiproxyApi": "",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "fb3a6b9a-c4c0-4df0-a925-84a49516a3a0",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 10,
+    "peakOpenTx": 20,
+    "peakIdleInTx": 4,
+    "peakLockHolders": 15,
+    "maxOpenTxAgeMs": 19,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 5,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 17,
+    "bookingsAnsweredWith201": 17,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-aa038e39",
+  "k6": {
+    "statusTally": {
+      "201": 17,
+      "409": 43
+    },
+    "transportErrors": {},
+    "durationMs": 491,
+    "maxRequestMs": 73,
+    "p50RequestMs": 66,
+    "p95RequestMs": 72,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 17,
+      "409": 43
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat bf2df0ba-c815-4968-b9bb-2ac6ce9606fd is claimed by 17 bookings",
+          "seatIds": [
+            "bf2df0ba-c815-4968-b9bb-2ac6ce9606fd"
+          ],
+          "bookingIds": [
+            "12aea0f8-a354-424a-9f63-208dcfaa532f",
+            "2fba5ed7-dea7-4ebf-af81-4c73d94237b4",
+            "4d0a3bfc-b9b7-4341-b6b3-86246ccf8e74",
+            "530efd55-f3a6-468d-a5b9-9921a80c499a",
+            "56c991b5-23e7-4cd4-b8c4-308d1e32ae26",
+            "5aa5f843-2cc8-486f-8ff5-5fad08743317",
+            "6c072e1c-3227-421f-ab90-578bc11f2ceb",
+            "8399d2fb-2b95-4459-a7c4-2e6bb295472a",
+            "8cec86f7-d78f-4766-872d-d5fe7b3232c0",
+            "9b6f40ff-d0be-49e5-9f0a-da72d3dd76ac",
+            "b7d43857-fe58-4481-a310-f2d400951c10",
+            "b95263e8-b7f1-482c-8c17-d77517aa6c80",
+            "bd02d811-2510-4336-8caf-1aa90fad0038",
+            "c5a5d03d-f168-4cec-a5c5-05540858c7ee",
+            "d3b2141f-cc3a-4189-a949-92409a0b29e4",
+            "e396da59-e57a-4b3b-9745-397e60fde4e3",
+            "e784214a-5d63-4cd6-9ce4-9c471bf1b220"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

@@ -1,0 +1,527 @@
+{
+  "label": "w1-naive-deadlock-pairs-rep2",
+  "ranAt": "2026-11-26T03:46:13.423Z",
+  "args": {
+    "strategy": "naive",
+    "load": "deadlock-pairs",
+    "concurrency": 30,
+    "fault": "none",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": false,
+    "label": "w1-naive-deadlock-pairs-rep2",
+    "outDir": "docs/evidence/exhibit-i",
+    "appPort": 3100,
+    "proxyPort": 5434,
+    "toxiproxyApi": "",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "00b5e0f3-3e5e-4b19-8778-f565f93dfee6",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 8,
+    "peakOpenTx": 9,
+    "peakIdleInTx": 7,
+    "peakLockHolders": 8,
+    "maxOpenTxAgeMs": 12,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 5,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 48,
+    "bookingsAnsweredWith201": 48,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-ae19a2d1",
+  "k6": {
+    "statusTally": {
+      "201": 48,
+      "409": 12
+    },
+    "transportErrors": {},
+    "durationMs": 425,
+    "maxRequestMs": 82,
+    "p50RequestMs": 75,
+    "p95RequestMs": 82,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 48,
+      "409": 12
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 0b64e33a-ea65-4b63-be52-2c1b083f0657 is claimed by 2 bookings",
+          "seatIds": [
+            "0b64e33a-ea65-4b63-be52-2c1b083f0657"
+          ],
+          "bookingIds": [
+            "0efedbb7-efd0-40bf-ada8-b140b2c3ca36",
+            "d749a994-7293-40a0-93d2-8abdb14cd447"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 1003ba5f-897d-4f59-84d4-b5fc6be504d2 is claimed by 2 bookings",
+          "seatIds": [
+            "1003ba5f-897d-4f59-84d4-b5fc6be504d2"
+          ],
+          "bookingIds": [
+            "bacd8a84-902d-4b38-97a9-6d323e09ba04",
+            "eb0a2def-d8cd-457e-838b-ba41b3ff2b1d"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 14cdcb80-2d59-4c6a-af27-d934f1df7bde is claimed by 2 bookings",
+          "seatIds": [
+            "14cdcb80-2d59-4c6a-af27-d934f1df7bde"
+          ],
+          "bookingIds": [
+            "075fb60e-1f00-42e8-88e3-e47eb28b8cc4",
+            "abf66a7f-4172-49e6-a434-cac6a5e5597d"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 1dbf0a23-7d1e-449d-9647-cd106575640b is claimed by 2 bookings",
+          "seatIds": [
+            "1dbf0a23-7d1e-449d-9647-cd106575640b"
+          ],
+          "bookingIds": [
+            "57562082-3acc-4392-8d3d-bb4ae3078f9f",
+            "6e5de9be-1506-498e-9eff-603e002d83ce"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 5d291d9e-31c3-46c9-85af-48789aa4498d is claimed by 2 bookings",
+          "seatIds": [
+            "5d291d9e-31c3-46c9-85af-48789aa4498d"
+          ],
+          "bookingIds": [
+            "b1ac4b60-4924-4423-a323-995a7a1fad39",
+            "b693d28c-bfc4-4fb4-95d7-a35a9e34fc66"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 672be001-2460-4129-95f2-fbdfb6505fd4 is claimed by 2 bookings",
+          "seatIds": [
+            "672be001-2460-4129-95f2-fbdfb6505fd4"
+          ],
+          "bookingIds": [
+            "4496d489-0d9e-41e0-aaf4-a1f29bbe252a",
+            "7c267503-4fae-4f51-a06c-409c7f726bc4"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 6a6db396-9d74-47cd-a8a0-96528c09109d is claimed by 2 bookings",
+          "seatIds": [
+            "6a6db396-9d74-47cd-a8a0-96528c09109d"
+          ],
+          "bookingIds": [
+            "bacd8a84-902d-4b38-97a9-6d323e09ba04",
+            "eb0a2def-d8cd-457e-838b-ba41b3ff2b1d"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 6e46c0d9-efcc-42fc-a087-24125fa2a970 is claimed by 2 bookings",
+          "seatIds": [
+            "6e46c0d9-efcc-42fc-a087-24125fa2a970"
+          ],
+          "bookingIds": [
+            "0fff080a-039b-48ce-9d97-c44bef000cd4",
+            "750c86fe-0956-49fb-8744-61c63a91e70b"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 76501098-18e3-47fe-b7e4-0a8b79c88109 is claimed by 2 bookings",
+          "seatIds": [
+            "76501098-18e3-47fe-b7e4-0a8b79c88109"
+          ],
+          "bookingIds": [
+            "0efedbb7-efd0-40bf-ada8-b140b2c3ca36",
+            "d749a994-7293-40a0-93d2-8abdb14cd447"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 7dcd0345-6e9a-4c3b-aa0f-9a457450d11f is claimed by 2 bookings",
+          "seatIds": [
+            "7dcd0345-6e9a-4c3b-aa0f-9a457450d11f"
+          ],
+          "bookingIds": [
+            "530c43e8-7d60-4fec-80f5-d476806dd4ad",
+            "d13694c9-db20-4ff9-8fe3-d6096f2379f2"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 82235459-2a89-4cfc-a711-d2ba65e5c258 is claimed by 2 bookings",
+          "seatIds": [
+            "82235459-2a89-4cfc-a711-d2ba65e5c258"
+          ],
+          "bookingIds": [
+            "5627e9e0-ccdf-4bbd-bfb9-cea3646676b8",
+            "d9c037fd-82f0-4fee-aacd-9f9397cd8255"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 87934e1c-4a68-429b-b6f1-9eae66d1c153 is claimed by 2 bookings",
+          "seatIds": [
+            "87934e1c-4a68-429b-b6f1-9eae66d1c153"
+          ],
+          "bookingIds": [
+            "57562082-3acc-4392-8d3d-bb4ae3078f9f",
+            "6e5de9be-1506-498e-9eff-603e002d83ce"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 8a7972bf-370b-45f5-aff9-9db2232e21be is claimed by 2 bookings",
+          "seatIds": [
+            "8a7972bf-370b-45f5-aff9-9db2232e21be"
+          ],
+          "bookingIds": [
+            "56f7ee65-3a9a-4627-b348-b5da67bc668e",
+            "63faa1e4-68b3-4892-8701-725f07187597"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 8e1c79df-5345-440b-a220-cd7dfd6d6e5b is claimed by 2 bookings",
+          "seatIds": [
+            "8e1c79df-5345-440b-a220-cd7dfd6d6e5b"
+          ],
+          "bookingIds": [
+            "39ca96ec-575f-4d2a-9524-a4188c35f6b0",
+            "5af21951-470b-4380-bd47-98a2f8b1fd2b"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 9686a040-ec99-4e9a-bdea-f732c9d0e8f3 is claimed by 2 bookings",
+          "seatIds": [
+            "9686a040-ec99-4e9a-bdea-f732c9d0e8f3"
+          ],
+          "bookingIds": [
+            "7c967ade-01ba-44a1-bb9a-6adb12df7bbc",
+            "a2f71f0e-8896-401d-9cf8-8ba4334668cf"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 9882b39f-10d5-42eb-87ae-a76dccca5be3 is claimed by 2 bookings",
+          "seatIds": [
+            "9882b39f-10d5-42eb-87ae-a76dccca5be3"
+          ],
+          "bookingIds": [
+            "1a85b826-e1ce-4583-90ee-c6dc5bcf5964",
+            "878bcaf0-b531-42a7-9087-750468451da7"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 98b95dc0-3afd-4a94-bff0-db5ae30bb882 is claimed by 2 bookings",
+          "seatIds": [
+            "98b95dc0-3afd-4a94-bff0-db5ae30bb882"
+          ],
+          "bookingIds": [
+            "0fff080a-039b-48ce-9d97-c44bef000cd4",
+            "750c86fe-0956-49fb-8744-61c63a91e70b"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat 9deb9bbe-1fc6-4f6c-a4e8-9cb680ad8c7a is claimed by 2 bookings",
+          "seatIds": [
+            "9deb9bbe-1fc6-4f6c-a4e8-9cb680ad8c7a"
+          ],
+          "bookingIds": [
+            "5627e9e0-ccdf-4bbd-bfb9-cea3646676b8",
+            "d9c037fd-82f0-4fee-aacd-9f9397cd8255"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat a956af73-8343-4780-be98-4ac9acf02654 is claimed by 2 bookings",
+          "seatIds": [
+            "a956af73-8343-4780-be98-4ac9acf02654"
+          ],
+          "bookingIds": [
+            "530c43e8-7d60-4fec-80f5-d476806dd4ad",
+            "d13694c9-db20-4ff9-8fe3-d6096f2379f2"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat ac726c41-f805-405d-8876-daf98b6c05f7 is claimed by 2 bookings",
+          "seatIds": [
+            "ac726c41-f805-405d-8876-daf98b6c05f7"
+          ],
+          "bookingIds": [
+            "337d9649-d49c-4525-a6e9-d1f1f6e81e8e",
+            "998dc0d8-89c5-4099-9be3-a7b07f26470c"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat acdc71db-e218-4b59-81ad-808cc529c25e is claimed by 2 bookings",
+          "seatIds": [
+            "acdc71db-e218-4b59-81ad-808cc529c25e"
+          ],
+          "bookingIds": [
+            "b8dba01b-39f4-4015-839e-af7641cec7c2",
+            "bdf70272-bf4e-4c59-b3c0-62359d85062f"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat ad63bfe2-e5b6-4e52-ad98-f9500d5e7dee is claimed by 2 bookings",
+          "seatIds": [
+            "ad63bfe2-e5b6-4e52-ad98-f9500d5e7dee"
+          ],
+          "bookingIds": [
+            "430ce111-2724-48f6-9d07-e5936b529350",
+            "788d3052-013d-44a0-877e-b9ec918ddcf2"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat b4018457-e5d8-4de7-bff1-8a346cc90eeb is claimed by 2 bookings",
+          "seatIds": [
+            "b4018457-e5d8-4de7-bff1-8a346cc90eeb"
+          ],
+          "bookingIds": [
+            "b8dba01b-39f4-4015-839e-af7641cec7c2",
+            "bdf70272-bf4e-4c59-b3c0-62359d85062f"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat b40b3fed-5e4f-4e2f-8eeb-7f6a4b18d006 is claimed by 2 bookings",
+          "seatIds": [
+            "b40b3fed-5e4f-4e2f-8eeb-7f6a4b18d006"
+          ],
+          "bookingIds": [
+            "3c160215-3afe-4b18-b29f-a3a4b2328034",
+            "ef44d23f-b914-48ba-a667-d86e2afd844e"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat b505f1e4-b2e7-4615-82f2-51a052b79ded is claimed by 2 bookings",
+          "seatIds": [
+            "b505f1e4-b2e7-4615-82f2-51a052b79ded"
+          ],
+          "bookingIds": [
+            "337d9649-d49c-4525-a6e9-d1f1f6e81e8e",
+            "998dc0d8-89c5-4099-9be3-a7b07f26470c"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat b54352b4-a1f2-42ea-aaec-0a626b0fcb18 is claimed by 2 bookings",
+          "seatIds": [
+            "b54352b4-a1f2-42ea-aaec-0a626b0fcb18"
+          ],
+          "bookingIds": [
+            "4496d489-0d9e-41e0-aaf4-a1f29bbe252a",
+            "7c267503-4fae-4f51-a06c-409c7f726bc4"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat bcc0a5ca-3e88-47f9-a97a-eac701418d6c is claimed by 2 bookings",
+          "seatIds": [
+            "bcc0a5ca-3e88-47f9-a97a-eac701418d6c"
+          ],
+          "bookingIds": [
+            "075fb60e-1f00-42e8-88e3-e47eb28b8cc4",
+            "abf66a7f-4172-49e6-a434-cac6a5e5597d"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat bcc5ecaa-8355-4fad-bc67-45c8cebf3f25 is claimed by 2 bookings",
+          "seatIds": [
+            "bcc5ecaa-8355-4fad-bc67-45c8cebf3f25"
+          ],
+          "bookingIds": [
+            "56f7ee65-3a9a-4627-b348-b5da67bc668e",
+            "63faa1e4-68b3-4892-8701-725f07187597"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat bdb6b8bd-743d-43d8-a3dd-323ed7859a1c is claimed by 2 bookings",
+          "seatIds": [
+            "bdb6b8bd-743d-43d8-a3dd-323ed7859a1c"
+          ],
+          "bookingIds": [
+            "1a85b826-e1ce-4583-90ee-c6dc5bcf5964",
+            "878bcaf0-b531-42a7-9087-750468451da7"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat c29e7ceb-dbfa-4a1f-b5a0-1b970c051591 is claimed by 2 bookings",
+          "seatIds": [
+            "c29e7ceb-dbfa-4a1f-b5a0-1b970c051591"
+          ],
+          "bookingIds": [
+            "60549aac-cc9d-49ac-aa78-3e8e95d84f90",
+            "83d21154-a272-47bf-8441-464c9dc831af"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat cb678a07-c309-4921-a4b4-47c8b5ffafd2 is claimed by 2 bookings",
+          "seatIds": [
+            "cb678a07-c309-4921-a4b4-47c8b5ffafd2"
+          ],
+          "bookingIds": [
+            "3c160215-3afe-4b18-b29f-a3a4b2328034",
+            "ef44d23f-b914-48ba-a667-d86e2afd844e"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat e2b0a207-7363-4128-a2d5-db64486420dc is claimed by 2 bookings",
+          "seatIds": [
+            "e2b0a207-7363-4128-a2d5-db64486420dc"
+          ],
+          "bookingIds": [
+            "60549aac-cc9d-49ac-aa78-3e8e95d84f90",
+            "83d21154-a272-47bf-8441-464c9dc831af"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat e2e1b5a1-982d-458c-a7b6-3a3149041f7a is claimed by 2 bookings",
+          "seatIds": [
+            "e2e1b5a1-982d-458c-a7b6-3a3149041f7a"
+          ],
+          "bookingIds": [
+            "39ca96ec-575f-4d2a-9524-a4188c35f6b0",
+            "5af21951-470b-4380-bd47-98a2f8b1fd2b"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat e75a19cf-cb64-4711-a853-8311995552e3 is claimed by 2 bookings",
+          "seatIds": [
+            "e75a19cf-cb64-4711-a853-8311995552e3"
+          ],
+          "bookingIds": [
+            "b1ac4b60-4924-4423-a323-995a7a1fad39",
+            "b693d28c-bfc4-4fb4-95d7-a35a9e34fc66"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat ed4eaaae-5836-444c-8f74-8e5f7a62bb2c is claimed by 2 bookings",
+          "seatIds": [
+            "ed4eaaae-5836-444c-8f74-8e5f7a62bb2c"
+          ],
+          "bookingIds": [
+            "7c967ade-01ba-44a1-bb9a-6adb12df7bbc",
+            "a2f71f0e-8896-401d-9cf8-8ba4334668cf"
+          ]
+        },
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat fb3e08c5-e1ae-4781-894b-a874d2b62e17 is claimed by 2 bookings",
+          "seatIds": [
+            "fb3e08c5-e1ae-4781-894b-a874d2b62e17"
+          ],
+          "bookingIds": [
+            "430ce111-2724-48f6-9d07-e5936b529350",
+            "788d3052-013d-44a0-877e-b9ec918ddcf2"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": []
+}

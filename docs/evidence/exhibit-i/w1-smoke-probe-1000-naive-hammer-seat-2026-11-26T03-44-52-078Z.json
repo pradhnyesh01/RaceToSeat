@@ -1,0 +1,153 @@
+{
+  "label": "w1-smoke-probe-1000-naive-hammer-seat",
+  "ranAt": "2026-11-26T03:44:52.078Z",
+  "args": {
+    "strategy": "naive",
+    "load": "hammer-seat",
+    "concurrency": 1000,
+    "fault": "none",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch-no-unique",
+    "expectViolations": false,
+    "label": "w1-smoke-probe-1000-naive-hammer-seat",
+    "outDir": "docs/evidence/exhibit-i",
+    "appPort": 3100,
+    "proxyPort": 5434,
+    "toxiproxyApi": "",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 20000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 1500,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "acae97e3-99e5-4bee-89b2-125f5fb7c83b",
+  "requestsIssued": 1000,
+  "fault": {
+    "kind": "none",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "stall": {
+    "samples": 18,
+    "peakOpenTx": 17,
+    "peakIdleInTx": 0,
+    "peakLockHolders": 0,
+    "maxOpenTxAgeMs": 41,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 5,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 606,
+    "bookingsCommittedBeforeReplay": 3,
+    "bookingsAnsweredWith201": 3,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 20000,
+  "appName": "c2-app-c05e5e98",
+  "k6": {
+    "statusTally": {
+      "0": 606,
+      "201": 3,
+      "409": 391
+    },
+    "transportErrors": {
+      "read: connection reset by peer": 408,
+      "dial: connection reset by peer": 191,
+      "write: broken pipe": 7
+    },
+    "durationMs": 951,
+    "maxRequestMs": 453,
+    "p50RequestMs": 3,
+    "p95RequestMs": 410,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {}
+  },
+  "replay": {
+    "tally": {
+      "201": 3,
+      "409": 997
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "seat-in-multiple-bookings",
+          "detail": "seat c09afca6-6fe8-443e-aaa8-4497e5d697a3 is claimed by 3 bookings",
+          "seatIds": [
+            "c09afca6-6fe8-443e-aaa8-4497e5d697a3"
+          ],
+          "bookingIds": [
+            "0d426dbf-a1eb-438a-89db-e8fabcffefbb",
+            "e0f5112f-c3de-4821-ae52-e968e2ef8bc3",
+            "eba57c8a-3c3b-43ad-a7ff-964cb37b519d"
+          ]
+        }
+      ]
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": [
+    {
+      "id": "requests-without-answer",
+      "detail": "606 request(s) got no HTTP response (connection refused/reset/timeout)"
+    }
+  ]
+}

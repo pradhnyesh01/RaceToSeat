@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1048" height="738" viewBox="0 0 1048 738" font-family="Helvetica, Arial, sans-serif" role="img">
+<title>Oracle results across the chaos matrix</title>
+<desc>A matrix of Mechanisms and the Control by injected Fault giving the number of runs in which every Oracle passed over the number of runs, for unmodified code and, separately, with the survive-uncaught scaffold.</desc>
+<defs>
+<pattern id="pat-violation" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#D55E00"/><path d="M-1 7L7 -1M-1 1L1 -1M5 7L7 5" stroke="#000000" stroke-width="1.6"/></pattern>
+</defs>
+<rect width="1048" height="738" fill="#ffffff"/>
+<text x="40" y="28" font-size="18" text-anchor="start" fill="#1a1a1a" font-weight="bold">Oracle results across the chaos matrix</text>
+<text x="40" y="48" font-size="11" text-anchor="start" fill="#555555">Exhibit H, C2 Fault matrix. Each cell: Oracle-clean runs/total, both loads (hammer-seat, deadlock-pairs) together. A cell with a Correctness violation is hatched and marked with a cross.</text>
+<rect fill="#E8F1F8" x="40" y="62" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="64" y="72" font-size="12" text-anchor="start" fill="#1a1a1a">Every run Oracle-clean</text>
+<rect fill="url(#pat-violation)" x="260" y="62" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="284" y="72" font-size="12" text-anchor="start" fill="#1a1a1a">At least one Correctness violation</text>
+<text x="40" y="100" font-size="14" text-anchor="start" fill="#1a1a1a" font-weight="bold">Unmodified code (Exhibit H, A1 and A2)</text>
+<text x="40" y="116" font-size="11" text-anchor="start" fill="#555555">The application as shipped (R1/R2: it exits on the first torn connection, then the harness restarts it). The application process exited in 112 of 300 runs.</text>
+<text x="359" y="144" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">latency-below</text>
+<text x="477" y="144" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">latency-above</text>
+<text x="595" y="144" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">partition-stall</text>
+<text x="713" y="144" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">partition-reset</text>
+<text x="831" y="144" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">app-sigkill</text>
+<text x="949" y="144" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">All Faults</text>
+<text x="44" y="144" font-size="11" text-anchor="start" fill="#1a1a1a" font-weight="bold">Mechanism</text>
+<text x="1008" y="160" font-size="10" text-anchor="end" fill="#555555">Oracle-clean runs/total</text>
+<text x="44" y="189" font-size="12" text-anchor="start" fill="#1a1a1a">naive (Control, with Backstop)</text>
+<rect data-mechanism="naive" data-clean="yes" x="303" y="171" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="190" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="naive" data-clean="yes" x="421" y="171" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="190" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="naive" data-clean="yes" x="539" y="171" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="190" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="naive" data-clean="yes" x="657" y="171" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="713" y="190" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="naive" data-clean="yes" x="775" y="171" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="831" y="190" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="naive" data-clean="yes" x="893" y="171" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="949" y="190" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">50/50 ✓</text>
+<text x="44" y="223" font-size="12" text-anchor="start" fill="#1a1a1a">unique_constraint</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="303" y="205" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="224" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="421" y="205" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="224" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="539" y="205" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="224" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="657" y="205" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="713" y="224" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="775" y="205" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="831" y="224" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="893" y="205" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="949" y="224" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">50/50 ✓</text>
+<text x="44" y="257" font-size="12" text-anchor="start" fill="#1a1a1a">pessimistic</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="303" y="239" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="258" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="421" y="239" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="258" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="539" y="239" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="258" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="657" y="239" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="713" y="258" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="775" y="239" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="831" y="258" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="893" y="239" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="949" y="258" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">50/50 ✓</text>
+<text x="44" y="291" font-size="12" text-anchor="start" fill="#1a1a1a">optimistic</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="303" y="273" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="292" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="421" y="273" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="292" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="539" y="273" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="292" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="657" y="273" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="713" y="292" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="775" y="273" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="831" y="292" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="893" y="273" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="949" y="292" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">50/50 ✓</text>
+<text x="44" y="325" font-size="12" text-anchor="start" fill="#1a1a1a">advisory</text>
+<rect data-mechanism="advisory" data-clean="yes" x="303" y="307" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="326" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="advisory" data-clean="yes" x="421" y="307" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="326" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="advisory" data-clean="yes" x="539" y="307" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="326" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="advisory" data-clean="yes" x="657" y="307" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="713" y="326" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="advisory" data-clean="yes" x="775" y="307" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="831" y="326" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="advisory" data-clean="yes" x="893" y="307" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="949" y="326" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">50/50 ✓</text>
+<text x="44" y="359" font-size="12" text-anchor="start" fill="#1a1a1a">serializable</text>
+<rect data-mechanism="serializable" data-clean="yes" x="303" y="341" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="360" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="serializable" data-clean="yes" x="421" y="341" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="360" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="serializable" data-clean="yes" x="539" y="341" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="360" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="serializable" data-clean="yes" x="657" y="341" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="713" y="360" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="serializable" data-clean="yes" x="775" y="341" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="831" y="360" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="serializable" data-clean="yes" x="893" y="341" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="949" y="360" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">50/50 ✓</text>
+<text x="40" y="416" font-size="14" text-anchor="start" fill="#1a1a1a" font-weight="bold">With the --survive-uncaught scaffold (Exhibit H, B1 and B2)</text>
+<text x="40" y="432" font-size="11" text-anchor="start" fill="#555555">Reported separately and never merged with the unmodified runs: the scaffold keeps the process alive past torn connections. The application process exited in 0 of 120 runs.</text>
+<text x="359" y="460" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">partition-stall</text>
+<text x="477" y="460" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">partition-reset</text>
+<text x="595" y="460" font-size="11" text-anchor="middle" fill="#1a1a1a" font-weight="bold">All Faults</text>
+<text x="44" y="460" font-size="11" text-anchor="start" fill="#1a1a1a" font-weight="bold">Mechanism</text>
+<text x="654" y="476" font-size="10" text-anchor="end" fill="#555555">Oracle-clean runs/total</text>
+<text x="44" y="505" font-size="12" text-anchor="start" fill="#1a1a1a">naive (Control, with Backstop)</text>
+<rect data-mechanism="naive" data-clean="yes" x="303" y="487" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="506" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="naive" data-clean="yes" x="421" y="487" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="506" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="naive" data-clean="yes" x="539" y="487" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="506" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">20/20 ✓</text>
+<text x="44" y="539" font-size="12" text-anchor="start" fill="#1a1a1a">unique_constraint</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="303" y="521" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="540" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="421" y="521" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="540" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="unique_constraint" data-clean="yes" x="539" y="521" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="540" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">20/20 ✓</text>
+<text x="44" y="573" font-size="12" text-anchor="start" fill="#1a1a1a">pessimistic</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="303" y="555" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="574" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="421" y="555" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="574" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="pessimistic" data-clean="yes" x="539" y="555" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="574" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">20/20 ✓</text>
+<text x="44" y="607" font-size="12" text-anchor="start" fill="#1a1a1a">optimistic</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="303" y="589" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="608" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="421" y="589" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="608" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="optimistic" data-clean="yes" x="539" y="589" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="608" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">20/20 ✓</text>
+<text x="44" y="641" font-size="12" text-anchor="start" fill="#1a1a1a">advisory</text>
+<rect data-mechanism="advisory" data-clean="yes" x="303" y="623" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="642" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="advisory" data-clean="yes" x="421" y="623" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="642" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="advisory" data-clean="yes" x="539" y="623" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="642" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">20/20 ✓</text>
+<text x="44" y="675" font-size="12" text-anchor="start" fill="#1a1a1a">serializable</text>
+<rect data-mechanism="serializable" data-clean="yes" x="303" y="657" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="359" y="676" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="serializable" data-clean="yes" x="421" y="657" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="477" y="676" font-size="13" text-anchor="middle" fill="#1a1a1a">10/10 ✓</text>
+<rect data-mechanism="serializable" data-clean="yes" x="539" y="657" width="112" height="28" fill="#E8F1F8" stroke="#222222" stroke-width="1"/>
+<text x="595" y="676" font-size="13" text-anchor="middle" fill="#1a1a1a" font-weight="bold">20/20 ✓</text>
+<text x="40" y="718" font-size="11" text-anchor="start" fill="#555555">Oracles 1-4 read stored database state, never HTTP responses. A clean matrix is evidence about the Oracles' verdict, not about the application surviving the Fault.</text>
+</svg>
