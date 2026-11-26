@@ -1,0 +1,158 @@
+{
+  "label": "c4-kill-hammer-safe-rep3",
+  "ranAt": "2026-11-26T03:10:33.325Z",
+  "args": {
+    "variant": "kill",
+    "load": "hammer",
+    "profile": "safe",
+    "strategy": "pessimistic",
+    "seats": 250,
+    "workers": 30,
+    "thinkMs": 20,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4-kill-hammer-safe-rep3",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-58173887",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "wal_writer_delay": "200",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "f2be8fcc-c953-445b-bbee-2de8b9843faa",
+  "requestsIssued": 7500,
+  "seats": 250,
+  "acknowledged": {
+    "bookings": 250,
+    "holds": 0,
+    "confirms": 0,
+    "atFault": 75
+  },
+  "fault": {
+    "variant": "kill",
+    "profile": "safe",
+    "commandStartedAtMs": 2379,
+    "commandReturnedAtMs": 5724,
+    "heldDownMs": 3000,
+    "firstProbeFailedAtMs": 2437,
+    "dbBackAtMs": 5782,
+    "unreachableMs": 3345
+  },
+  "finals": {
+    "201": 250,
+    "409": 7250
+  },
+  "abandoned": 0,
+  "attempts": 7620,
+  "windows": {
+    "before": {
+      "201": 75,
+      "409": 2175
+    },
+    "during": {
+      "201": 1,
+      "409": 9,
+      "502": 120
+    },
+    "after": {
+      "201": 174,
+      "409": 5066
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 2360,
+    "firstCreatedAfterDbBackMs": 5990,
+    "appLagAfterDbBackMs": 208,
+    "writeOutageMs": 3630,
+    "firstFailureAfterFaultMs": 28
+  },
+  "slowestAttemptMs": 56,
+  "loadFinishedAtMs": 11539,
+  "drain": {
+    "drainedAfterMs": 8,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 250,
+    "bookingsAnsweredWith201": 250,
+    "committedUnacknowledged": 0
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to unexpected postmaster exit": 37,
+      "error: terminating connection due to unexpected postmaster exit": 14,
+      "severity: 'FATAL',": 14,
+      "ROLLBACK also failed (connection already dead): terminating connection due to unexpected postmaster exit; the error it did not replace: terminating connection due to unexpected postmaster exit": 1,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 19,
+      "ROLLBACK also failed (connection already dead): terminating connection due to unexpected postmaster exit; the error it did not replace: (no error; a designed no-commit result)": 3,
+      "Error: Connection terminated unexpectedly": 26,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: terminating connection due to unexpected postmaster exit": 1,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: terminating connection due to unexpected postmaster exit": 1,
+      "Error: connect ECONNREFUSED 127.0.0.1:49473": 80,
+      "code: 'ECONNREFUSED',": 83,
+      "Reaper sweep failed: Error: connect ECONNREFUSED 127.0.0.1:49473": 3
+    },
+    "reaperSweepFailures": 3
+  },
+  "replay": {
+    "tally": {
+      "201": 250,
+      "409": 7250
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "3 reaper sweep(s) failed and were logged (the reaper survived each)"
+    }
+  ]
+}

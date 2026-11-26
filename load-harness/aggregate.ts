@@ -35,6 +35,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { countUnitControls, loadChaosReports, renderExhibitH, type NoRegressionRow } from "./exhibitH.js";
+import { loadC4Reports } from "./exhibitHC4.js";
 
 interface RunReportLike {
   ranAt: string;
@@ -857,7 +858,7 @@ export function parseOutPath(argv: string[], exhibit: Exhibit): string {
 
 // --- Exhibit H: Phase 6 chaos testing (issue #52) ---
 
-const UNIT_CONTROL_FILES = ["oracles.test.ts", "faults.test.ts", "faultScoping.test.ts", "c2.test.ts", "holdOracles.test.ts"];
+const UNIT_CONTROL_FILES = ["oracles.test.ts", "faults.test.ts", "faultScoping.test.ts", "c2.test.ts", "holdOracles.test.ts", "durability.test.ts", "restartFault.test.ts"];
 
 // Issue #56's no-regression check: ordinary `npm run harness` reports of no-Fault
 // hammer-seat runs, kept in docs/evidence/chaos/r4-nofault/ (a subdirectory, so
@@ -917,7 +918,9 @@ async function mainExhibitH(evidenceDir: URL, outPath: string) {
     before: await loadNoRegressionRows(new URL("rf2-nofault/before/", chaosDir), evidenceDir),
     after: await loadNoRegressionRows(new URL("rf2-nofault/after/", chaosDir), evidenceDir),
   };
-  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression, r5NoRegression, r6NoRegression, rf2NoRegression }));
+  // C4 (#51): the Postgres-restart reports, in their own directory and shape.
+  const c4Reports = await loadC4Reports(new URL("c4-restart/", chaosDir));
+  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression, r5NoRegression, r6NoRegression, rf2NoRegression, c4Reports }));
 
   const measured = reports.filter((r) => !r.report.args.expectViolations);
   const violations = measured.filter((r) => r.report.correctnessViolation);

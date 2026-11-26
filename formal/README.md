@@ -304,7 +304,7 @@ at any time, so a retry may follow a crashed attempt, overlap an in-flight one, 
 | `BookingKeyCreatesAtMostOne`, `HoldKeyCreatesAtMostOne` | **RF1 (#60), now positive** (`CrashFindingKeyReuse`, `CrashFindingHoldKeyReuse`): the strong, history-based statement — a key creates at most one Booking/Hold *ever* (within the retention window, which is not modeled). It was false before the tombstone; see Findings |
 
 The two fault assumptions are explicit and falsifiable (controls below); they are what the model *assumes*
-about Postgres, which is exactly what chaos tickets C1/C3/C4 test empirically.
+about Postgres, which is exactly what chaos tickets C1/C3/C4 test empirically. C4 (#51) did so for the durability assumption: 39 runs, 90,842 acknowledged Bookings/Holds/Confirms, none lost after a restart or a SIGKILL of Postgres (Exhibit H, section N).
 
 ## Negative controls — each must fail, for the named reason
 
@@ -428,8 +428,10 @@ a Confirm that crashes holding the Hold's locks neither double-confirms nor stra
 ## What is NOT modeled
 
 - **Postgres restart, WAL replay, fsync, replication.** `CommittedPersists` *assumes* a returned `COMMIT` is
-  durable; whether a crashing server honors that is chaos ticket C4 (#51). `CrashLoseCommitted` shows what
-  happens to the spec if it does not.
+  durable. Chaos ticket C4 (#51) tested it against a real server killed with SIGKILL: no acknowledged commit was
+  lost (Exhibit H, section N), and an unsafe-configured server did lose them, which the same check flagged.
+  That covers a killed *process*; a machine crash or power loss (a lying `fsync`) is still untested.
+  `CrashLoseCommitted` shows what happens to the spec if it does not.
 - **Network partitions, packet loss, client timeouts as their own events.** A response lost without a crash is
   indistinguishable, to the database, from an attempt whose client stopped listening, and a retry may begin at
   any time, so the *state-level* effects are covered; partition-and-heal latency behavior is C2 (#49).

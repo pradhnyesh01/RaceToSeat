@@ -1,0 +1,164 @@
+{
+  "label": "c4-stop-holds-safe-rep1",
+  "ranAt": "2026-11-26T03:00:04.820Z",
+  "args": {
+    "variant": "stop",
+    "load": "holds",
+    "profile": "safe",
+    "strategy": "pessimistic",
+    "seats": 1500,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4-stop-holds-safe-rep1",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-b3e07b8f",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "wal_writer_delay": "200",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "7e1dcf3a-63dc-4717-8396-c1c539c4bc5a",
+  "requestsIssued": 1500,
+  "seats": 1500,
+  "acknowledged": {
+    "bookings": 0,
+    "holds": 1500,
+    "confirms": 733,
+    "atFault": 450
+  },
+  "fault": {
+    "variant": "stop",
+    "profile": "safe",
+    "commandStartedAtMs": 987,
+    "commandReturnedAtMs": 4370,
+    "heldDownMs": 3000,
+    "firstProbeFailedAtMs": 1044,
+    "dbBackAtMs": 4402,
+    "unreachableMs": 3358
+  },
+  "finals": {
+    "hold-201": 1500,
+    "confirm-201": 733
+  },
+  "abandoned": 0,
+  "attempts": 2413,
+  "windows": {
+    "before": {
+      "201": 666
+    },
+    "during": {
+      "201": 8,
+      "502": 180
+    },
+    "after": {
+      "201": 1559
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 976,
+    "firstCreatedAfterDbBackMs": 4561,
+    "appLagAfterDbBackMs": 159,
+    "writeOutageMs": 3585,
+    "firstFailureAfterFaultMs": 20
+  },
+  "slowestAttemptMs": 69,
+  "loadFinishedAtMs": 6854,
+  "drain": {
+    "drainedAfterMs": 10,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 733,
+    "bookingsAnsweredWith201": 733,
+    "committedUnacknowledged": 0
+  },
+  "reaper": {
+    "atRecovery": {
+      "expiredPendingAtRecovery": 0,
+      "clearedAfterMs": 0
+    },
+    "caughtUpMs": 226,
+    "stillHeld": 0,
+    "sweepFailures": 3,
+    "intervalMs": 1000,
+    "holdTtlSeconds": 15
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to administrator command": 25,
+      "error: terminating connection due to administrator command": 5,
+      "severity: 'FATAL',": 14,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 5,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: terminating connection due to administrator command": 2,
+      "Error: Connection terminated unexpectedly": 46,
+      "error: the database system is shutting down": 9,
+      "Error: connect ECONNREFUSED 127.0.0.1:57597": 120,
+      "code: 'ECONNREFUSED',": 123,
+      "Reaper sweep failed: Error: connect ECONNREFUSED 127.0.0.1:57597": 3
+    },
+    "reaperSweepFailures": 3
+  },
+  "replay": {
+    "tally": {
+      "201": 733,
+      "404": 767
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "3 reaper sweep(s) failed and were logged (the reaper survived each)"
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+{
+  "label": "c4-stop-spread-safe-rep1",
+  "ranAt": "2026-11-26T02:58:15.173Z",
+  "args": {
+    "variant": "stop",
+    "load": "spread",
+    "profile": "safe",
+    "strategy": "pessimistic",
+    "seats": 4000,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4-stop-spread-safe-rep1",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-51d1d3fc",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "wal_writer_delay": "200",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "7e61c5dc-0251-4041-94a4-bcf4a956719e",
+  "requestsIssued": 4000,
+  "seats": 4000,
+  "acknowledged": {
+    "bookings": 4000,
+    "holds": 0,
+    "confirms": 0,
+    "atFault": 1200
+  },
+  "fault": {
+    "variant": "stop",
+    "profile": "safe",
+    "commandStartedAtMs": 2565,
+    "commandReturnedAtMs": 5937,
+    "heldDownMs": 3000,
+    "firstProbeFailedAtMs": 2622,
+    "dbBackAtMs": 6024,
+    "unreachableMs": 3402
+  },
+  "finals": {
+    "201": 4000
+  },
+  "abandoned": 0,
+  "attempts": 4180,
+  "windows": {
+    "before": {
+      "201": 1212
+    },
+    "during": {
+      "201": 9,
+      "502": 180
+    },
+    "after": {
+      "201": 2779
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 2563,
+    "firstCreatedAfterDbBackMs": 6134,
+    "appLagAfterDbBackMs": 110,
+    "writeOutageMs": 3571,
+    "firstFailureAfterFaultMs": 23
+  },
+  "slowestAttemptMs": 72,
+  "loadFinishedAtMs": 12123,
+  "drain": {
+    "drainedAfterMs": 13,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 4000,
+    "bookingsAnsweredWith201": 4000,
+    "committedUnacknowledged": 0
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to administrator command": 28,
+      "error: terminating connection due to administrator command": 2,
+      "severity: 'FATAL',": 3,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 2,
+      "Error: Connection terminated unexpectedly": 57,
+      "error: the database system is shutting down": 1,
+      "Error: connect ECONNREFUSED 127.0.0.1:56029": 120,
+      "code: 'ECONNREFUSED',": 123,
+      "Reaper sweep failed: Error: connect ECONNREFUSED 127.0.0.1:56029": 3,
+      "Reaper sweep failed: Error: Connection terminated unexpectedly": 1
+    },
+    "reaperSweepFailures": 4
+  },
+  "replay": {
+    "tally": {
+      "201": 4000
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "4 reaper sweep(s) failed and were logged (the reaper survived each)"
+    }
+  ]
+}

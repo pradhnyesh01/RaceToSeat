@@ -1,0 +1,163 @@
+{
+  "label": "c4-kill-holds-down15s-safe-rep3",
+  "ranAt": "2026-11-26T03:17:41.214Z",
+  "args": {
+    "variant": "kill",
+    "load": "holds",
+    "profile": "safe",
+    "strategy": "pessimistic",
+    "seats": 1500,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 15000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4-kill-holds-down15s-safe-rep3",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-a9c4560e",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "wal_writer_delay": "200",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "37eaaa81-2b89-4d58-8a59-b4bd4edc5b01",
+  "requestsIssued": 1500,
+  "seats": 1500,
+  "acknowledged": {
+    "bookings": 0,
+    "holds": 1500,
+    "confirms": 759,
+    "atFault": 450
+  },
+  "fault": {
+    "variant": "kill",
+    "profile": "safe",
+    "commandStartedAtMs": 989,
+    "commandReturnedAtMs": 16337,
+    "heldDownMs": 15000,
+    "firstProbeFailedAtMs": 1049,
+    "dbBackAtMs": 16445,
+    "unreachableMs": 15396
+  },
+  "finals": {
+    "hold-201": 1500,
+    "confirm-201": 759,
+    "confirm-410": 1
+  },
+  "abandoned": 0,
+  "attempts": 2800,
+  "windows": {
+    "before": {
+      "201": 703
+    },
+    "during": {
+      "201": 11,
+      "502": 540
+    },
+    "after": {
+      "201": 1545,
+      "410": 1
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 985,
+    "firstCreatedAfterDbBackMs": 16628,
+    "appLagAfterDbBackMs": 183,
+    "writeOutageMs": 15643,
+    "firstFailureAfterFaultMs": 20
+  },
+  "slowestAttemptMs": 74,
+  "loadFinishedAtMs": 18945,
+  "drain": {
+    "drainedAfterMs": 10,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 759,
+    "bookingsAnsweredWith201": 759,
+    "committedUnacknowledged": 0
+  },
+  "reaper": {
+    "atRecovery": {
+      "expiredPendingAtRecovery": 210,
+      "clearedAfterMs": 481
+    },
+    "caughtUpMs": 223,
+    "stillHeld": 0,
+    "sweepFailures": 15,
+    "intervalMs": 1000,
+    "holdTtlSeconds": 15
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to unexpected postmaster exit": 5,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 25,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Connection terminated unexpectedly": 1,
+      "Error: Connection terminated unexpectedly": 60,
+      "Error: connect ECONNREFUSED 127.0.0.1:57286": 480,
+      "code: 'ECONNREFUSED',": 495,
+      "Reaper sweep failed: Error: connect ECONNREFUSED 127.0.0.1:57286": 15
+    },
+    "reaperSweepFailures": 15
+  },
+  "replay": {
+    "tally": {
+      "201": 759,
+      "404": 741
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "15 reaper sweep(s) failed and were logged (the reaper survived each)"
+    }
+  ]
+}

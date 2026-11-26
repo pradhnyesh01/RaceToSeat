@@ -1,0 +1,121 @@
+{
+  "label": "c4base-none-spread-safe-rep3",
+  "ranAt": "2026-11-26T03:12:38.233Z",
+  "args": {
+    "variant": "none",
+    "load": "spread",
+    "profile": "safe",
+    "strategy": "pessimistic",
+    "seats": 4000,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4base-none-spread-safe-rep3",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-cd117f5e",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "wal_writer_delay": "200",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "ad37d56e-849a-4337-b6e3-df45e7eb4c9e",
+  "requestsIssued": 4000,
+  "seats": 4000,
+  "acknowledged": {
+    "bookings": 4000,
+    "holds": 0,
+    "confirms": 0,
+    "atFault": 0
+  },
+  "fault": null,
+  "finals": {
+    "201": 4000
+  },
+  "abandoned": 0,
+  "attempts": 4000,
+  "windows": {
+    "before": {
+      "201": 4000
+    },
+    "during": {},
+    "after": {}
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": null,
+    "firstCreatedAfterDbBackMs": null,
+    "appLagAfterDbBackMs": null,
+    "writeOutageMs": null,
+    "firstFailureAfterFaultMs": null
+  },
+  "slowestAttemptMs": 57,
+  "loadFinishedAtMs": 8557,
+  "drain": {
+    "drainedAfterMs": 19,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 4000,
+    "bookingsAnsweredWith201": 4000,
+    "committedUnacknowledged": 0
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {},
+    "reaperSweepFailures": 0
+  },
+  "replay": {
+    "tally": {
+      "201": 4000
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": []
+}

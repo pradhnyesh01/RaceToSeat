@@ -1,0 +1,130 @@
+{
+  "label": "c4base-none-holds-safe-rep3",
+  "ranAt": "2026-11-26T03:13:06.635Z",
+  "args": {
+    "variant": "none",
+    "load": "holds",
+    "profile": "safe",
+    "strategy": "pessimistic",
+    "seats": 1500,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4base-none-holds-safe-rep3",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-4e0b3c17",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "wal_writer_delay": "200",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "b8883f44-ac2b-4112-a930-688781217f84",
+  "requestsIssued": 1500,
+  "seats": 1500,
+  "acknowledged": {
+    "bookings": 0,
+    "holds": 1500,
+    "confirms": 730,
+    "atFault": 0
+  },
+  "fault": null,
+  "finals": {
+    "hold-201": 1500,
+    "confirm-201": 730
+  },
+  "abandoned": 0,
+  "attempts": 2230,
+  "windows": {
+    "before": {
+      "201": 2230
+    },
+    "during": {},
+    "after": {}
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": null,
+    "firstCreatedAfterDbBackMs": null,
+    "appLagAfterDbBackMs": null,
+    "writeOutageMs": null,
+    "firstFailureAfterFaultMs": null
+  },
+  "slowestAttemptMs": 44,
+  "loadFinishedAtMs": 3312,
+  "drain": {
+    "drainedAfterMs": 11,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 730,
+    "bookingsAnsweredWith201": 730,
+    "committedUnacknowledged": 0
+  },
+  "reaper": {
+    "caughtUpMs": 750,
+    "stillHeld": 0,
+    "sweepFailures": 0,
+    "intervalMs": 1000,
+    "holdTtlSeconds": 15
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {},
+    "reaperSweepFailures": 0
+  },
+  "replay": {
+    "tally": {
+      "201": 730,
+      "404": 770
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": []
+}

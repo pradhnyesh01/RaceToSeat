@@ -1,0 +1,163 @@
+{
+  "label": "c4-kill-holds-short-safe-rep3",
+  "ranAt": "2026-11-26T03:12:22.540Z",
+  "args": {
+    "variant": "kill",
+    "load": "holds",
+    "profile": "safe",
+    "strategy": "pessimistic",
+    "seats": 1500,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 4,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4-kill-holds-short-safe-rep3",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-d3cea263",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "on",
+      "fsync": "on",
+      "wal_writer_delay": "200",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "c405e27e-bc9d-4211-8e46-dce5693ed6b9",
+  "requestsIssued": 1500,
+  "seats": 1500,
+  "acknowledged": {
+    "bookings": 0,
+    "holds": 1500,
+    "confirms": 768,
+    "atFault": 450
+  },
+  "fault": {
+    "variant": "kill",
+    "profile": "safe",
+    "commandStartedAtMs": 1018,
+    "commandReturnedAtMs": 4376,
+    "heldDownMs": 3000,
+    "firstProbeFailedAtMs": 1077,
+    "dbBackAtMs": 4470,
+    "unreachableMs": 3393
+  },
+  "finals": {
+    "hold-201": 1500,
+    "confirm-201": 768
+  },
+  "abandoned": 0,
+  "attempts": 2448,
+  "windows": {
+    "before": {
+      "201": 705
+    },
+    "during": {
+      "201": 14,
+      "502": 180
+    },
+    "after": {
+      "201": 1549
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 1017,
+    "firstCreatedAfterDbBackMs": 4588,
+    "appLagAfterDbBackMs": 118,
+    "writeOutageMs": 3571,
+    "firstFailureAfterFaultMs": 22
+  },
+  "slowestAttemptMs": 81,
+  "loadFinishedAtMs": 6904,
+  "drain": {
+    "drainedAfterMs": 8,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 768,
+    "bookingsAnsweredWith201": 768,
+    "committedUnacknowledged": 0
+  },
+  "reaper": {
+    "atRecovery": {
+      "expiredPendingAtRecovery": 96,
+      "clearedAfterMs": 514
+    },
+    "caughtUpMs": 216,
+    "stillHeld": 0,
+    "sweepFailures": 3,
+    "intervalMs": 1000,
+    "holdTtlSeconds": 4
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to unexpected postmaster exit": 12,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 18,
+      "Error: Connection terminated unexpectedly": 59,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: terminating connection due to unexpected postmaster exit": 1,
+      "error: terminating connection due to unexpected postmaster exit": 1,
+      "severity: 'FATAL',": 1,
+      "Error: connect ECONNREFUSED 127.0.0.1:50809": 120,
+      "code: 'ECONNREFUSED',": 123,
+      "Reaper sweep failed: Error: connect ECONNREFUSED 127.0.0.1:50809": 3
+    },
+    "reaperSweepFailures": 3
+  },
+  "replay": {
+    "tally": {
+      "201": 768,
+      "404": 732
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "3 reaper sweep(s) failed and were logged (the reaper survived each)"
+    }
+  ]
+}
