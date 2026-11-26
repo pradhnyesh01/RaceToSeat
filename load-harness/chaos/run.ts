@@ -27,6 +27,7 @@
 //   [--fault backend-kill|idle-pool-kill|none] [--kill-scope in-transaction|idle|any] [--survive-uncaught]
 //   [--kill-interval-ms 40] [--kill-fraction 0.5]
 //   [--db shared|scratch-no-unique] [--expect-violations] [--label name]
+//   [--out-dir docs/evidence/exhibit-i]   (default docs/evidence/chaos/, which Exhibit H aggregates)
 //   [--app-port 3100] [--proxy-port 5434]
 //
 // Issue #49 (C2) additions, all opt-in so C1 invocations behave as before:
@@ -42,7 +43,8 @@
 import { randomUUID } from "node:crypto";
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Pool } from "pg";
 import "dotenv/config";
 import { startAppKiller, type AppKillStats } from "./appKillFault.js";
@@ -83,6 +85,9 @@ interface Args {
   db: "shared" | "scratch-no-unique" | "scratch";
   expectViolations: boolean;
   label: string;
+  // Phase 8 W1 (issue #73): where the report is written, relative to the repo root.
+  // Empty keeps the original docs/evidence/chaos/, which Exhibit H aggregates.
+  outDir: string;
   appPort: number;
   proxyPort: number;
   // --- C2 (issue #49) ---
@@ -118,6 +123,7 @@ function parseArgs(argv: string[]): Args {
     db: "shared",
     expectViolations: false,
     label: "",
+    outDir: "",
     appPort: 3100,
     proxyPort: 5434,
     toxiproxyApi: "",
@@ -162,6 +168,7 @@ function parseArgs(argv: string[]): Args {
     } else if (flag === "--db") args.db = oneOf("--db", argv[++i], ["shared", "scratch-no-unique", "scratch"]);
     else if (flag === "--expect-violations") args.expectViolations = true;
     else if (flag === "--label") args.label = String(argv[++i]);
+    else if (flag === "--out-dir") args.outDir = String(argv[++i]);
     else if (flag === "--app-port") args.appPort = posInt(flag, argv[++i]);
     else if (flag === "--proxy-port") args.proxyPort = posInt(flag, argv[++i]);
     else if (flag === "--toxiproxy-api") args.toxiproxyApi = String(argv[++i]);
@@ -836,7 +843,9 @@ async function main(): Promise<void> {
       correctnessViolation,
       robustnessObservations: robustness,
     };
-    const outDir = new URL("../../docs/evidence/chaos/", import.meta.url);
+    const outDir = args.outDir
+      ? pathToFileURL(resolve(fileURLToPath(new URL("../../", import.meta.url)), args.outDir) + "/")
+      : new URL("../../docs/evidence/chaos/", import.meta.url);
     await mkdir(outDir, { recursive: true });
     const outPath = new URL(`${label}-${stamp}.json`, outDir);
     await writeFile(outPath, JSON.stringify(report, null, 2));

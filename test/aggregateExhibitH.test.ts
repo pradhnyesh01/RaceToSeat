@@ -66,11 +66,12 @@ describe("--exhibit wiring", () => {
     expect(parseExhibit(["--exhibit", "c"])).toBe("c");
   });
 
-  it("accepts e, f and h, and rejects anything else", () => {
+  it("accepts e, f, h and i, and rejects anything else", () => {
     expect(parseExhibit(["--exhibit", "e"])).toBe("e");
     expect(parseExhibit(["--exhibit", "f"])).toBe("f");
     expect(parseExhibit(["--exhibit", "h"])).toBe("h");
-    expect(() => parseExhibit(["--exhibit", "g"])).toThrow(/"c", "e", "f", or "h"/);
+    expect(parseExhibit(["--exhibit", "i"])).toBe("i");
+    expect(() => parseExhibit(["--exhibit", "g"])).toThrow(/"c", "e", "f", "h", or "i"/);
   });
 
   it("writes Exhibit H to its own default file, and honours --out", () => {

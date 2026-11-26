@@ -30,12 +30,13 @@
 // load-harness/exhibitH.ts to keep this file's size in check; this file only
 // wires the mode up.
 //
-// Usage: tsx load-harness/aggregate.ts [--exhibit c|e|f|h] [--out <path>]
+// Usage: tsx load-harness/aggregate.ts [--exhibit c|e|f|h|i] [--out <path>]
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { countUnitControls, loadChaosReports, renderExhibitH, type NoRegressionRow } from "./exhibitH.js";
 import { loadC4Reports } from "./exhibitHC4.js";
+import { loadExhibitIReports, renderExhibitI } from "./exhibitI.js";
 
 interface RunReportLike {
   ranAt: string;
@@ -831,7 +832,7 @@ follow-up ticket from this exhibit.
   );
 }
 
-export type Exhibit = "c" | "e" | "f" | "h";
+export type Exhibit = "c" | "e" | "f" | "h" | "i";
 
 export function parseExhibit(argv: string[]): Exhibit {
   const flagIndex = argv.indexOf("--exhibit");
@@ -840,7 +841,8 @@ export function parseExhibit(argv: string[]): Exhibit {
   if (value === "e") return "e";
   if (value === "f") return "f";
   if (value === "h") return "h";
-  throw new Error(`--exhibit must be "c", "e", "f", or "h", got ${JSON.stringify(value)}`);
+  if (value === "i") return "i";
+  throw new Error(`--exhibit must be "c", "e", "f", "h", or "i", got ${JSON.stringify(value)}`);
 }
 
 const DEFAULT_OUT_NAMES: Record<Exhibit, string> = {
@@ -848,6 +850,7 @@ const DEFAULT_OUT_NAMES: Record<Exhibit, string> = {
   e: "exhibit-e-phase4-isolation.md",
   f: "exhibit-f-phase5-hold-expiry.md",
   h: "exhibit-h-phase6-chaos.md",
+  i: "exhibit-i-phase8-no-backstop.md",
 };
 
 export function parseOutPath(argv: string[], exhibit: Exhibit): string {
@@ -958,8 +961,24 @@ async function main() {
     await mainExhibitH(evidenceDir, outPath);
     return;
   }
+  if (exhibit === "i") {
+    await mainExhibitI(evidenceDir, outPath);
+    return;
+  }
 
   await mainExhibitC(evidenceDir, outPath);
+}
+
+// Exhibit I (issue #73, Phase 8 W1): reads docs/evidence/exhibit-i/ (its own directory, so
+// Exhibit H's loader over docs/evidence/chaos/ never sees these runs).
+async function mainExhibitI(evidenceDir: URL, outPath: string) {
+  const loaded = await loadExhibitIReports(new URL("exhibit-i/", evidenceDir));
+  if (loaded.length === 0) {
+    throw new Error("No Exhibit I run reports found under docs/evidence/exhibit-i/ — run the matrix (load-harness/chaos/exhibitIMatrix.ts) first.");
+  }
+  await writeFile(outPath, renderExhibitI(loaded));
+  console.log(`Exhibit I written to ${outPath}`);
+  console.log(`${loaded.length} run report(s) aggregated.`);
 }
 
 async function mainExhibitC(evidenceDir: URL, outPath: string) {
