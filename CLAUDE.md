@@ -518,6 +518,8 @@ exists); the same server restarted orderly lost none. Limitation recorded with t
 Docker VM's page cache, so this tests "the server process dies", not power loss or a lying `fsync`. No new Robustness
 finding. `src/` and `db/schema.sql` untouched.
 
+Phase 8 (writeup, umbrella #72, issues #73-#76) is complete: `README.md`, `docs/writeup.md` and `docs/recommendation-matrix.md` name `pessimistic` as the default, backed by Exhibit I (Mechanisms with the Backstop removed), four generated charts (`npm run charts`) and a documents drift test (`test/docsDrift.test.ts`); `src/` and `db/schema.sql` untouched.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:
