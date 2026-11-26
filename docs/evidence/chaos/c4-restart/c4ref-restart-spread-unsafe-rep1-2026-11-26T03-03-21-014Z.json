@@ -1,0 +1,141 @@
+{
+  "label": "c4ref-restart-spread-unsafe-rep1",
+  "ranAt": "2026-11-26T03:03:21.014Z",
+  "args": {
+    "variant": "restart",
+    "load": "spread",
+    "profile": "unsafe",
+    "strategy": "pessimistic",
+    "seats": 4000,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": false,
+    "label": "c4ref-restart-spread-unsafe-rep1",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-54ac595e",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "off",
+      "fsync": "off",
+      "wal_writer_delay": "10000",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "e99aa31a-dbc3-4ce4-bc4a-72c1012345f0",
+  "requestsIssued": 4000,
+  "seats": 4000,
+  "acknowledged": {
+    "bookings": 4000,
+    "holds": 0,
+    "confirms": 0,
+    "atFault": 1200
+  },
+  "fault": {
+    "variant": "restart",
+    "profile": "unsafe",
+    "commandStartedAtMs": 2540,
+    "commandReturnedAtMs": 2818,
+    "heldDownMs": 0,
+    "firstProbeFailedAtMs": 2598,
+    "dbBackAtMs": 2865,
+    "unreachableMs": 267
+  },
+  "finals": {
+    "201": 4000
+  },
+  "abandoned": 0,
+  "attempts": 4060,
+  "windows": {
+    "before": {
+      "201": 1217
+    },
+    "during": {
+      "201": 6,
+      "502": 60
+    },
+    "after": {
+      "201": 2777
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 2539,
+    "firstCreatedAfterDbBackMs": 2876,
+    "appLagAfterDbBackMs": 11,
+    "writeOutageMs": 337,
+    "firstFailureAfterFaultMs": 23
+  },
+  "slowestAttemptMs": 70,
+  "loadFinishedAtMs": 8754,
+  "drain": {
+    "drainedAfterMs": 11,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 4000,
+    "bookingsAnsweredWith201": 4000,
+    "committedUnacknowledged": 0
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to administrator command": 29,
+      "error: terminating connection due to administrator command": 1,
+      "severity: 'FATAL',": 1,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 1,
+      "Error: Connection terminated unexpectedly": 59
+    },
+    "reaperSweepFailures": 0
+  },
+  "replay": {
+    "tally": {
+      "201": 4000
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": []
+}

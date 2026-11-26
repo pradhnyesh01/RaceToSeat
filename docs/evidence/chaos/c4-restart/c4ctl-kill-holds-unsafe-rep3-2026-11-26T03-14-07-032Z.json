@@ -1,0 +1,4151 @@
+{
+  "label": "c4ctl-kill-holds-unsafe-rep3",
+  "ranAt": "2026-11-26T03:14:07.032Z",
+  "args": {
+    "variant": "kill",
+    "load": "holds",
+    "profile": "unsafe",
+    "strategy": "pessimistic",
+    "seats": 1500,
+    "workers": 30,
+    "thinkMs": 60,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": true,
+    "label": "c4ctl-kill-holds-unsafe-rep3",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-0203f960",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "off",
+      "fsync": "off",
+      "wal_writer_delay": "10000",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "c55a70dc-56b4-4886-a977-4bb2c1894207",
+  "requestsIssued": 1500,
+  "seats": 1500,
+  "acknowledged": {
+    "bookings": 0,
+    "holds": 1500,
+    "confirms": 787,
+    "atFault": 450
+  },
+  "fault": {
+    "variant": "kill",
+    "profile": "unsafe",
+    "commandStartedAtMs": 1006,
+    "commandReturnedAtMs": 4344,
+    "heldDownMs": 3000,
+    "firstProbeFailedAtMs": 1065,
+    "dbBackAtMs": 4399,
+    "unreachableMs": 3334
+  },
+  "finals": {
+    "hold-201": 1500,
+    "confirm-201": 787
+  },
+  "abandoned": 0,
+  "attempts": 2467,
+  "windows": {
+    "before": {
+      "201": 692
+    },
+    "during": {
+      "201": 15,
+      "502": 180
+    },
+    "after": {
+      "201": 1580
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 1005,
+    "firstCreatedAfterDbBackMs": 4572,
+    "appLagAfterDbBackMs": 173,
+    "writeOutageMs": 3567,
+    "firstFailureAfterFaultMs": 22
+  },
+  "slowestAttemptMs": 86,
+  "loadFinishedAtMs": 6928,
+  "drain": {
+    "drainedAfterMs": 7,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 547,
+    "bookingsAnsweredWith201": 787,
+    "committedUnacknowledged": 0
+  },
+  "reaper": {
+    "atRecovery": {
+      "expiredPendingAtRecovery": 0,
+      "clearedAfterMs": 0
+    },
+    "caughtUpMs": 219,
+    "stillHeld": 0,
+    "sweepFailures": 3,
+    "intervalMs": 1000,
+    "holdTtlSeconds": 15
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 28,
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to unexpected postmaster exit": 2,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Connection terminated unexpectedly": 1,
+      "Error: Connection terminated unexpectedly": 60,
+      "Error: connect ECONNREFUSED 127.0.0.1:52003": 120,
+      "code: 'ECONNREFUSED',": 123,
+      "Reaper sweep failed: Error: connect ECONNREFUSED 127.0.0.1:52003": 3
+    },
+    "reaperSweepFailures": 3
+  },
+  "replay": {
+    "tally": {
+      "201": 547,
+      "404": 953
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f08a9750-2d23-4368-a548-800874c5b335 was answered 201 (held until 2026-11-26T03:14:22.060Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "52610bee-56d2-468a-b42c-4cdd5e594868"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 835da781-2cc3-4b27-bb74-2a4ace954c6e was answered 201 with booking 3fb88a5a-5c86-4993-b589-b7c0ff464ab8, which does not exist after recovery",
+          "bookingIds": [
+            "3fb88a5a-5c86-4993-b589-b7c0ff464ab8"
+          ],
+          "seatIds": [
+            "be8f9e5d-10dc-4aa0-a6fa-087cc95a7fb7"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6cf9916e-52e7-4073-a4e2-fb4e8dbd28f0 was answered 201 with booking 892f2c1d-dbaf-4886-82ce-b807d0fe85a7, which does not exist after recovery",
+          "bookingIds": [
+            "892f2c1d-dbaf-4886-82ce-b807d0fe85a7"
+          ],
+          "seatIds": [
+            "46338733-e61c-4553-9d8a-886215283385"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 844bced7-c9e6-4128-8b4b-8e83363b929a was answered 201 with booking 2a941bb7-c907-493b-88fa-8b540aa13405, which does not exist after recovery",
+          "bookingIds": [
+            "2a941bb7-c907-493b-88fa-8b540aa13405"
+          ],
+          "seatIds": [
+            "e58c4115-ca06-47a4-ac2d-0874c6c250fc"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 0d4f469b-b8ec-40c4-a48c-e7ca810645b6 was answered 201 with booking 534c3755-ddfe-44a7-9593-ab284f1f5a15, which does not exist after recovery",
+          "bookingIds": [
+            "534c3755-ddfe-44a7-9593-ab284f1f5a15"
+          ],
+          "seatIds": [
+            "9a184b09-2e09-412f-92f4-10c8bccd9aef"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e6335ddc-2798-48c3-b1c6-04c7eb8047ed was answered 201 (held until 2026-11-26T03:14:22.059Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "55ebc4a6-9f04-473c-b8b9-8a985ada416b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 3a9b096e-0e95-466e-905d-5e29e0674194 was answered 201 with booking 8c1ce129-83da-4356-b073-d2b7efa8bc00, which does not exist after recovery",
+          "bookingIds": [
+            "8c1ce129-83da-4356-b073-d2b7efa8bc00"
+          ],
+          "seatIds": [
+            "3cda55b4-be38-4e4b-9757-b2a005ce8a5c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6d1424db-3abb-44aa-b2cb-7f48cde99901 was answered 201 (held until 2026-11-26T03:14:22.059Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "59b3a9b4-710f-4599-ad30-f37fb6cd00a2"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 31eec870-f915-4f90-9630-80154897a1cf was answered 201 with booking 1c2216e1-743c-4e07-847d-42422303a241, which does not exist after recovery",
+          "bookingIds": [
+            "1c2216e1-743c-4e07-847d-42422303a241"
+          ],
+          "seatIds": [
+            "b8a96b13-d901-4f36-9540-913479a58e56"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c7a1ee67-f3ae-4c66-b66a-0409ad27f72e was answered 201 with booking fa4bef9a-bca7-4abd-bfb2-115c670c1dc0, which does not exist after recovery",
+          "bookingIds": [
+            "fa4bef9a-bca7-4abd-bfb2-115c670c1dc0"
+          ],
+          "seatIds": [
+            "3c46ee74-6d91-4ef1-a440-0000a4c17033"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 90f5bae4-7752-4109-a315-e6d6fa95fd92 was answered 201 with booking d4246e98-1bf8-46e3-8854-18a25c99a2fd, which does not exist after recovery",
+          "bookingIds": [
+            "d4246e98-1bf8-46e3-8854-18a25c99a2fd"
+          ],
+          "seatIds": [
+            "c037879f-af25-45d2-a956-0af09e5a67ff"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6cabf7d4-f6f7-40ae-b103-734626d9a3f7 was answered 201 with booking 1c2206c8-1e07-42f0-9ac3-9469faf517fc, which does not exist after recovery",
+          "bookingIds": [
+            "1c2206c8-1e07-42f0-9ac3-9469faf517fc"
+          ],
+          "seatIds": [
+            "367dc42c-23ed-47f1-b14a-9b393d2ca7e8"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6ba8e6b5-3d8b-4dbf-9a22-5d4938ba43bb was answered 201 with booking 22bc199c-e296-476b-9c6d-02695fb9ce1c, which does not exist after recovery",
+          "bookingIds": [
+            "22bc199c-e296-476b-9c6d-02695fb9ce1c"
+          ],
+          "seatIds": [
+            "f3c5da00-18f7-4de0-aaa9-d75327e28f70"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e5f0fbd5-6405-48d0-bf83-3cadf96ba9d2 was answered 201 (held until 2026-11-26T03:14:22.064Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4b086567-295e-40ff-8023-8932a99dd3f0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f7ec6e1a-7bee-4f39-a1c4-c70218b8f70b was answered 201 (held until 2026-11-26T03:14:22.062Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9fde0cfe-444d-45c5-aa81-cd2a4d6dc54b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b8a1abb5-b245-48b5-a896-b10017e3a33c was answered 201 with booking 6563ad16-a2eb-454b-a7f6-954df89add35, which does not exist after recovery",
+          "bookingIds": [
+            "6563ad16-a2eb-454b-a7f6-954df89add35"
+          ],
+          "seatIds": [
+            "9e95ece4-f58c-47ea-b08b-cdb2b82b66f9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 956ca07b-60d3-4730-8624-ce66932a9000 was answered 201 (held until 2026-11-26T03:14:22.065Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1f2df343-87e4-4b9a-af88-7582ad9f1ba4"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e552f222-e9da-433c-8a24-494bb6e65a8b was answered 201 (held until 2026-11-26T03:14:22.067Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "cb880e90-6bef-4516-a190-62217b83299c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 72ed330e-c0d6-427a-aa65-0f6f103f77aa was answered 201 (held until 2026-11-26T03:14:22.063Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4bcd385f-a0d2-41ec-8ad2-cd215cbd9e61"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e4adc835-f05d-46da-b296-f83d87a30aba was answered 201 with booking 4141c207-49eb-4281-ad8a-d89ac228fb3e, which does not exist after recovery",
+          "bookingIds": [
+            "4141c207-49eb-4281-ad8a-d89ac228fb3e"
+          ],
+          "seatIds": [
+            "ca293ed3-4e2c-46ae-8b61-d2ae378cb562"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 5aa958a9-6a7a-491b-b84d-13910e7109b1 was answered 201 with booking cb3b8022-e49e-4e93-97a5-e59d609fb0f6, which does not exist after recovery",
+          "bookingIds": [
+            "cb3b8022-e49e-4e93-97a5-e59d609fb0f6"
+          ],
+          "seatIds": [
+            "9a88b5f0-9d66-40ee-8398-58da1c899221"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 124a178b-ad47-46ba-8458-2e04f14e27dd was answered 201 (held until 2026-11-26T03:14:22.067Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "210207df-f2f2-4dd8-a878-76a8348bf563"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f92beed3-9514-4518-a37c-61e469b0f8d2 was answered 201 (held until 2026-11-26T03:14:22.067Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "46b34b16-b0f3-4732-8243-935e07882e46"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 737085af-e8fa-4100-b334-538be601f196 was answered 201 with booking 4d6972f8-f549-4b74-8a12-8f6d6903e1b6, which does not exist after recovery",
+          "bookingIds": [
+            "4d6972f8-f549-4b74-8a12-8f6d6903e1b6"
+          ],
+          "seatIds": [
+            "e10300f7-563a-43bf-89cc-b4d0dda51dfb"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 17f4c979-e910-43af-98e7-1237546d6b02 was answered 201 (held until 2026-11-26T03:14:22.071Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "94420e6a-6bbd-40e8-b3ac-5fec26006d36"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d0f6001f-05db-489c-a228-e60c338912be was answered 201 with booking 50efb93c-0d69-4aab-8a3b-1294c080985a, which does not exist after recovery",
+          "bookingIds": [
+            "50efb93c-0d69-4aab-8a3b-1294c080985a"
+          ],
+          "seatIds": [
+            "bb3c5a3d-6542-475d-8147-cde455a73df3"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7848829e-9495-47e5-ab21-b50256dcd761 was answered 201 with booking b212290e-f45b-4191-b644-e35a0dd2ed51, which does not exist after recovery",
+          "bookingIds": [
+            "b212290e-f45b-4191-b644-e35a0dd2ed51"
+          ],
+          "seatIds": [
+            "37828030-e69d-4328-b224-23b7c728a870"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7949723c-c864-4ecb-af1f-5d41266c2265 was answered 201 with booking c668aaab-7acd-45e5-b377-b7abeb8d6b65, which does not exist after recovery",
+          "bookingIds": [
+            "c668aaab-7acd-45e5-b377-b7abeb8d6b65"
+          ],
+          "seatIds": [
+            "5212870b-47b8-49f7-bb5c-276782c67f2c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold c555bd00-f288-4ade-a252-27dfd6753b86 was answered 201 (held until 2026-11-26T03:14:22.076Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1f081c90-5c36-42aa-9392-48a35b003fe5"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 0e2078f4-748c-478b-bdec-650cd77ac696 was answered 201 (held until 2026-11-26T03:14:22.074Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a3b345e3-3fa6-4542-a4e3-f4f329aa0227"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 14f83b76-704a-43f9-afb3-e334da34c018 was answered 201 (held until 2026-11-26T03:14:22.104Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "b008c30c-a3ae-4c9b-beb0-59f063b61b40"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold c154e8a0-a6e3-4761-b060-c8371493d866 was answered 201 (held until 2026-11-26T03:14:22.111Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3eb43fbc-b9a5-4800-a2cc-c7f5c31e5740"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 814a554b-d627-4b25-bcd6-2263459ad43e was answered 201 with booking 1810a213-1765-41fc-9562-486c3f77c323, which does not exist after recovery",
+          "bookingIds": [
+            "1810a213-1765-41fc-9562-486c3f77c323"
+          ],
+          "seatIds": [
+            "30656c78-4ac1-4b71-b7d3-b2a15fc4c867"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 3f5c1771-b98d-4241-afd5-975b81bea00b was answered 201 with booking 1506b8f8-3f18-4069-ba32-457dd56b5f15, which does not exist after recovery",
+          "bookingIds": [
+            "1506b8f8-3f18-4069-ba32-457dd56b5f15"
+          ],
+          "seatIds": [
+            "38f8513b-e950-4192-83bf-3336047cf7f0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6ce86338-f38e-456d-a139-844239ce393a was answered 201 (held until 2026-11-26T03:14:22.122Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2d8b10cd-d4ad-47cf-9369-019616f3dde4"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e0046976-64d1-4a1f-8611-16db7f1249be was answered 201 (held until 2026-11-26T03:14:22.122Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1ab3b226-7b8f-478d-b082-75610225221b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7011f354-2624-450f-8374-2f03b5a069b4 was answered 201 with booking 2f530aeb-caf5-4942-9322-89b91a9e5116, which does not exist after recovery",
+          "bookingIds": [
+            "2f530aeb-caf5-4942-9322-89b91a9e5116"
+          ],
+          "seatIds": [
+            "ea3d8171-17ba-4913-98a3-e902aa3bf5f9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 99118efb-68a3-4dee-9ea3-70b899ad82b0 was answered 201 with booking cb7f27d6-92dc-4468-ad0b-28d849178f78, which does not exist after recovery",
+          "bookingIds": [
+            "cb7f27d6-92dc-4468-ad0b-28d849178f78"
+          ],
+          "seatIds": [
+            "49796f18-015a-49a2-b281-df645cd6d9d4"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1a1e24da-39a1-4de7-8a27-8d057548718d was answered 201 (held until 2026-11-26T03:14:22.128Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9b74b428-0445-411e-b180-b3290a4bfaf0"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 4dea30b3-5dec-44e6-8c4c-b3da9c57f2b8 was answered 201 with booking 75531fa5-e577-4575-866b-cbc922d42976, which does not exist after recovery",
+          "bookingIds": [
+            "75531fa5-e577-4575-866b-cbc922d42976"
+          ],
+          "seatIds": [
+            "c895c68b-6394-4fdc-80c0-c54205e70578"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1b340b67-96cf-4fea-b516-af306fc75618 was answered 201 (held until 2026-11-26T03:14:22.137Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "e2d919ff-0fa4-4622-af0d-c7e7a5cfdc25"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ad0c3f20-934c-4d02-9c26-bc6708ec82a2 was answered 201 with booking 820c201f-8588-4dc0-b4ec-355574800624, which does not exist after recovery",
+          "bookingIds": [
+            "820c201f-8588-4dc0-b4ec-355574800624"
+          ],
+          "seatIds": [
+            "b38473e6-8ae7-4212-9f12-39d8d8dc4001"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f4636f96-355c-4def-b679-057712519168 was answered 201 (held until 2026-11-26T03:14:22.140Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "c67a89c1-7ca5-4661-a9a2-f50e7d0091c2"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold bde3c2be-b683-4dc7-8ce7-705afa82134b was answered 201 (held until 2026-11-26T03:14:22.141Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "fa2a284a-8f47-4ee4-bbdf-abecdcc86cdd"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 0a6497b8-76de-41c5-b33f-77e0308c4670 was answered 201 (held until 2026-11-26T03:14:22.144Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6d10b207-9dca-4a62-9d46-ca52ac56d3c0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 467c19bc-cb3b-4f49-92b8-5e5d252d3e45 was answered 201 (held until 2026-11-26T03:14:22.144Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "57c029f1-cb21-4938-a823-67d556d15be1"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 8c136afd-3641-4b7a-92b4-4f7b6c5b173a was answered 201 (held until 2026-11-26T03:14:22.149Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "18b4a33e-b3df-4258-ba18-c062ee4ac81e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold afb15c70-087a-47bd-9911-86bd2a64e910 was answered 201 (held until 2026-11-26T03:14:22.150Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1e6e3b99-956e-4a3b-a2a2-321a823ee2d8"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 86768c41-c8e0-44dd-9e9c-2e0793b2a0e1 was answered 201 (held until 2026-11-26T03:14:22.152Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "192b61fd-8845-4572-896c-9ebb7b0184a3"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 12aa07af-49e3-4b6f-87c0-5566ca7a4968 was answered 201 with booking ac290bd5-ef20-4692-962a-29612a2c5c4f, which does not exist after recovery",
+          "bookingIds": [
+            "ac290bd5-ef20-4692-962a-29612a2c5c4f"
+          ],
+          "seatIds": [
+            "cc9f4214-0967-4a5e-a959-365553e0cba0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold a1c927a4-a91c-487c-af52-1e8e1411b4c4 was answered 201 (held until 2026-11-26T03:14:22.157Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a2ef3f1c-5182-4f02-ad13-064161782dcb"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 9806c00b-2079-48a0-91bc-45b63991e329 was answered 201 (held until 2026-11-26T03:14:22.158Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6fb92d81-27a5-43a5-bda7-f91023c9706d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c23a5857-31ad-45f5-844f-32e82ed7467f was answered 201 with booking c23f0adc-a8e9-4948-97c1-cba2982c3251, which does not exist after recovery",
+          "bookingIds": [
+            "c23f0adc-a8e9-4948-97c1-cba2982c3251"
+          ],
+          "seatIds": [
+            "c39a0ed7-a735-49dc-ac29-db8aa74314e9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ce05689e-63d0-4333-ac70-701ec405bbd3 was answered 201 with booking 319d9a3b-1df3-436b-be91-262d2befc1ef, which does not exist after recovery",
+          "bookingIds": [
+            "319d9a3b-1df3-436b-be91-262d2befc1ef"
+          ],
+          "seatIds": [
+            "cdf2b657-9b2b-4bf9-af12-75583d11e02f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 0296dfd1-352f-49e3-b762-9b90be2e4227 was answered 201 with booking 22211438-0fe6-4507-8ca5-4c7de07ee8d6, which does not exist after recovery",
+          "bookingIds": [
+            "22211438-0fe6-4507-8ca5-4c7de07ee8d6"
+          ],
+          "seatIds": [
+            "3778b908-3bee-47fd-8733-0a8366976b0b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 5d8890c6-c6d3-4515-b1c7-375bcf2bd5c7 was answered 201 with booking 015cc95b-4b5b-4c03-b29a-6ebf97c2fed2, which does not exist after recovery",
+          "bookingIds": [
+            "015cc95b-4b5b-4c03-b29a-6ebf97c2fed2"
+          ],
+          "seatIds": [
+            "94b82f10-9026-4fe8-80f9-5449ec2b0673"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 33f5c1cf-da02-44d2-bc83-76c52f86b9bd was answered 201 (held until 2026-11-26T03:14:22.171Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "26171767-24ce-46a8-a556-6fd59a2b77af"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ac8e44c5-eba8-412c-b19f-7e66de6bcf7f was answered 201 with booking 2a0486b8-5e4b-4602-9b7f-12d4deccf88e, which does not exist after recovery",
+          "bookingIds": [
+            "2a0486b8-5e4b-4602-9b7f-12d4deccf88e"
+          ],
+          "seatIds": [
+            "3cb6e410-d401-42a9-8dec-4e35f05c404d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 83216429-8621-4474-8dad-6da3476aff01 was answered 201 with booking 5ee0592f-fb1c-4014-b6a2-c86943dd9290, which does not exist after recovery",
+          "bookingIds": [
+            "5ee0592f-fb1c-4014-b6a2-c86943dd9290"
+          ],
+          "seatIds": [
+            "208587dd-1b17-48da-a01a-814c98fa521e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold ced4cc1b-0088-4e7d-a2bf-0f35b67d9ee1 was answered 201 (held until 2026-11-26T03:14:22.175Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f7d03a25-651d-4366-b96e-7608a0d3b825"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 36fc9978-45ae-40b9-bdc4-dc41271c4004 was answered 201 (held until 2026-11-26T03:14:22.175Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3c20c99b-68f1-4b3d-99b0-b88ad78f9d90"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c2ef1332-8e53-4975-b1dd-f9c0d564fecb was answered 201 with booking 450bae45-7214-4707-9444-2116895b8b0c, which does not exist after recovery",
+          "bookingIds": [
+            "450bae45-7214-4707-9444-2116895b8b0c"
+          ],
+          "seatIds": [
+            "5757fd71-09ce-4110-b620-b64d5d7e048e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold fa6e134b-956d-40ac-b331-6ea3dd4accff was answered 201 (held until 2026-11-26T03:14:22.179Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "d5633391-67ef-4bce-89ab-d3c4086c54e5"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 642a60f6-bd27-4bda-aabf-ac153876c94f was answered 201 (held until 2026-11-26T03:14:22.180Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "62e48ae0-bd02-4d5d-8bfb-61daab792167"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold eb7d3512-5950-4d2e-b2e2-f76a634ddb51 was answered 201 (held until 2026-11-26T03:14:22.184Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6e48f45f-a8f6-4253-ad99-cf6c03d83f5b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold caea40e1-145b-452f-8a0a-7af2a9ebc9d0 was answered 201 with booking a3e05529-eb79-4ab2-a79c-921c329e3634, which does not exist after recovery",
+          "bookingIds": [
+            "a3e05529-eb79-4ab2-a79c-921c329e3634"
+          ],
+          "seatIds": [
+            "083811cf-b45c-43fc-b2f3-e0d07993bfcb"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 485e5a38-4ed4-475c-8290-e2a0ea50e4dc was answered 201 (held until 2026-11-26T03:14:22.189Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "01c353d5-c23b-4e97-bcc6-70d11e3e916e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 76427e09-0c98-42cb-a8ba-5c3c4f4395f3 was answered 201 (held until 2026-11-26T03:14:22.190Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "37c07bb7-44e3-405e-97b7-0d986a5d8816"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f67d959f-4fc8-4566-a99d-3401a5482d4d was answered 201 with booking 7c79d023-2c77-47e5-900f-2d2580fbc7de, which does not exist after recovery",
+          "bookingIds": [
+            "7c79d023-2c77-47e5-900f-2d2580fbc7de"
+          ],
+          "seatIds": [
+            "1dec5f0e-ade5-4b09-86d8-aad6112e5261"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 698d867a-3adc-4785-b9e8-9dddcefab060 was answered 201 (held until 2026-11-26T03:14:22.197Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "aeaca4ae-bbe5-4f04-abf0-d170c57a82c3"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 69a3faa5-6e29-47bf-8415-93dcdb1738a7 was answered 201 (held until 2026-11-26T03:14:22.201Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a7f72ba4-7eac-4ee4-a2f8-269ae1dd43b3"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8d8fd4c0-fa68-48ab-8afe-a3da8dc83879 was answered 201 with booking 31291a5f-d8e5-40ee-af98-9c3cbf93dac3, which does not exist after recovery",
+          "bookingIds": [
+            "31291a5f-d8e5-40ee-af98-9c3cbf93dac3"
+          ],
+          "seatIds": [
+            "b1d5f97c-6e97-4f7c-be99-6de39f589be8"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f8425739-23cc-48e7-b07c-e8dd8e2a7b60 was answered 201 with booking f13e2ec3-4de1-4692-91df-9afd2945de3d, which does not exist after recovery",
+          "bookingIds": [
+            "f13e2ec3-4de1-4692-91df-9afd2945de3d"
+          ],
+          "seatIds": [
+            "7de5175e-6c2b-41bf-97c6-9896a1a819d5"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 68bc46d5-30b9-4dba-9647-a78b3f89c223 was answered 201 (held until 2026-11-26T03:14:22.206Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "0bad737e-1db9-4585-aa61-cbc33603dbe8"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 92389130-47a7-43b8-8dc8-87ad124cb0ff was answered 201 (held until 2026-11-26T03:14:22.212Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2692d46d-1ec0-48ad-8c4c-db64107171e1"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ef9d08e4-43ee-4725-b7ee-2e9a5b46dd49 was answered 201 with booking a437a850-b306-4073-8769-472fa9f7e0b6, which does not exist after recovery",
+          "bookingIds": [
+            "a437a850-b306-4073-8769-472fa9f7e0b6"
+          ],
+          "seatIds": [
+            "00f1638b-7bf3-4fd9-8023-a6edc36d5a89"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b98e72c1-eadc-495c-b1b6-5ff812b2f6b4 was answered 201 with booking c0ce9115-cfe1-4a2f-a01e-4e31367fde0d, which does not exist after recovery",
+          "bookingIds": [
+            "c0ce9115-cfe1-4a2f-a01e-4e31367fde0d"
+          ],
+          "seatIds": [
+            "ccf68af0-2ea3-42e1-bb88-329e890c8569"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1973f87f-3507-4e89-90d3-fa4ad3bb60e6 was answered 201 (held until 2026-11-26T03:14:22.218Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "bcb1f950-8d92-4391-aafe-db26db899ad4"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d37ecd01-1e27-4764-b0c2-6539bd861bdb was answered 201 (held until 2026-11-26T03:14:22.220Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "23df65e0-3c83-481e-8bdb-dbc943ecb1d9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold b36fa6e4-5900-43c2-aa39-867d9227694f was answered 201 (held until 2026-11-26T03:14:22.220Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "76549d0f-e133-4bd9-9a50-e45c2c5cc78b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f212ec7e-3fc2-491a-940b-a7ab3c1830d4 was answered 201 with booking 555ca97d-4d2f-4487-9c2e-cd744813798c, which does not exist after recovery",
+          "bookingIds": [
+            "555ca97d-4d2f-4487-9c2e-cd744813798c"
+          ],
+          "seatIds": [
+            "0dec5384-cda3-4d5c-9c67-538bd9c4ce68"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e54880ad-dab4-4d98-89c3-8c1605c3412e was answered 201 with booking c00f0d27-cb86-4a8b-9d9b-504dba610047, which does not exist after recovery",
+          "bookingIds": [
+            "c00f0d27-cb86-4a8b-9d9b-504dba610047"
+          ],
+          "seatIds": [
+            "24758d25-b36e-4114-8657-f392c93632cf"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold c32a1601-6205-441b-92df-7c2214e9aa93 was answered 201 (held until 2026-11-26T03:14:22.222Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9b8cb124-e253-4add-98bc-2bc3a26bc2b2"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 848dc047-1ca2-4ddc-b7ef-eadf4454b47a was answered 201 with booking 8fdd2956-af67-4229-981f-5e5e28701217, which does not exist after recovery",
+          "bookingIds": [
+            "8fdd2956-af67-4229-981f-5e5e28701217"
+          ],
+          "seatIds": [
+            "638a968b-5af5-4a8f-afa7-25b71dbe0aba"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e6538a7b-66eb-470b-9bce-ca366ef9c072 was answered 201 with booking 0c2fa532-55cb-47ce-8ed2-1eca629fe85a, which does not exist after recovery",
+          "bookingIds": [
+            "0c2fa532-55cb-47ce-8ed2-1eca629fe85a"
+          ],
+          "seatIds": [
+            "241aadcd-08d5-4edc-b22f-a85337106575"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6e27bfd4-4ac7-4f00-b870-36e75d81d891 was answered 201 with booking a7a2ec83-1dbd-4e64-a43e-c64b9739d0bf, which does not exist after recovery",
+          "bookingIds": [
+            "a7a2ec83-1dbd-4e64-a43e-c64b9739d0bf"
+          ],
+          "seatIds": [
+            "acb736c4-ae7d-4262-9b58-fb31b0891c65"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold afb6de34-3641-482b-bfc5-4790c3f68f59 was answered 201 (held until 2026-11-26T03:14:22.228Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "d87018a0-93fd-4291-95f1-7910842d504a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 0f30d612-ecd7-47ca-810f-6d263556441d was answered 201 (held until 2026-11-26T03:14:22.230Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "83f978f1-2be6-4a21-b15b-bf8bf3d933d1"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a577350b-85ce-4a90-8803-4da49f8a8f0c was answered 201 with booking d93e4aff-83a7-4874-b0e8-6c74cfb412b0, which does not exist after recovery",
+          "bookingIds": [
+            "d93e4aff-83a7-4874-b0e8-6c74cfb412b0"
+          ],
+          "seatIds": [
+            "8d404d5f-83cf-495d-8900-d95263fd82d2"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold cb57bbf4-2f86-4b8e-9b25-8f54456afe6d was answered 201 (held until 2026-11-26T03:14:22.236Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4867422b-1966-4fbc-b9f3-518db7fd93c9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 771a79cd-a195-4832-9c73-4c5d0f04bacf was answered 201 with booking 699e3f5d-b95b-465c-a5ac-1801110d1907, which does not exist after recovery",
+          "bookingIds": [
+            "699e3f5d-b95b-465c-a5ac-1801110d1907"
+          ],
+          "seatIds": [
+            "22a1c10f-463c-4b14-adf3-ea2dd97f9cd7"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 07e7bc3d-f9a3-47fe-b934-9b83a0782add was answered 201 (held until 2026-11-26T03:14:22.242Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "39fd1297-10fb-4cf2-9d66-cf2289173847"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 62ddce47-78e3-4073-a81f-e42b6186116a was answered 201 with booking 2132f544-cdbc-4be1-aef1-41be9ab11d6a, which does not exist after recovery",
+          "bookingIds": [
+            "2132f544-cdbc-4be1-aef1-41be9ab11d6a"
+          ],
+          "seatIds": [
+            "05f56c9b-cdab-412c-8727-db4caec91402"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 77985b7e-376a-4447-88dd-8d4c5ebf4f2c was answered 201 with booking f2b3a24a-0913-4923-bada-61a4a049b380, which does not exist after recovery",
+          "bookingIds": [
+            "f2b3a24a-0913-4923-bada-61a4a049b380"
+          ],
+          "seatIds": [
+            "406e20eb-4e94-42d8-8186-576b70e53f9b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 94cd1c1b-68ed-4758-8c32-8bc0b65bd039 was answered 201 with booking 79b8a90c-1351-4a81-88ff-d47851ca1e98, which does not exist after recovery",
+          "bookingIds": [
+            "79b8a90c-1351-4a81-88ff-d47851ca1e98"
+          ],
+          "seatIds": [
+            "42a6af48-4d31-4a89-9d44-b6c62224102e"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6e192c71-fddd-4f1e-b47d-34921a93f633 was answered 201 with booking a28754ac-5471-490b-be31-ea23bd398028, which does not exist after recovery",
+          "bookingIds": [
+            "a28754ac-5471-490b-be31-ea23bd398028"
+          ],
+          "seatIds": [
+            "4a5b4919-1935-4566-bfab-79c4cbe36ef0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7c2de3fb-70d2-485e-a78b-37ebf26b0f2f was answered 201 (held until 2026-11-26T03:14:22.250Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "b459cf12-c89f-4366-9bc4-39cefd91858a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 865c8322-ab13-4785-b19d-646090c35efe was answered 201 (held until 2026-11-26T03:14:22.251Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "8443bb78-a4f0-4d1b-8b58-0eaf242e6eff"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 55df2d04-f6e1-4b4c-a227-7acfde6baad9 was answered 201 with booking c0ef6f7b-96c5-4f13-a264-32fc5d179409, which does not exist after recovery",
+          "bookingIds": [
+            "c0ef6f7b-96c5-4f13-a264-32fc5d179409"
+          ],
+          "seatIds": [
+            "b33afcf5-df9f-447f-9cc6-08ea9b4eb04b"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 23bef46f-1dd8-4b0a-9604-5b42b51f647f was answered 201 (held until 2026-11-26T03:14:22.254Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "658cf42f-b2e8-4fe0-83cd-3ecf2df9a3c0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold b62bba8c-04de-465d-9f42-9bfc8da151f8 was answered 201 (held until 2026-11-26T03:14:22.255Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "5c1d3031-25df-4c6a-85fd-b7082e11ec6a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f84a47f9-a0b3-43f4-a6a5-c42e5e8ea3de was answered 201 (held until 2026-11-26T03:14:22.257Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "97025a44-dbab-44c9-b487-d5535bfcbef0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold b295843a-e82a-4dfe-b567-6c50fc15544d was answered 201 (held until 2026-11-26T03:14:22.259Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "096f8bce-8e41-43b0-9e6f-73650d871936"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 2dec8307-6c7f-483a-bb6d-a33f38a69381 was answered 201 (held until 2026-11-26T03:14:22.262Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f06ba165-7b25-4866-bbd1-8f3f3f70269f"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold b11cec26-856d-403e-aa6b-db534ae7fe83 was answered 201 (held until 2026-11-26T03:14:22.263Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ce0e454a-74d5-4b6e-a27e-f16c0fb1d010"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 0ba8fb30-9f39-41e6-b8f6-fdcbee129822 was answered 201 (held until 2026-11-26T03:14:22.264Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "bd620e5b-50c6-44ae-bd0b-74f33d40d2b7"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 4f74cf41-4fab-4b06-803b-3cbf40515968 was answered 201 with booking 8d6938db-cd54-4c4b-9ec5-3d0d13481c83, which does not exist after recovery",
+          "bookingIds": [
+            "8d6938db-cd54-4c4b-9ec5-3d0d13481c83"
+          ],
+          "seatIds": [
+            "3c4e6880-7d3a-47a1-a6c6-c4769e377bd9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 51309a1f-e5ec-4b67-af98-1e3e59364ac1 was answered 201 (held until 2026-11-26T03:14:22.276Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "17f7dc31-d2c8-4f44-9667-2934dc768a89"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 75d8e26e-9222-4387-a00e-0072b418ccc5 was answered 201 with booking 632a856c-b33a-4445-a008-d73eab2d7751, which does not exist after recovery",
+          "bookingIds": [
+            "632a856c-b33a-4445-a008-d73eab2d7751"
+          ],
+          "seatIds": [
+            "153f95a2-856d-47bb-bf30-3a142736a430"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f48b540f-2ee4-4b4f-8bd4-579d1082f45f was answered 201 with booking d19d01ac-fe56-4c6d-b0bb-66d914cd9b4a, which does not exist after recovery",
+          "bookingIds": [
+            "d19d01ac-fe56-4c6d-b0bb-66d914cd9b4a"
+          ],
+          "seatIds": [
+            "b0b4eae3-60bd-4561-8522-0adf4639a2f7"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 4116be4e-5451-41ef-9e37-169877380e96 was answered 201 (held until 2026-11-26T03:14:22.289Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6d45b0f3-6f5d-454b-b624-f3dc7d942a2a"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9264833f-7aad-440d-bf5c-c2e85eeaa32d was answered 201 with booking b5c924b9-fab7-4950-9b3e-60923849b7b1, which does not exist after recovery",
+          "bookingIds": [
+            "b5c924b9-fab7-4950-9b3e-60923849b7b1"
+          ],
+          "seatIds": [
+            "a4bdf6a8-8cc6-423c-8623-44a827a67651"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 73dff47f-cefd-4e42-bf62-ab1766104333 was answered 201 (held until 2026-11-26T03:14:22.294Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4f9368c8-a43a-44c5-96a6-d8e3885f682c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 64a2f7f7-f2df-46cd-b8fe-0cfe49dafddd was answered 201 (held until 2026-11-26T03:14:22.294Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2b9e2a84-8e5f-4a55-89c2-b78480df19ec"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 58ca8307-6590-4962-a7cb-326aafe4a0e7 was answered 201 (held until 2026-11-26T03:14:22.296Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "948c2eba-e234-4f20-a15b-2811d910d849"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold a79281d8-625a-400e-9eb2-b9a0c825a84f was answered 201 (held until 2026-11-26T03:14:22.298Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "c17c398a-2ec0-408e-81ca-0fe4ab5d3c8b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b109771a-72e8-4d83-bac5-038b86ba5e78 was answered 201 with booking bb83654a-1f53-4fe6-b36c-b12942a4ea0c, which does not exist after recovery",
+          "bookingIds": [
+            "bb83654a-1f53-4fe6-b36c-b12942a4ea0c"
+          ],
+          "seatIds": [
+            "5c8933a9-457a-4e81-8b36-9b059aee1009"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 258e7742-3752-4101-af01-8e3c6454c413 was answered 201 with booking 5cb3f767-56e5-4a58-9555-8130b8cd726c, which does not exist after recovery",
+          "bookingIds": [
+            "5cb3f767-56e5-4a58-9555-8130b8cd726c"
+          ],
+          "seatIds": [
+            "cc0b992a-6a6b-4f5b-a0fd-46114e7f3f65"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a06a4c97-badf-4b4c-9d31-f473e82d6bf8 was answered 201 with booking 9a556a6b-625c-4942-959d-87be86fe1174, which does not exist after recovery",
+          "bookingIds": [
+            "9a556a6b-625c-4942-959d-87be86fe1174"
+          ],
+          "seatIds": [
+            "f47ce160-b59a-4cf2-8381-0ce4869fa144"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 2cc9afb3-863a-4e78-921b-9e054c060766 was answered 201 (held until 2026-11-26T03:14:22.308Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "bacc77a9-2cae-49e9-9494-956dcf871714"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold df1e3673-28f2-4318-a93e-efafe0adc57c was answered 201 (held until 2026-11-26T03:14:22.308Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "00723b5a-21b7-4b35-84ed-2a312756a9c2"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold db3923b6-6032-48af-9c57-4cc6dabdf1e4 was answered 201 (held until 2026-11-26T03:14:22.310Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "955690e6-d11d-4663-96cb-a32c53836d62"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 9d6c4618-d5f7-41f3-94a0-b5b8e8e9431a was answered 201 (held until 2026-11-26T03:14:22.310Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "5f6d015a-6b8e-419c-b59e-ee7c6eed64bb"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9a43d08e-ebc4-45c3-babc-5785f3935d4f was answered 201 with booking 31e0efb9-f4e7-4e92-943a-50143a196508, which does not exist after recovery",
+          "bookingIds": [
+            "31e0efb9-f4e7-4e92-943a-50143a196508"
+          ],
+          "seatIds": [
+            "7542aeb7-0ab8-47c0-94dd-6bec5281d7cf"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 51002885-e9a6-4a87-a409-c54607c88f63 was answered 201 (held until 2026-11-26T03:14:22.312Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ac232833-40be-4bd5-9079-69d7dc21a84f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold df3dea62-68b2-4a86-938d-f0e38f689f10 was answered 201 with booking 464d6c70-4e5e-403d-b53a-6cc6625b27fd, which does not exist after recovery",
+          "bookingIds": [
+            "464d6c70-4e5e-403d-b53a-6cc6625b27fd"
+          ],
+          "seatIds": [
+            "ef2a6e5a-531e-44c7-b88a-14f1168e5183"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c94c3b05-49a5-4955-ac50-59cf26e727b8 was answered 201 with booking 21814846-2645-433c-8c16-f0f467dc645f, which does not exist after recovery",
+          "bookingIds": [
+            "21814846-2645-433c-8c16-f0f467dc645f"
+          ],
+          "seatIds": [
+            "afb1621f-663e-4363-b417-ec09524f69ea"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ab8b08c5-bb31-4057-ad81-6d03c6f0f571 was answered 201 with booking 42f98509-9e31-4535-806c-6e1ab2b42138, which does not exist after recovery",
+          "bookingIds": [
+            "42f98509-9e31-4535-806c-6e1ab2b42138"
+          ],
+          "seatIds": [
+            "71c39381-c66c-4bee-912e-e3153570cdc7"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1018d415-82c5-4f22-bf7c-ab5f11365c1b was answered 201 (held until 2026-11-26T03:14:22.318Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "995a773d-a1a4-4e58-a3e8-b4bd4974e4f5"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 93da0ff7-6887-4770-b1c4-1aa630d3c2c7 was answered 201 with booking ce49cfde-90e2-4a1d-b294-48afbe9731a5, which does not exist after recovery",
+          "bookingIds": [
+            "ce49cfde-90e2-4a1d-b294-48afbe9731a5"
+          ],
+          "seatIds": [
+            "89315497-f62c-44d2-85ec-592b29f0a414"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 591be747-8e35-4e9d-8616-d8c6354bc3aa was answered 201 (held until 2026-11-26T03:14:22.320Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a2fa9527-a69d-4829-80e6-2ea99b22149e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e942ac1e-e849-471c-b3dc-cb9e97a442c5 was answered 201 (held until 2026-11-26T03:14:22.320Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "b2419d2c-9191-4ca7-8324-4baa820b0851"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c9aee9d0-03a3-4bfe-a95e-f71117aadc98 was answered 201 with booking e407bd89-acfc-483b-b7aa-026f5620baae, which does not exist after recovery",
+          "bookingIds": [
+            "e407bd89-acfc-483b-b7aa-026f5620baae"
+          ],
+          "seatIds": [
+            "869f00de-66f7-4748-a832-dd28a176e1d1"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1c86fc5f-3cdb-4242-bf91-874c47048a3d was answered 201 (held until 2026-11-26T03:14:22.326Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "5d3c4539-6eb7-4f13-a662-6baba2ffafa0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold cd731135-6094-4017-9ab6-eb56f2ecc157 was answered 201 (held until 2026-11-26T03:14:22.326Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "63b42bb5-41e1-4f9c-a1eb-67d7447d1fa8"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e3674f4f-8883-4f4b-bb1c-1ecfdd72dd83 was answered 201 with booking 47c56175-a48e-4d97-a7b9-b176f7edef09, which does not exist after recovery",
+          "bookingIds": [
+            "47c56175-a48e-4d97-a7b9-b176f7edef09"
+          ],
+          "seatIds": [
+            "bc0efd94-816b-402c-b53e-086618fb9a9c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 9a37acf0-50cf-4c48-a02b-0ae88d2dfe45 was answered 201 (held until 2026-11-26T03:14:22.329Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "19177518-946f-4406-a4ae-464bdae94f69"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold ed5cdbb5-26b9-4d67-a456-c637a0100709 was answered 201 (held until 2026-11-26T03:14:22.331Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a4375e8d-3c38-402a-a088-3aebabe6cf66"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 400107ac-9461-4a31-9fd6-14228022c8ec was answered 201 with booking 86bb7031-c7e7-4295-a8aa-b4ed13d698e5, which does not exist after recovery",
+          "bookingIds": [
+            "86bb7031-c7e7-4295-a8aa-b4ed13d698e5"
+          ],
+          "seatIds": [
+            "d9ea2e95-a8db-4fc6-b03c-e02253c26a38"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6243e9ba-80dc-4e92-82d0-523de95b0981 was answered 201 (held until 2026-11-26T03:14:22.343Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "35228fff-6052-4f16-9b0b-aa9c3cd8a57e"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 415b7cef-1b16-43f7-911b-9d423aa7d54f was answered 201 with booking fb51ea31-e3d5-475c-a372-f9dc85fae582, which does not exist after recovery",
+          "bookingIds": [
+            "fb51ea31-e3d5-475c-a372-f9dc85fae582"
+          ],
+          "seatIds": [
+            "8150844e-ac10-4650-8738-0c50f4388d4a"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f98f298b-02bd-4079-836a-69436da06403 was answered 201 with booking ace46adb-489d-4baf-bce7-5bc85ebba97e, which does not exist after recovery",
+          "bookingIds": [
+            "ace46adb-489d-4baf-bce7-5bc85ebba97e"
+          ],
+          "seatIds": [
+            "9b410198-d5e0-494b-a973-ccceb6007db2"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d55c332b-81f8-4729-a57e-22bcf493ea77 was answered 201 with booking 9b5a54b8-0b9d-4396-982d-73c2de2dfc34, which does not exist after recovery",
+          "bookingIds": [
+            "9b5a54b8-0b9d-4396-982d-73c2de2dfc34"
+          ],
+          "seatIds": [
+            "d79686a4-a339-41a0-b3fa-804c105b601e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold dd61ac24-8ecb-4ae8-85dd-772922bd29ab was answered 201 (held until 2026-11-26T03:14:22.359Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "d92767de-868f-4f28-b73c-05da233650d6"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 09c0fcc5-b453-45c0-88fc-bd4af01bd99c was answered 201 (held until 2026-11-26T03:14:22.360Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ee3d29e6-23b6-4553-8794-8cdeaf7f1d6e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 06bdde0a-dac0-48e5-bb6f-22448522d686 was answered 201 (held until 2026-11-26T03:14:22.361Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "c07c9fb8-cbe6-4e24-b546-f36649332834"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 02dada09-d783-4eb8-9e5a-1a3136028598 was answered 201 (held until 2026-11-26T03:14:22.364Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "bfac1b5d-4290-4746-8a47-655f7339a9c6"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 23963ca5-75b2-41ba-969c-084590754b1a was answered 201 with booking 8cb7e786-082d-4e80-86ea-cd7484826803, which does not exist after recovery",
+          "bookingIds": [
+            "8cb7e786-082d-4e80-86ea-cd7484826803"
+          ],
+          "seatIds": [
+            "06eb2a1a-568c-46e6-92b7-5b90c3c9af7d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6e976193-d9ec-467e-90cb-836764745b86 was answered 201 (held until 2026-11-26T03:14:22.366Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "80b88e33-004a-4b9e-a09a-b3914f75231f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d5349f72-d064-4d47-8eb2-da8122614d47 was answered 201 with booking d0763d22-475c-43d8-8b47-9d6e2a523da5, which does not exist after recovery",
+          "bookingIds": [
+            "d0763d22-475c-43d8-8b47-9d6e2a523da5"
+          ],
+          "seatIds": [
+            "301894f0-9b55-4895-9489-359994be9410"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold a6661e4a-fe00-457a-9e24-7c9f36bb4b77 was answered 201 (held until 2026-11-26T03:14:22.369Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4fa55b07-3107-4eaa-9af5-678557227e67"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 191e9847-ca75-4321-81bb-e447e2b08f90 was answered 201 with booking 98a880eb-4cb7-4d77-b155-2d45f5c10fa2, which does not exist after recovery",
+          "bookingIds": [
+            "98a880eb-4cb7-4d77-b155-2d45f5c10fa2"
+          ],
+          "seatIds": [
+            "b56e97a9-a119-49c1-94ea-eb5fda7036d0"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 248a16c0-ab0d-4ed6-b7de-e5eb35f636dd was answered 201 with booking d655986c-40a1-43cd-83bd-f9097ba52e23, which does not exist after recovery",
+          "bookingIds": [
+            "d655986c-40a1-43cd-83bd-f9097ba52e23"
+          ],
+          "seatIds": [
+            "d7cc17b1-4bf5-49e9-b82e-adfb1bf30321"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e1693fb8-4d63-4f80-99b9-823031b3a559 was answered 201 with booking a812e3f5-1d9f-48ed-9798-0c0212f56bd4, which does not exist after recovery",
+          "bookingIds": [
+            "a812e3f5-1d9f-48ed-9798-0c0212f56bd4"
+          ],
+          "seatIds": [
+            "0058a825-52e5-492f-9ec9-52c60f4c820c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 55b344a2-1bff-4d5b-aefe-c5ac13ed1d95 was answered 201 (held until 2026-11-26T03:14:22.379Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2b01daa9-c7a9-43fd-8ad6-7716d7bf5f14"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 900e0700-eec1-481f-995b-405827826415 was answered 201 with booking 42dc1b9f-f9a9-4179-9aee-d8825556cde9, which does not exist after recovery",
+          "bookingIds": [
+            "42dc1b9f-f9a9-4179-9aee-d8825556cde9"
+          ],
+          "seatIds": [
+            "6bba3762-7fa9-4b2a-8541-a1891acb0ac0"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2f411424-e51b-4bdb-baa4-975bb6826c6c was answered 201 with booking 53daee00-35cf-4f35-bb1a-6a96f0699f1b, which does not exist after recovery",
+          "bookingIds": [
+            "53daee00-35cf-4f35-bb1a-6a96f0699f1b"
+          ],
+          "seatIds": [
+            "85c88879-e6a2-43ce-a824-8a8ad456a0e9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold de946a06-1e08-431c-9f83-e5f864bd295a was answered 201 (held until 2026-11-26T03:14:22.385Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ff3b4b41-fe2a-4e99-989f-8bc65f15b81b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 45df3483-30fc-4fc8-b749-2b8f130dbacc was answered 201 with booking 6a3df08e-318b-4872-a2a4-74079b361066, which does not exist after recovery",
+          "bookingIds": [
+            "6a3df08e-318b-4872-a2a4-74079b361066"
+          ],
+          "seatIds": [
+            "a67cd2d9-152f-4fa2-ad2c-962c91b4e44f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 4fd7ea7e-0edd-4b38-b80f-2d9f882e15eb was answered 201 with booking 76281bff-3fc4-4693-9264-2fcb524b373a, which does not exist after recovery",
+          "bookingIds": [
+            "76281bff-3fc4-4693-9264-2fcb524b373a"
+          ],
+          "seatIds": [
+            "50b6a48a-8ed4-4780-bade-d0dfc0c51d03"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold cf4111a2-a3ed-424f-8813-94ae682005e2 was answered 201 (held until 2026-11-26T03:14:22.393Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "af37f336-e56b-4cf8-bee5-d857c5206f85"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6407bd6f-9587-45df-9bf2-a6fb17d36fc8 was answered 201 with booking 489d92a5-d5a6-4aaa-8d17-b2383c4920f0, which does not exist after recovery",
+          "bookingIds": [
+            "489d92a5-d5a6-4aaa-8d17-b2383c4920f0"
+          ],
+          "seatIds": [
+            "1b8e136f-ed6f-413d-9bab-9a4daebc76c1"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f067bfb1-12d0-43f3-b5bd-e8d70a3d2550 was answered 201 (held until 2026-11-26T03:14:22.396Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6fe199dc-4e6b-461c-b576-98b22379fb72"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6503ce21-412b-4ce8-9483-f58c5c05e0db was answered 201 with booking 369e8873-91f8-43ed-932c-999d9b53cbe9, which does not exist after recovery",
+          "bookingIds": [
+            "369e8873-91f8-43ed-932c-999d9b53cbe9"
+          ],
+          "seatIds": [
+            "ffd7ce99-2682-4c0e-a3de-1ef73cdde64f"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 5f04ef60-8125-4315-afc5-53e222461c86 was answered 201 (held until 2026-11-26T03:14:22.399Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "51b53a71-d0ac-45f1-85b6-d7eb53fd8799"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 28ba8a55-99ed-45a2-8ee0-8bff14034e55 was answered 201 (held until 2026-11-26T03:14:22.402Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2b01b5f5-6138-4cdb-b422-71d5fe1afbb0"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold bd58ec5d-700a-486a-ac72-f4c5124ef769 was answered 201 with booking 09d6f74b-9588-4569-b1cb-40227b897b23, which does not exist after recovery",
+          "bookingIds": [
+            "09d6f74b-9588-4569-b1cb-40227b897b23"
+          ],
+          "seatIds": [
+            "a482a245-3f0c-475b-aa40-22234d23fbd3"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 48888640-777e-4bbd-b97f-ade6f8c5c65d was answered 201 with booking 7576b588-1ae6-4318-82bc-4d9b74c07adc, which does not exist after recovery",
+          "bookingIds": [
+            "7576b588-1ae6-4318-82bc-4d9b74c07adc"
+          ],
+          "seatIds": [
+            "f93a62cb-5283-43bf-94ba-06b13a645c58"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b41b4032-d46a-40fe-aa98-38f4417b2479 was answered 201 with booking 3854bc78-d8b1-4be1-8630-f60526084e3a, which does not exist after recovery",
+          "bookingIds": [
+            "3854bc78-d8b1-4be1-8630-f60526084e3a"
+          ],
+          "seatIds": [
+            "df27b35a-e10d-4317-b1bc-dba56840438f"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold c03b44c7-743f-4f85-ab45-c5f8fb7e2d50 was answered 201 (held until 2026-11-26T03:14:22.407Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "e61ee7e0-6c4a-4125-a509-3e663ab39490"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2e70a3c8-64e1-4a6f-8f9f-6ce9c1a20e2c was answered 201 with booking 179add60-6e1c-40a1-ab93-12d163f7f36d, which does not exist after recovery",
+          "bookingIds": [
+            "179add60-6e1c-40a1-ab93-12d163f7f36d"
+          ],
+          "seatIds": [
+            "361f8b4f-9597-49b4-9485-4272828bb9f7"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold fe91ef70-8843-41d7-8833-65e11b9d3d35 was answered 201 (held until 2026-11-26T03:14:22.417Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "270730ec-19d9-4e5c-848f-2c8ecf2e5f1b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 253f9105-d10a-4320-acef-13493c0b232f was answered 201 with booking 2aa68a82-b674-47ad-8214-a799d7dffe83, which does not exist after recovery",
+          "bookingIds": [
+            "2aa68a82-b674-47ad-8214-a799d7dffe83"
+          ],
+          "seatIds": [
+            "d7945db1-229a-4b97-a1c5-f2d48f1eae1a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 687f30f3-4993-403e-b87a-23960e9fb0bf was answered 201 (held until 2026-11-26T03:14:22.420Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f14085f4-845d-40c8-87e3-4e43fbe9d60a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 211fb4c0-2a97-4d43-9f3c-54ff521371b0 was answered 201 (held until 2026-11-26T03:14:22.420Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "b1826f71-0b5e-44ef-a85e-81a11a98fc58"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 43fa7689-9175-459f-a130-101d8a64f4ca was answered 201 (held until 2026-11-26T03:14:22.422Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f2391d09-8336-40b4-adeb-0bfd524800f8"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 5b0db7e6-20b5-4086-ac96-917c7bb681f5 was answered 201 with booking d4df50d4-c48e-421f-8390-0648a51404a7, which does not exist after recovery",
+          "bookingIds": [
+            "d4df50d4-c48e-421f-8390-0648a51404a7"
+          ],
+          "seatIds": [
+            "b60f4828-52cc-4e95-b3a9-66e1418d422b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 97c4a3ee-23ed-4c30-ad2e-b953c3b337a7 was answered 201 with booking b03e5821-da5e-4504-9fce-0a12ac62dfd8, which does not exist after recovery",
+          "bookingIds": [
+            "b03e5821-da5e-4504-9fce-0a12ac62dfd8"
+          ],
+          "seatIds": [
+            "142318de-788f-4623-a5f8-a7f23572b6d6"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 1632039e-3ce3-4872-90ba-cd582e6aae55 was answered 201 with booking b22d14be-7e75-4b72-8d18-0bc6d018f912, which does not exist after recovery",
+          "bookingIds": [
+            "b22d14be-7e75-4b72-8d18-0bc6d018f912"
+          ],
+          "seatIds": [
+            "81fac070-26a6-4e2f-9141-5009755dfdcc"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 58d40977-b86a-408b-8fc9-a80c08a616ec was answered 201 (held until 2026-11-26T03:14:22.425Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a42c77c7-67c3-43fe-8162-b17ea0b7c61d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ccc3b711-0512-4806-8da2-8473e3e78cda was answered 201 with booking d84f175a-c73b-4bc6-bbaf-747ffa491243, which does not exist after recovery",
+          "bookingIds": [
+            "d84f175a-c73b-4bc6-bbaf-747ffa491243"
+          ],
+          "seatIds": [
+            "82b59117-c537-43ad-b18e-c26ccc0a31db"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold dd606c62-a4a3-4c21-b111-acc112be541d was answered 201 (held until 2026-11-26T03:14:22.431Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "73a325f5-d114-4f88-811a-c34ba0530c7f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8e79288b-c0bd-4970-91fc-8b6016cacd58 was answered 201 with booking 42cebd14-1d7e-4297-8e0d-2b8c8cbc0ec7, which does not exist after recovery",
+          "bookingIds": [
+            "42cebd14-1d7e-4297-8e0d-2b8c8cbc0ec7"
+          ],
+          "seatIds": [
+            "0625be2e-2c64-422b-856c-c2d0a448f477"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold fdd15b2f-8608-4064-b00a-7d3a5777a940 was answered 201 with booking e77729a1-a389-4032-a5e6-ace52ff4b3c4, which does not exist after recovery",
+          "bookingIds": [
+            "e77729a1-a389-4032-a5e6-ace52ff4b3c4"
+          ],
+          "seatIds": [
+            "18c8459c-3a4f-42e0-99b4-38ae943c1760"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 3523c0a7-8420-4299-9bcd-7525f186ef55 was answered 201 (held until 2026-11-26T03:14:22.434Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2bc807c8-f136-4309-a3e9-374e7975297b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 92bbb46d-ade7-4da4-a0f1-7bacde2647d9 was answered 201 with booking c2eba5ac-b7b1-4eed-a2bc-ee81560634b9, which does not exist after recovery",
+          "bookingIds": [
+            "c2eba5ac-b7b1-4eed-a2bc-ee81560634b9"
+          ],
+          "seatIds": [
+            "eaa69a7d-87bf-4b0a-b72d-6212d7bf9963"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e430682c-8eb0-4299-aefc-8329d0cc7311 was answered 201 (held until 2026-11-26T03:14:22.437Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "5a9474eb-e8e0-4550-9bf2-63ac7a03eda9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7dcedb92-60a5-4d7b-8f40-5284c42961bb was answered 201 with booking bceecab9-3b26-4425-a38f-7fd17f8a5374, which does not exist after recovery",
+          "bookingIds": [
+            "bceecab9-3b26-4425-a38f-7fd17f8a5374"
+          ],
+          "seatIds": [
+            "b8d9921c-cb22-412f-8e93-c567b617ef5c"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold fbedd44b-91d5-4e49-9883-46dca213ea06 was answered 201 with booking e8f4103d-349e-440b-b1dd-8848bfac5f04, which does not exist after recovery",
+          "bookingIds": [
+            "e8f4103d-349e-440b-b1dd-8848bfac5f04"
+          ],
+          "seatIds": [
+            "f194670f-31e8-4fdd-8745-1a6ce7a6e03e"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 221f4a0e-586b-4806-ae88-0fefb34c0bee was answered 201 with booking 443525cc-c8bb-44cc-b9c0-21e412e342c4, which does not exist after recovery",
+          "bookingIds": [
+            "443525cc-c8bb-44cc-b9c0-21e412e342c4"
+          ],
+          "seatIds": [
+            "15b84899-ccbf-4c76-8f6b-3f1770405cdb"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 099535c3-8bd9-4df5-bb72-14a611cd38c6 was answered 201 with booking f9cc8302-bb1b-4d99-82eb-ae274339e913, which does not exist after recovery",
+          "bookingIds": [
+            "f9cc8302-bb1b-4d99-82eb-ae274339e913"
+          ],
+          "seatIds": [
+            "30971442-b23a-492c-8653-acbaace27d3d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 66500b0b-44ef-4852-ab91-e563ec9c2e63 was answered 201 with booking f92bd90b-ab78-4778-9414-877d0adebabf, which does not exist after recovery",
+          "bookingIds": [
+            "f92bd90b-ab78-4778-9414-877d0adebabf"
+          ],
+          "seatIds": [
+            "2114d667-8680-4772-a079-8d191405eb1f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8cc103b4-5882-4c5d-bd14-2305f6721fe1 was answered 201 with booking 8ff3119c-7cbd-4eba-8d0b-8465b2ed72e9, which does not exist after recovery",
+          "bookingIds": [
+            "8ff3119c-7cbd-4eba-8d0b-8465b2ed72e9"
+          ],
+          "seatIds": [
+            "56135110-8cda-4169-b0f1-b55770279513"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e99fdfff-3c33-4831-8cb7-e0b08b445c6d was answered 201 with booking af8277e4-e516-4944-9da8-1536289ba445, which does not exist after recovery",
+          "bookingIds": [
+            "af8277e4-e516-4944-9da8-1536289ba445"
+          ],
+          "seatIds": [
+            "5d8851d6-c944-41d5-b2be-cae7829d9d0e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 3bac3d73-2711-4338-8ec1-215eb1243280 was answered 201 (held until 2026-11-26T03:14:22.463Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "b624b73e-16f6-4fe1-9f7b-3a9249f3aca6"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 0658916d-cf20-4b29-98e4-b09cb7f4584c was answered 201 with booking 17338fd7-b62e-4dcc-93a5-a0c3a879071b, which does not exist after recovery",
+          "bookingIds": [
+            "17338fd7-b62e-4dcc-93a5-a0c3a879071b"
+          ],
+          "seatIds": [
+            "a4ba6eeb-f271-427b-a7fe-6c48575a170d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 44644de5-efe5-4223-b0b7-aaf7cf453d10 was answered 201 with booking dae00245-29da-4ed6-b377-2d1e7096405a, which does not exist after recovery",
+          "bookingIds": [
+            "dae00245-29da-4ed6-b377-2d1e7096405a"
+          ],
+          "seatIds": [
+            "bb0247f1-ad85-4c6e-9fe9-91c1051b0156"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 26adfee5-35f5-4175-a33c-ac39c2123f48 was answered 201 with booking 8274b3a6-c713-4ee6-b80c-acd16549a335, which does not exist after recovery",
+          "bookingIds": [
+            "8274b3a6-c713-4ee6-b80c-acd16549a335"
+          ],
+          "seatIds": [
+            "73f59552-c04f-44ac-a572-6860df443eb9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f1787ee4-7379-42e1-87b6-b8378b6157d4 was answered 201 with booking 8806f8c4-d6ad-45f8-95ce-3a6b7f394fb3, which does not exist after recovery",
+          "bookingIds": [
+            "8806f8c4-d6ad-45f8-95ce-3a6b7f394fb3"
+          ],
+          "seatIds": [
+            "9c06e891-0ace-4161-aff0-1c60b3c88c70"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c7a9ab11-b0e6-4ec8-b941-676f5fc42dbc was answered 201 with booking 33169acd-1f18-44e9-a2de-c33409ee7cc2, which does not exist after recovery",
+          "bookingIds": [
+            "33169acd-1f18-44e9-a2de-c33409ee7cc2"
+          ],
+          "seatIds": [
+            "7cb7d4e9-a9d9-4113-8db7-443da4e67a33"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 46ae7955-ae8b-4191-a657-36e0cc53546b was answered 201 with booking 9e49b876-6d51-439b-9457-2e2376c545f5, which does not exist after recovery",
+          "bookingIds": [
+            "9e49b876-6d51-439b-9457-2e2376c545f5"
+          ],
+          "seatIds": [
+            "0f9da8af-8f2f-4301-b2b5-8f3ae7a35d4b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold fdcb9cce-fcfc-4b68-98b1-2a73ccb85984 was answered 201 with booking fd1060bc-d3ae-4474-adee-b3408739be46, which does not exist after recovery",
+          "bookingIds": [
+            "fd1060bc-d3ae-4474-adee-b3408739be46"
+          ],
+          "seatIds": [
+            "a5a0af9c-292b-41f6-8514-65c8b7689d05"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6b1fff4f-4f18-46b4-bba8-f27d0b2d2ff3 was answered 201 (held until 2026-11-26T03:14:22.483Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "509c5817-1d85-40ba-a827-69a9cd0fa8dc"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e98886a2-0fb7-4969-b770-e8b638fc723b was answered 201 with booking b9928475-aa29-4ed9-b738-676a0750bcf4, which does not exist after recovery",
+          "bookingIds": [
+            "b9928475-aa29-4ed9-b738-676a0750bcf4"
+          ],
+          "seatIds": [
+            "9320b386-ff87-4b5d-aad9-927dffcf3f3d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 39bcef00-9a16-497f-97e0-6353ffa40ca7 was answered 201 with booking ed527ed2-fd4c-4b19-9d8b-797e79fd4325, which does not exist after recovery",
+          "bookingIds": [
+            "ed527ed2-fd4c-4b19-9d8b-797e79fd4325"
+          ],
+          "seatIds": [
+            "088748df-b47b-460f-ada9-7bf813ccc779"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a4b78d40-1c35-4536-bfa3-9e3b35f3c623 was answered 201 with booking 23ce241b-8267-4749-a3b6-eb03b9ff6341, which does not exist after recovery",
+          "bookingIds": [
+            "23ce241b-8267-4749-a3b6-eb03b9ff6341"
+          ],
+          "seatIds": [
+            "35f156f0-9654-450a-8325-2bee41dabac1"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e5ec7935-9812-4e6c-b2f4-b124a270da1b was answered 201 with booking 765a1a2b-af29-4a8a-9f7e-3714af48ba8d, which does not exist after recovery",
+          "bookingIds": [
+            "765a1a2b-af29-4a8a-9f7e-3714af48ba8d"
+          ],
+          "seatIds": [
+            "a0d3ba28-71b6-4852-81fb-598604f69c3e"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a3f2aa8b-be77-406b-9835-10373299384f was answered 201 with booking a772348c-59a9-40fc-82f0-b4d68b605f40, which does not exist after recovery",
+          "bookingIds": [
+            "a772348c-59a9-40fc-82f0-b4d68b605f40"
+          ],
+          "seatIds": [
+            "8989f7e6-ce42-417a-93a1-963a8521d928"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a31e9ccf-0b12-4830-990f-ad593ab1e0e6 was answered 201 with booking d3bb6ccc-9608-4e55-aabe-21366d85f67a, which does not exist after recovery",
+          "bookingIds": [
+            "d3bb6ccc-9608-4e55-aabe-21366d85f67a"
+          ],
+          "seatIds": [
+            "8e6190cc-e4b6-40e4-86be-62005a5ca204"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7b021531-39fd-4c46-a352-38d4ae8c035e was answered 201 (held until 2026-11-26T03:14:22.496Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f921ed61-f4dd-4af7-b541-e74011b5ad2a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 43b1df0e-21ca-4989-b438-73b4bf38fd6a was answered 201 (held until 2026-11-26T03:14:22.500Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "637e3c33-4cc5-43ed-98d8-2fb30ba81dca"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold dfcf53ef-14e6-4651-80ec-1bb0d77c272d was answered 201 with booking 69ddfd78-20fc-4a90-bb1c-53fdc22ee799, which does not exist after recovery",
+          "bookingIds": [
+            "69ddfd78-20fc-4a90-bb1c-53fdc22ee799"
+          ],
+          "seatIds": [
+            "7cfd5dcd-eda7-4f29-8e6a-f264777c1a37"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 612069da-70a2-4c80-b280-3571ad142750 was answered 201 (held until 2026-11-26T03:14:22.510Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9ae61a00-4a0e-4648-b817-d51733b33ad0"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7b054cf0-efec-427c-aec4-d0f4ea61e874 was answered 201 with booking 4e3e33a8-fdfd-4bdb-a82e-59f88586d947, which does not exist after recovery",
+          "bookingIds": [
+            "4e3e33a8-fdfd-4bdb-a82e-59f88586d947"
+          ],
+          "seatIds": [
+            "d2fd807a-097d-420e-b916-c12598873e62"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 25f8973b-8160-4c30-9bc7-87ac0be784c1 was answered 201 with booking 33bff9f7-8ae7-43a3-97aa-c31927a50307, which does not exist after recovery",
+          "bookingIds": [
+            "33bff9f7-8ae7-43a3-97aa-c31927a50307"
+          ],
+          "seatIds": [
+            "77af766d-a5c0-4ec2-9a3f-052fe039a2ad"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 53c547e9-5216-46b9-bd9d-9c635848f01a was answered 201 (held until 2026-11-26T03:14:22.512Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "7ae844e5-7d48-4ab7-927b-63e9d1bc2125"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 12452f76-577a-4f3b-9658-375023c23884 was answered 201 with booking 9255bdf1-d32f-487e-ad99-3f690f571cd8, which does not exist after recovery",
+          "bookingIds": [
+            "9255bdf1-d32f-487e-ad99-3f690f571cd8"
+          ],
+          "seatIds": [
+            "aaf3061e-41b7-4af9-858d-262639ddc406"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold baf09948-7efd-44ff-be42-992936fd0801 was answered 201 with booking 6eebcbaa-8d9a-4d05-9af5-c237a34de6a6, which does not exist after recovery",
+          "bookingIds": [
+            "6eebcbaa-8d9a-4d05-9af5-c237a34de6a6"
+          ],
+          "seatIds": [
+            "608a3d24-4c89-43f5-97ca-cd507ce39f95"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 59b9a68d-7a7f-4b77-ad7b-b8a2aaa2b143 was answered 201 (held until 2026-11-26T03:14:22.518Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f1b05b5f-96ab-4004-8d14-85ceafe0917b"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 8017ed09-99e8-43c1-bb9a-823c4ac4f9c7 was answered 201 (held until 2026-11-26T03:14:22.520Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6affdac7-8902-421d-bdcb-358a7528fd96"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 4e35b2f4-cda4-49ee-a53c-0718b2669144 was answered 201 (held until 2026-11-26T03:14:22.521Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "80526771-8ca5-4783-9327-ccfbe8690a6f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ea026e3e-cf92-4643-b69a-b2f9ec559dc7 was answered 201 with booking 45a61ac6-df3e-4309-b6c3-4bf7b3141dd2, which does not exist after recovery",
+          "bookingIds": [
+            "45a61ac6-df3e-4309-b6c3-4bf7b3141dd2"
+          ],
+          "seatIds": [
+            "9a625ddc-2611-436d-969c-cd581e379045"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ff0bc0a5-d066-4105-b215-b4803f86d0a4 was answered 201 with booking 6e1d9fb4-ddc0-44e7-9ddc-3e9b29bbbb87, which does not exist after recovery",
+          "bookingIds": [
+            "6e1d9fb4-ddc0-44e7-9ddc-3e9b29bbbb87"
+          ],
+          "seatIds": [
+            "203ed4b9-685a-43ad-aded-49686ae07373"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1ff1827a-21fe-4a80-a997-276916a56b9a was answered 201 (held until 2026-11-26T03:14:22.531Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a6789ccd-f7d7-4280-8d46-f51db19cf64d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 689056be-88e9-4a09-8d7d-ac36a66089e4 was answered 201 (held until 2026-11-26T03:14:22.532Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "984bb4f2-68b2-4983-a817-60c1da77f1ac"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 796775cb-9531-420f-9eec-61f747a653cd was answered 201 with booking ad99cc03-9cd1-4597-bf04-fb79bb7bb768, which does not exist after recovery",
+          "bookingIds": [
+            "ad99cc03-9cd1-4597-bf04-fb79bb7bb768"
+          ],
+          "seatIds": [
+            "f53d6f41-4642-4c81-8dbe-0cd0daab374e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 0581e50c-b049-40de-928d-232f2b88cc0b was answered 201 (held until 2026-11-26T03:14:22.539Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "82733d63-89fd-4742-9f95-8bbf2e2b2822"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1f070f5c-b4e1-45f3-bb53-3ff70d0ce63f was answered 201 (held until 2026-11-26T03:14:22.540Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f9647b6f-636f-4d95-841c-3f5cb05207c1"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 487cfcd7-8a62-40a8-b7be-014545927d94 was answered 201 (held until 2026-11-26T03:14:22.541Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3d8eff10-dc6b-43fe-a857-747a32c7e513"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 06927af4-37e7-4098-ba1d-005e37fad3ec was answered 201 (held until 2026-11-26T03:14:22.542Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3eda11bb-22af-489f-bf38-32008258e585"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 07c83223-64c6-4625-af7c-7eeda275df71 was answered 201 (held until 2026-11-26T03:14:22.545Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1a5a93cf-0372-42a1-8843-6cc9795caa59"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 85500a27-26a5-4fbe-a28a-6032a4f3f01b was answered 201 with booking 4e81468e-de45-4e83-8682-59898b25f276, which does not exist after recovery",
+          "bookingIds": [
+            "4e81468e-de45-4e83-8682-59898b25f276"
+          ],
+          "seatIds": [
+            "a95dd717-e5c4-4023-9f5b-0be44d284ddf"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7e7acab1-80d4-4aca-9890-b7eb961e6719 was answered 201 (held until 2026-11-26T03:14:22.545Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "59ee9708-f43c-4bd3-9300-5850f89e5305"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8ead8ebb-abac-4611-9d9f-1741c2bd138e was answered 201 with booking 61d72689-b8c1-4d1d-9a94-c4956586c938, which does not exist after recovery",
+          "bookingIds": [
+            "61d72689-b8c1-4d1d-9a94-c4956586c938"
+          ],
+          "seatIds": [
+            "9960cc6c-313f-4d8a-b604-d04cb1d25b3e"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold fc77e641-ffeb-4856-8c89-c15cf0624ac7 was answered 201 with booking d43a3398-9f86-4fab-ba6a-443ff8d13425, which does not exist after recovery",
+          "bookingIds": [
+            "d43a3398-9f86-4fab-ba6a-443ff8d13425"
+          ],
+          "seatIds": [
+            "363e6431-04c9-4597-9296-5f1b9fd25596"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 5e9c259a-2598-4816-8153-10456b03de80 was answered 201 (held until 2026-11-26T03:14:22.547Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ecbdecf4-656c-4b58-aaf5-1458e9c75a52"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d64985ee-ef2c-4b6c-92b9-0ffc01a63d08 was answered 201 (held until 2026-11-26T03:14:22.548Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "56e3e294-9c8b-4193-ba63-8a3292845bf3"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6840b711-1ff1-41ed-b9d4-e13089a4b0da was answered 201 with booking 6152588a-4ec0-4431-84bb-9e919919717c, which does not exist after recovery",
+          "bookingIds": [
+            "6152588a-4ec0-4431-84bb-9e919919717c"
+          ],
+          "seatIds": [
+            "0368b6b3-81f1-4d82-b593-8cff0025c4fa"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold ebb88bce-bf16-472b-b3f3-534b0ae944f8 was answered 201 (held until 2026-11-26T03:14:22.554Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "eabba270-bf1a-4f8a-8ca2-45f1c78d26f5"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 969aad14-890f-4aee-8943-c2b7e5eb0d7e was answered 201 (held until 2026-11-26T03:14:22.556Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "cf0d612e-9349-4a88-965b-779ff3d60118"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9c0024d6-a2c5-4086-b6c6-7d622af4b32e was answered 201 with booking 396ebd7a-fbe0-462c-81f9-ffce92de961c, which does not exist after recovery",
+          "bookingIds": [
+            "396ebd7a-fbe0-462c-81f9-ffce92de961c"
+          ],
+          "seatIds": [
+            "adc2df38-6427-4ea4-89ad-7c8b1b4142e6"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 2c3bc81f-41ac-45b2-b0ea-3878eb5711de was answered 201 (held until 2026-11-26T03:14:22.558Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4450e346-0b52-4830-abcc-cf8317220e2c"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2588e9eb-8d62-4073-9a35-3c5087a65cc7 was answered 201 with booking 0711aa62-36c3-4daa-a47a-d8fb17e0d6f9, which does not exist after recovery",
+          "bookingIds": [
+            "0711aa62-36c3-4daa-a47a-d8fb17e0d6f9"
+          ],
+          "seatIds": [
+            "34000a5a-323a-41aa-a09d-ab1b3b45c720"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 43e6a490-c263-499c-9664-786b7feb4b0b was answered 201 with booking 5a239e7e-5e96-4d29-b43e-cb0d6a3def50, which does not exist after recovery",
+          "bookingIds": [
+            "5a239e7e-5e96-4d29-b43e-cb0d6a3def50"
+          ],
+          "seatIds": [
+            "70a19e86-5e37-478d-ad43-19d39df8c569"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 87bc2e1b-2365-4d4f-9267-460eadafe70d was answered 201 with booking e74017d1-d949-482c-b715-37e8092b61c1, which does not exist after recovery",
+          "bookingIds": [
+            "e74017d1-d949-482c-b715-37e8092b61c1"
+          ],
+          "seatIds": [
+            "67ad0828-c8d9-4ec2-a512-76a06b240101"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 4dde529e-9ac3-4c20-aa96-cbb02bda5b60 was answered 201 with booking 14fcb2e4-72e3-4ea1-ba16-f36b3be7162c, which does not exist after recovery",
+          "bookingIds": [
+            "14fcb2e4-72e3-4ea1-ba16-f36b3be7162c"
+          ],
+          "seatIds": [
+            "8e118a6f-0282-4488-9902-57932c4fd0bb"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold eeb35e72-69be-44ce-9177-00c4bff1a34d was answered 201 (held until 2026-11-26T03:14:22.577Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6e2966e7-99ba-4bd4-ac1f-9c20d77d2924"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e1003aa5-ed09-40c5-ba2f-01c429bb1837 was answered 201 with booking 7523fe8f-c493-4345-b068-9e57f11598bc, which does not exist after recovery",
+          "bookingIds": [
+            "7523fe8f-c493-4345-b068-9e57f11598bc"
+          ],
+          "seatIds": [
+            "b980e3a7-acf9-4abf-8122-851359a539df"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold b40bfde8-40d4-4604-be08-9a4bc229582e was answered 201 (held until 2026-11-26T03:14:22.581Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "15e95b47-cfb7-4992-90c6-0248c288a692"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 10766980-1a90-4c45-a31e-4e188eb58551 was answered 201 (held until 2026-11-26T03:14:22.585Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "246f15a6-8f14-4138-a5a0-c3829fcc347f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold eab6f099-f2c8-4656-9dc6-175cb2710237 was answered 201 with booking 63fe8282-c850-4923-8f2d-4fd873de9c5d, which does not exist after recovery",
+          "bookingIds": [
+            "63fe8282-c850-4923-8f2d-4fd873de9c5d"
+          ],
+          "seatIds": [
+            "487e340f-3d26-46a8-a834-58d5d286f9f7"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 19a9bb23-a610-41f2-97cf-61e475c5f80b was answered 201 (held until 2026-11-26T03:14:22.587Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f8ef4594-a4ad-4d4d-ac50-239e1702df03"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 46556e45-5bda-41ed-b1c2-daebd660f4de was answered 201 with booking d729f0ed-31da-4485-bfc6-dd532918e061, which does not exist after recovery",
+          "bookingIds": [
+            "d729f0ed-31da-4485-bfc6-dd532918e061"
+          ],
+          "seatIds": [
+            "b19fb6ce-5860-4e36-a676-a6594d4268c4"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7bc4904a-9880-4f86-9b91-8b333514b2be was answered 201 (held until 2026-11-26T03:14:22.591Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4d78b10d-1911-440e-b0e7-fb1d44db4e39"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 329e8169-9ff5-4a9a-9cf1-b71d4fa0f471 was answered 201 with booking f2bf859f-8fef-4340-8431-495741d8652d, which does not exist after recovery",
+          "bookingIds": [
+            "f2bf859f-8fef-4340-8431-495741d8652d"
+          ],
+          "seatIds": [
+            "42521d94-1a45-42f3-be0e-17532bb5db94"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 13478f46-ed67-411e-81b2-745d8a76c6a1 was answered 201 with booking 122d8d9c-c481-454a-b2e2-c65f6e5e236e, which does not exist after recovery",
+          "bookingIds": [
+            "122d8d9c-c481-454a-b2e2-c65f6e5e236e"
+          ],
+          "seatIds": [
+            "8514b4a7-fbce-4ded-b5ab-69a2b232cd8a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f1b351ec-baf8-465d-969b-d88f12646a0f was answered 201 (held until 2026-11-26T03:14:22.601Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "12f37ba9-c44a-49d1-96c5-a4ecafbec312"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold efe2f871-1533-430c-9f50-3579068aacac was answered 201 (held until 2026-11-26T03:14:22.601Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "d7c100c1-4e0f-4fb3-b674-40631455ba3f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 54592a81-e651-416d-82d9-cd324acd0188 was answered 201 with booking daa8cbea-a770-4ab5-85af-752b185e35fa, which does not exist after recovery",
+          "bookingIds": [
+            "daa8cbea-a770-4ab5-85af-752b185e35fa"
+          ],
+          "seatIds": [
+            "969835f9-a1cf-434c-87fd-7aeb4169b822"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 4e2c36e7-741f-449d-b4fd-7367eb7b8f9a was answered 201 with booking 327cce8c-7976-4a7f-b27c-b85bd24b6c38, which does not exist after recovery",
+          "bookingIds": [
+            "327cce8c-7976-4a7f-b27c-b85bd24b6c38"
+          ],
+          "seatIds": [
+            "abe4d72f-6212-40b0-99b2-798614a576f6"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 444d003f-0d60-40a6-9fad-478635cba9f3 was answered 201 (held until 2026-11-26T03:14:22.608Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "95c7ab30-b286-430f-a4da-7fd78d90d531"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c21cb15c-5c7e-425d-a9dd-5caeb390b939 was answered 201 with booking d1f3e780-9475-412c-a617-2bdfef45a50d, which does not exist after recovery",
+          "bookingIds": [
+            "d1f3e780-9475-412c-a617-2bdfef45a50d"
+          ],
+          "seatIds": [
+            "e9bd008e-6b57-4507-b2db-78a5c769b3b7"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f3e20051-1553-496b-95ba-140fa454fa0c was answered 201 (held until 2026-11-26T03:14:22.613Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "06902709-c2af-4399-9a1e-033e5114f867"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 3fc6386d-a8de-42b8-b21a-ea90c80b91a7 was answered 201 with booking 1e9ba33e-b2ff-49c2-b4b4-f463ba1de159, which does not exist after recovery",
+          "bookingIds": [
+            "1e9ba33e-b2ff-49c2-b4b4-f463ba1de159"
+          ],
+          "seatIds": [
+            "e8a18eb4-9cec-4ebb-9dc9-78f84b514822"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 73b623c2-6394-41e2-b8c0-4ce528f72af0 was answered 201 with booking 435f8cc2-3e4c-44ea-9e2e-78cd4826e956, which does not exist after recovery",
+          "bookingIds": [
+            "435f8cc2-3e4c-44ea-9e2e-78cd4826e956"
+          ],
+          "seatIds": [
+            "107dd1dd-4ced-422b-b248-c92bd28ecf62"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 9aa0ab67-4910-47b9-8d7c-cd7f8f288b03 was answered 201 (held until 2026-11-26T03:14:22.623Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1f60a7fd-9bad-4414-9402-5198656383e7"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d7a2b1ed-eec8-491b-9b0d-6e249a0ca4fc was answered 201 with booking d7f94871-2513-408e-9a91-804d5576abf3, which does not exist after recovery",
+          "bookingIds": [
+            "d7f94871-2513-408e-9a91-804d5576abf3"
+          ],
+          "seatIds": [
+            "136ab772-0dca-492c-a436-da50e1027883"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 46844fce-cb0a-4a13-9868-001d529137d0 was answered 201 (held until 2026-11-26T03:14:22.627Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "cde4805a-7253-48e8-87f6-76d2c8c1d98f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d973e099-ffdf-4388-83b6-c86bb359faff was answered 201 with booking ed2aa0a8-5338-4cd4-b97c-2a3b7ed4ed8a, which does not exist after recovery",
+          "bookingIds": [
+            "ed2aa0a8-5338-4cd4-b97c-2a3b7ed4ed8a"
+          ],
+          "seatIds": [
+            "cd7f52ea-1c6c-4b33-a82b-3448c6f998c9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7d274ca6-67e2-43fc-8b56-0829e3a17b4d was answered 201 (held until 2026-11-26T03:14:22.631Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "86afdfd7-9de3-414f-baa4-6822cf05fbfd"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6af1b8a7-c6d0-4e91-b6c8-ce65e78096be was answered 201 (held until 2026-11-26T03:14:22.631Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "0a11171d-ef7c-41e9-a26b-597ea8bb7a8b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c37b7733-1728-4b3d-9458-714846e296d9 was answered 201 with booking d07d16e1-028e-45e1-88f6-4a403cc5ced6, which does not exist after recovery",
+          "bookingIds": [
+            "d07d16e1-028e-45e1-88f6-4a403cc5ced6"
+          ],
+          "seatIds": [
+            "d73dfb2a-5af7-41e4-899a-b4b8bab2592b"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 16458098-b8f7-48b0-892f-8f0c2c4050df was answered 201 (held until 2026-11-26T03:14:22.635Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "8afe0143-7132-433e-81ab-b10cc450538a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 9f2b71c8-759a-40b8-a230-0555f5eb336c was answered 201 (held until 2026-11-26T03:14:22.636Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "95918a1f-98f7-474f-9d02-666172b1c703"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ccec59a4-ee9a-4893-8191-3d68168313ee was answered 201 with booking c42634c8-0875-4427-8096-d6ad963711f1, which does not exist after recovery",
+          "bookingIds": [
+            "c42634c8-0875-4427-8096-d6ad963711f1"
+          ],
+          "seatIds": [
+            "5ad8438b-4fca-4589-b72a-dc6926319ad3"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f2c42b6c-7896-4163-a3f5-74b9fa4ed25d was answered 201 (held until 2026-11-26T03:14:22.640Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "b423b307-3ef5-4856-a331-a148c52bb1f0"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9103d625-f977-422a-8cf4-617c17e5a0bd was answered 201 with booking 902e03cc-690b-4f38-9d09-e031928c163a, which does not exist after recovery",
+          "bookingIds": [
+            "902e03cc-690b-4f38-9d09-e031928c163a"
+          ],
+          "seatIds": [
+            "f0ae3803-92e0-4e94-8765-6849bc2df0ea"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f341103d-83d1-4268-ad3b-911709ccea75 was answered 201 with booking e428aa25-a373-4aba-a79a-505105afff6a, which does not exist after recovery",
+          "bookingIds": [
+            "e428aa25-a373-4aba-a79a-505105afff6a"
+          ],
+          "seatIds": [
+            "be86a901-8e16-423c-a94d-44a09b4e3efb"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 71f4d45a-09e5-4cb1-8ccb-0d492ebd4109 was answered 201 (held until 2026-11-26T03:14:22.647Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "d767fd25-1748-4119-a381-b41e46125579"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 63bccba1-8c1a-4b91-860e-a009bb2cd316 was answered 201 (held until 2026-11-26T03:14:22.649Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "0d91be18-a082-4b3e-95e1-4e7c7ca57952"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 3381cfb9-ab88-46a9-9dd8-146294c55a32 was answered 201 with booking 4b74b3fb-ad10-4cc5-be8a-2712bcf959e0, which does not exist after recovery",
+          "bookingIds": [
+            "4b74b3fb-ad10-4cc5-be8a-2712bcf959e0"
+          ],
+          "seatIds": [
+            "c0d38184-a881-4e6d-9e5c-996b30d6616d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 27f7a1a5-0559-497b-9bc8-7bdb8e83a4f8 was answered 201 with booking d9d2b9c7-2d8c-4aea-9ae1-9a3f624d22d9, which does not exist after recovery",
+          "bookingIds": [
+            "d9d2b9c7-2d8c-4aea-9ae1-9a3f624d22d9"
+          ],
+          "seatIds": [
+            "e7215d9c-dcf3-42f5-98dc-43118f569b5d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 77fee1bb-aa0c-48d5-90e7-41d72d17248e was answered 201 (held until 2026-11-26T03:14:22.661Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "dc484172-2c96-46af-a444-d915ab3323c2"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 19a5b22f-0e34-40a4-80c7-c0a1d7b6e707 was answered 201 (held until 2026-11-26T03:14:22.663Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ec1ff75c-0d86-4922-92f0-bef243692020"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b3b3ca2b-c5e4-4ff4-bbb4-780392b22ff6 was answered 201 with booking f2b4c942-3dd9-4a84-91d9-af8846dd200c, which does not exist after recovery",
+          "bookingIds": [
+            "f2b4c942-3dd9-4a84-91d9-af8846dd200c"
+          ],
+          "seatIds": [
+            "484907c8-9f93-439f-972e-4bd699934c78"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold bdcad4d7-80df-4d01-a25b-0019269988dd was answered 201 with booking 011dd600-a7b9-4946-af49-15f41d491066, which does not exist after recovery",
+          "bookingIds": [
+            "011dd600-a7b9-4946-af49-15f41d491066"
+          ],
+          "seatIds": [
+            "3f8bf9c5-e8be-484c-8e1c-635642baad1f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold cb188808-7b20-466c-bafa-33809570eb86 was answered 201 with booking 94156804-7668-449b-8b43-7b47a514bb87, which does not exist after recovery",
+          "bookingIds": [
+            "94156804-7668-449b-8b43-7b47a514bb87"
+          ],
+          "seatIds": [
+            "b6400e14-9d46-4d82-bc08-bf962352dc62"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 29c353bb-e000-4c39-ae5b-19325bb0122f was answered 201 (held until 2026-11-26T03:14:22.668Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "cd3ecf50-bf9e-49f5-9c21-0ddf76d7cdd3"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 26cc2e27-9e33-4849-9d0f-6d23bef2666f was answered 201 with booking c03426bc-da43-428f-94d9-4baa13463e5f, which does not exist after recovery",
+          "bookingIds": [
+            "c03426bc-da43-428f-94d9-4baa13463e5f"
+          ],
+          "seatIds": [
+            "4440af99-5088-4fb9-879b-68672ddb79fc"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8b22bc6b-40c3-4b7c-ab7a-37a7566dd6ad was answered 201 with booking 682539bf-1132-4336-8d5f-ebe6f978633d, which does not exist after recovery",
+          "bookingIds": [
+            "682539bf-1132-4336-8d5f-ebe6f978633d"
+          ],
+          "seatIds": [
+            "279bad69-e3e5-414f-bfdb-3d59f5769ce8"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e46feab4-c5d5-4f30-b76c-9ac6b569def7 was answered 201 (held until 2026-11-26T03:14:22.675Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "76a3fa2c-504e-442a-89e1-13345bbf8556"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b9eb3dd6-a313-40b1-b68d-29e4d2bfb2b3 was answered 201 with booking 783322f4-5a3b-491d-96a0-2591b147149e, which does not exist after recovery",
+          "bookingIds": [
+            "783322f4-5a3b-491d-96a0-2591b147149e"
+          ],
+          "seatIds": [
+            "df30c127-989f-4e36-8151-258fecbcd8f4"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold fc240340-6158-4bb3-be15-42a92c1070af was answered 201 with booking d9fd31ba-4272-466d-9166-445bae4b1b5b, which does not exist after recovery",
+          "bookingIds": [
+            "d9fd31ba-4272-466d-9166-445bae4b1b5b"
+          ],
+          "seatIds": [
+            "e7f7dc30-e25e-4855-8bdb-ca06bf028d17"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2c78bb45-48eb-4f71-a26e-0a70faaf8383 was answered 201 with booking 02939252-9116-4425-a3c1-0f52437c6ae1, which does not exist after recovery",
+          "bookingIds": [
+            "02939252-9116-4425-a3c1-0f52437c6ae1"
+          ],
+          "seatIds": [
+            "9e6e680f-43c7-4414-abf9-d7b66814d107"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 80264234-e6de-4711-8c05-c7bdc2d0a702 was answered 201 (held until 2026-11-26T03:14:22.684Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "7bdbb052-1269-4a57-91b8-6b5623794398"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 4bd31de1-10a5-4fd6-984b-89eda4b1480a was answered 201 (held until 2026-11-26T03:14:22.684Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6b538835-ea84-4e21-8d1e-320904c7d52d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d9c7aad4-d0bf-40ef-9341-5d0ed67ff16a was answered 201 (held until 2026-11-26T03:14:22.687Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "949fd22c-64f5-41a8-918b-63eef4531a3a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 3a3f9bd4-b0bd-4225-8f04-a74e15d9c515 was answered 201 (held until 2026-11-26T03:14:22.692Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "8d2e8253-ee28-4077-bd3f-aad2e311e6f8"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 78c1290b-ce68-41b6-b3f4-d1227132e21c was answered 201 with booking 9d1c72a5-8829-4eba-8fac-56ce96f4d0f7, which does not exist after recovery",
+          "bookingIds": [
+            "9d1c72a5-8829-4eba-8fac-56ce96f4d0f7"
+          ],
+          "seatIds": [
+            "54ad15a1-1204-438a-8ff2-14a979331b64"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 37731b1e-f7b1-4df3-a623-84020d7f54b9 was answered 201 (held until 2026-11-26T03:14:22.698Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "590c53f5-eaa1-49f4-a9fc-060415cae8ed"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 97a82860-70dc-401b-9290-2a5b08ff0680 was answered 201 (held until 2026-11-26T03:14:22.699Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3cca80f2-e956-4af4-b8c4-49c5203a8f41"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 5ccd3c4d-ebef-45ca-a26d-e5bcbbe6be91 was answered 201 (held until 2026-11-26T03:14:22.704Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "53fe7bf3-3447-4deb-ba08-ec6dcd66d1d0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 2b4dba5c-6575-4cca-9ee2-767142736057 was answered 201 (held until 2026-11-26T03:14:22.704Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "45b496b0-063d-48b0-88c0-0d126d894b12"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e3cb6151-060e-4f04-82a2-4e48933d0f33 was answered 201 with booking d06c4e94-823f-4f23-91ae-c545efc40d78, which does not exist after recovery",
+          "bookingIds": [
+            "d06c4e94-823f-4f23-91ae-c545efc40d78"
+          ],
+          "seatIds": [
+            "8baa2429-4848-4ec5-a885-728f71092f16"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e22e8311-4604-43f8-b161-c56342ae8714 was answered 201 (held until 2026-11-26T03:14:22.711Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "461e936b-11f7-4ccd-bbac-33b9a675d93d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9f4e86d3-d25c-4b3e-a206-d32131e1ffdb was answered 201 with booking e34ef60f-9634-4ff7-9300-47ededbe6bbc, which does not exist after recovery",
+          "bookingIds": [
+            "e34ef60f-9634-4ff7-9300-47ededbe6bbc"
+          ],
+          "seatIds": [
+            "6fddb1d7-9a8e-404c-8e39-4e724ed6212d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d0c0ca75-faed-438e-b8de-ccadc59cdcbb was answered 201 (held until 2026-11-26T03:14:22.711Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "c6db64b0-a686-4388-911e-ed492d60c959"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 07987933-0c24-402f-9eec-a05b52c3b7b6 was answered 201 with booking 435fc404-371e-4e18-8c53-03102a2db1f1, which does not exist after recovery",
+          "bookingIds": [
+            "435fc404-371e-4e18-8c53-03102a2db1f1"
+          ],
+          "seatIds": [
+            "ea24ede3-6e05-4d2b-b3e2-4d51357fe251"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 9924d212-caad-4fd1-9b6b-508724a07cc4 was answered 201 (held until 2026-11-26T03:14:22.716Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3db46e03-6985-4370-9613-ded097e263ab"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 45355383-7c64-48f1-99b6-ede1363333d8 was answered 201 with booking e574ffe0-4e00-4c1e-8cec-bae5d92578bc, which does not exist after recovery",
+          "bookingIds": [
+            "e574ffe0-4e00-4c1e-8cec-bae5d92578bc"
+          ],
+          "seatIds": [
+            "3b6282aa-fde7-4be8-bcec-b45801f305b9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold cbe95cc5-db9b-4e3c-b4cf-d5ebeadbf21d was answered 201 (held until 2026-11-26T03:14:22.719Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "45480aed-b155-49cc-8464-1170d2412024"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 8609c161-75ce-4f14-b5ac-77ca3886560a was answered 201 (held until 2026-11-26T03:14:22.724Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "e285dc60-0445-4095-b2ca-39c3d8e61085"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 76cd49a3-928d-4ca1-bd1f-eba5902f6e60 was answered 201 with booking a1726771-5224-4e19-a338-82c4f801b681, which does not exist after recovery",
+          "bookingIds": [
+            "a1726771-5224-4e19-a338-82c4f801b681"
+          ],
+          "seatIds": [
+            "1a6a122a-11d2-460a-9de0-4961752fc309"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 731d73ea-e5ec-4a1a-be3f-1ddd9793e8c2 was answered 201 (held until 2026-11-26T03:14:22.728Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "09aa89ad-f476-4668-9f15-8a5fc1ba3548"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b257594a-7d24-445c-8031-f6e853d9198d was answered 201 with booking 59343361-7a7a-47ec-9640-ae28f203d725, which does not exist after recovery",
+          "bookingIds": [
+            "59343361-7a7a-47ec-9640-ae28f203d725"
+          ],
+          "seatIds": [
+            "e7331712-ec27-4955-8bdd-9010f9c8d925"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8cecb51a-16e4-48b6-b304-bff30ae66a88 was answered 201 with booking 41a3912c-86f4-4b1d-b415-88646cde92fa, which does not exist after recovery",
+          "bookingIds": [
+            "41a3912c-86f4-4b1d-b415-88646cde92fa"
+          ],
+          "seatIds": [
+            "f7c056b6-4fe1-4ff6-af5c-9a4e3deefb62"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9a6b8027-705f-47e1-a940-2a5b15bf1c58 was answered 201 with booking d423f76a-0287-4a96-a0a0-a2af3f95f286, which does not exist after recovery",
+          "bookingIds": [
+            "d423f76a-0287-4a96-a0a0-a2af3f95f286"
+          ],
+          "seatIds": [
+            "a5ec6359-549a-4a4b-8164-8aba45b9856f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 91006e2e-44d3-4f34-84d4-6c79d59ef91a was answered 201 with booking 82a4bdc6-34e7-4146-a72c-7b0d349737b5, which does not exist after recovery",
+          "bookingIds": [
+            "82a4bdc6-34e7-4146-a72c-7b0d349737b5"
+          ],
+          "seatIds": [
+            "00a63761-1671-4744-b798-2584223ef715"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 91351bb0-f3fa-4a86-9a6a-6ad787fe41cf was answered 201 with booking 1f388f99-e946-4d6e-9ca3-e20b06eae733, which does not exist after recovery",
+          "bookingIds": [
+            "1f388f99-e946-4d6e-9ca3-e20b06eae733"
+          ],
+          "seatIds": [
+            "8936ce21-a020-4c29-bd42-2eb162169e31"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold dc2c8460-1011-4598-bc01-c9080b265043 was answered 201 (held until 2026-11-26T03:14:22.736Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "6aa12f47-7039-4d89-a2d4-0312ab245c4f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b1734d82-aee3-4cb5-9c1b-1a852b54b879 was answered 201 with booking ef89e7f3-9d80-4c89-aae4-b6580ba6a629, which does not exist after recovery",
+          "bookingIds": [
+            "ef89e7f3-9d80-4c89-aae4-b6580ba6a629"
+          ],
+          "seatIds": [
+            "3871a23f-32df-4c42-8d14-d8968b507ba5"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 409f9f9a-1f15-482a-bc8e-18e241451b56 was answered 201 with booking edd2394f-99b0-46b3-9723-11a0a6e91eb3, which does not exist after recovery",
+          "bookingIds": [
+            "edd2394f-99b0-46b3-9723-11a0a6e91eb3"
+          ],
+          "seatIds": [
+            "2a7e2779-55ec-4ccd-a961-202f6c782bb5"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f94f0120-0d21-4eca-a6fc-e684545d0231 was answered 201 (held until 2026-11-26T03:14:22.740Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "50db2047-3747-4cfe-a32a-35be08d81039"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e56bb4ff-c15a-4dd7-8ada-fff67927735e was answered 201 (held until 2026-11-26T03:14:22.747Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "bbef7df9-5fb4-4935-9cc2-8a77a8a5b546"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold bdf31b43-41db-404d-964f-dce8d3bc747b was answered 201 with booking 465458ca-c4e7-425f-b737-c8eb5e5495cf, which does not exist after recovery",
+          "bookingIds": [
+            "465458ca-c4e7-425f-b737-c8eb5e5495cf"
+          ],
+          "seatIds": [
+            "0c6b50cb-79f0-42dc-a396-b685c3832bc6"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8eb05670-8a9b-4d5d-abaf-cdc8b3a164d7 was answered 201 with booking d141d86a-a9fe-4998-b265-a0192f6fcec9, which does not exist after recovery",
+          "bookingIds": [
+            "d141d86a-a9fe-4998-b265-a0192f6fcec9"
+          ],
+          "seatIds": [
+            "a16db614-b637-4e45-8ac2-9e69b47642a5"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold aebe80c7-b00e-4620-8ad9-636af0d9f72a was answered 201 with booking 7016d00a-5120-4674-a193-ad54c28fc0b9, which does not exist after recovery",
+          "bookingIds": [
+            "7016d00a-5120-4674-a193-ad54c28fc0b9"
+          ],
+          "seatIds": [
+            "990f12d2-52d3-4baa-8729-4c0d85b9d41b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 70e7b084-26a3-42a0-941c-0b48f1e60868 was answered 201 with booking 3b3b6475-c72f-4c37-b4ad-ff126510b90c, which does not exist after recovery",
+          "bookingIds": [
+            "3b3b6475-c72f-4c37-b4ad-ff126510b90c"
+          ],
+          "seatIds": [
+            "f253b128-3079-4a60-84e8-a964b608e33f"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold acdf4740-336f-4f81-a975-ba95d74df914 was answered 201 with booking 5ac9cbfc-a11c-4b16-958f-0112951b9a32, which does not exist after recovery",
+          "bookingIds": [
+            "5ac9cbfc-a11c-4b16-958f-0112951b9a32"
+          ],
+          "seatIds": [
+            "20ba400d-43a4-4b2b-b187-f1fe9d85c1cb"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 21eb4c6d-8d93-4cec-b9a1-1e23e1de1aca was answered 201 with booking 1994c03c-8aa8-4fce-a1e2-e318e8052c36, which does not exist after recovery",
+          "bookingIds": [
+            "1994c03c-8aa8-4fce-a1e2-e318e8052c36"
+          ],
+          "seatIds": [
+            "23ba50f4-4127-4c91-9e50-b6e004c78c85"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a56f1658-d7ab-4bb1-b71e-d64ab77a6c93 was answered 201 with booking e0750350-5125-45b8-9238-7827fd09c489, which does not exist after recovery",
+          "bookingIds": [
+            "e0750350-5125-45b8-9238-7827fd09c489"
+          ],
+          "seatIds": [
+            "7b06a4ed-af93-4124-9ff1-a6f78995089a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 83ca3f0f-0808-4aea-8439-87a8ec0f18dc was answered 201 (held until 2026-11-26T03:14:22.760Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "fb1532fb-01b0-46e7-85ef-aaa6599d691f"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e258e5e6-5195-46a7-b7b8-3aaba8237442 was answered 201 (held until 2026-11-26T03:14:22.760Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "e2c1ff22-dff3-4b21-af3b-471aeb5aab10"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9e9dfcbd-7fd5-4f62-a1ed-f3c76eeed253 was answered 201 with booking 00f25ce5-db69-49e9-a7dd-162740719699, which does not exist after recovery",
+          "bookingIds": [
+            "00f25ce5-db69-49e9-a7dd-162740719699"
+          ],
+          "seatIds": [
+            "e5989131-f335-4276-a64d-99ea4d470c96"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f0f4dd41-ee35-4e10-b3e7-133d564b436e was answered 201 (held until 2026-11-26T03:14:22.763Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "00cb9712-b5a1-4fe2-a3ff-b7867d26a429"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold fb8d0e3c-15c8-42a7-bd74-e5e51c490930 was answered 201 with booking a742821d-f320-427b-9bad-bcc039d8f10a, which does not exist after recovery",
+          "bookingIds": [
+            "a742821d-f320-427b-9bad-bcc039d8f10a"
+          ],
+          "seatIds": [
+            "ed21c81a-56f9-4a94-a631-47e5862461f6"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 90c0881a-e299-40f4-8ed7-f5725845cfbb was answered 201 with booking 1fc483fc-61fd-47da-9e6b-ab4220442710, which does not exist after recovery",
+          "bookingIds": [
+            "1fc483fc-61fd-47da-9e6b-ab4220442710"
+          ],
+          "seatIds": [
+            "e245bb9a-0989-4190-aa14-c6480ad57635"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold c32d379c-6a1c-4b72-aae8-d2c0db52d2f3 was answered 201 (held until 2026-11-26T03:14:22.769Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "78baa5dc-938d-4f02-a793-3446e47326a9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f88ccc56-e3ac-457a-aab2-279efeb26a58 was answered 201 (held until 2026-11-26T03:14:22.772Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9831c570-4d87-4efa-b7f4-651c2fae922f"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 80b4e746-ca28-42ae-af46-29dd7e401b02 was answered 201 (held until 2026-11-26T03:14:22.776Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3cd87d8e-ce70-4944-9731-dfd3168e27d6"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 3000899f-9603-4b11-bcf3-d4716a021048 was answered 201 (held until 2026-11-26T03:14:22.776Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "40d6ff49-9b4b-4948-b2b0-2bffebaf4c30"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 513fe847-3bb9-4f22-9f0a-463586492a51 was answered 201 with booking 452e5ded-4c00-4c3e-92ea-9fa3e5171909, which does not exist after recovery",
+          "bookingIds": [
+            "452e5ded-4c00-4c3e-92ea-9fa3e5171909"
+          ],
+          "seatIds": [
+            "a42f7aca-8426-4c79-8921-9e9430f6f3c6"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d364ac1f-7cb2-4206-9fa1-8a80f42bb17c was answered 201 (held until 2026-11-26T03:14:22.784Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "eaada2cc-2429-4787-a598-474b8dcc4535"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold adc31a78-4de3-4604-bfa7-d12eef9577a8 was answered 201 with booking 55196858-df29-466a-a715-4f0cda9c390d, which does not exist after recovery",
+          "bookingIds": [
+            "55196858-df29-466a-a715-4f0cda9c390d"
+          ],
+          "seatIds": [
+            "fa17b376-0eda-4648-ba70-16722ef08f98"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 3afe8dbf-2241-429a-add8-4b1ddaaa742e was answered 201 (held until 2026-11-26T03:14:22.787Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "39e4be5a-ac4b-49df-a9ce-51fc48afa54d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold dac66743-6758-4ef8-9c14-a2ce3c1b1744 was answered 201 with booking 9e9738d7-d7d7-43a1-85b7-4f985c5b58b1, which does not exist after recovery",
+          "bookingIds": [
+            "9e9738d7-d7d7-43a1-85b7-4f985c5b58b1"
+          ],
+          "seatIds": [
+            "c7aa6af1-0924-4bae-a5aa-324f8a8ebe62"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7558cbf7-afb8-4a8d-86d9-cc9f2dc69926 was answered 201 (held until 2026-11-26T03:14:22.795Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "14423d7e-5990-46e0-8b9c-8e69ca1a7468"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7bfcdb65-d4db-4eea-bf78-a33cff5ab58b was answered 201 with booking ee628b21-6204-4797-90f3-4c0d75e5099c, which does not exist after recovery",
+          "bookingIds": [
+            "ee628b21-6204-4797-90f3-4c0d75e5099c"
+          ],
+          "seatIds": [
+            "7253c470-53fc-4617-b35c-aa06a262e36b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6f2aeb35-4921-4012-91c0-9c17fd2e3d3d was answered 201 with booking 8d33a3a3-69d3-48e4-9738-54669e8f7bd8, which does not exist after recovery",
+          "bookingIds": [
+            "8d33a3a3-69d3-48e4-9738-54669e8f7bd8"
+          ],
+          "seatIds": [
+            "bf8e701c-2e24-41fe-8c17-0196fc6bf281"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d74ae672-cee4-4a5b-9015-ee408c9b56be was answered 201 with booking 18ff4938-8bbf-4bb3-a41c-7f6b850267da, which does not exist after recovery",
+          "bookingIds": [
+            "18ff4938-8bbf-4bb3-a41c-7f6b850267da"
+          ],
+          "seatIds": [
+            "5fa5db75-8a90-4b1f-b126-ba5416646b9c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 48cb27fa-1141-4153-a858-ed8046ded725 was answered 201 (held until 2026-11-26T03:14:22.808Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ebe9a745-18ea-42d9-a266-7c5da2d4c885"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7adb9b62-b506-475e-8c3c-993820fabfd9 was answered 201 with booking 9ecbef97-7801-468b-98fe-c9628342ff2d, which does not exist after recovery",
+          "bookingIds": [
+            "9ecbef97-7801-468b-98fe-c9628342ff2d"
+          ],
+          "seatIds": [
+            "9fca83e0-509d-41a6-9162-22f600845edf"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d98c77ca-dc48-4675-8c3c-34636894371f was answered 201 with booking 53fb682e-4279-46b9-886a-04a51e0b3d63, which does not exist after recovery",
+          "bookingIds": [
+            "53fb682e-4279-46b9-886a-04a51e0b3d63"
+          ],
+          "seatIds": [
+            "ba4e5765-bf41-4c84-a072-7a980ce857f2"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9a308d58-7c9c-4d0d-a13c-d1a3dd7740ab was answered 201 with booking a9c9d059-3269-4566-aa8d-38b137d85b14, which does not exist after recovery",
+          "bookingIds": [
+            "a9c9d059-3269-4566-aa8d-38b137d85b14"
+          ],
+          "seatIds": [
+            "2cef4e29-ef5a-4372-8ab0-972b9edce3f9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold ccbfc11b-c60a-44e7-b197-f482acbf748e was answered 201 (held until 2026-11-26T03:14:22.812Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2eb43007-3839-4a57-a181-f630465ce8c8"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold db09e848-6651-484f-9f25-1ce96271abbd was answered 201 (held until 2026-11-26T03:14:22.813Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a6c9021b-2b1e-44a7-a571-25459c1eab1d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 471dc78e-5ea6-44fb-b4d2-2a7a78655c4f was answered 201 (held until 2026-11-26T03:14:22.813Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "23909643-3c46-4a3f-8ea7-e1342d3a88a2"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b69b8733-92d3-427b-9228-aa2a91c454a4 was answered 201 with booking b50d18d4-3d7d-4c2d-be7e-d324e4198437, which does not exist after recovery",
+          "bookingIds": [
+            "b50d18d4-3d7d-4c2d-be7e-d324e4198437"
+          ],
+          "seatIds": [
+            "cdb22ac1-e113-4878-8af9-4c50d2c47c0d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 0e12b5ed-ff70-4c20-a212-c47018ede789 was answered 201 (held until 2026-11-26T03:14:22.817Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "c3beafff-de53-44c0-b0f7-e534fcc033e7"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold cadc6237-edef-4bfb-a154-151eb1bd04cc was answered 201 with booking 95459291-55fd-4965-8927-64b5d8043e8f, which does not exist after recovery",
+          "bookingIds": [
+            "95459291-55fd-4965-8927-64b5d8043e8f"
+          ],
+          "seatIds": [
+            "8e851eee-3e32-485a-96f2-39cbeb7af8f9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b063d740-248a-44f8-bae7-8aeac0aea489 was answered 201 with booking 88ea268c-2ae9-49b0-a29b-bef3d4506a1b, which does not exist after recovery",
+          "bookingIds": [
+            "88ea268c-2ae9-49b0-a29b-bef3d4506a1b"
+          ],
+          "seatIds": [
+            "7f48fff1-cad9-416b-942d-64123343a7cb"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e72cf5d0-0fed-4976-bf90-7d0263665db3 was answered 201 (held until 2026-11-26T03:14:22.824Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "66839046-654c-44eb-9e5c-639e0e15953d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 1d481771-728d-422e-88e3-84df9fa3d1c2 was answered 201 with booking 770e303b-8215-4e59-b1a3-0d2e65dc30ae, which does not exist after recovery",
+          "bookingIds": [
+            "770e303b-8215-4e59-b1a3-0d2e65dc30ae"
+          ],
+          "seatIds": [
+            "e9a783c0-5523-4df1-afe7-433b534a3bdf"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d3378702-7926-4418-b07f-27fde9bf3a39 was answered 201 (held until 2026-11-26T03:14:22.826Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ac0de536-1376-470b-bf48-3b00d8f94d4b"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 814dff54-9cde-4e4d-af01-9de9376e0f90 was answered 201 (held until 2026-11-26T03:14:22.832Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1908b0d4-c423-4f2e-a605-a317d048e570"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c5900830-73e2-4917-8839-1d89cd616ba4 was answered 201 with booking a38db0b2-40ec-4327-b242-f4dbfd04ab8c, which does not exist after recovery",
+          "bookingIds": [
+            "a38db0b2-40ec-4327-b242-f4dbfd04ab8c"
+          ],
+          "seatIds": [
+            "4fff1bce-229b-471f-a615-d882de12074d"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6430e37b-f597-4395-b624-736eae7165de was answered 201 with booking 6b7cb4c9-5dee-4249-b8f5-2a57b4a7d0e6, which does not exist after recovery",
+          "bookingIds": [
+            "6b7cb4c9-5dee-4249-b8f5-2a57b4a7d0e6"
+          ],
+          "seatIds": [
+            "1cadeca4-7b72-4e6f-b2c3-595c487b250b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold fe6d8643-88f7-4eeb-92c8-cffa3fda9475 was answered 201 with booking 129c869c-72f6-42a7-b4e1-9c8a145e327f, which does not exist after recovery",
+          "bookingIds": [
+            "129c869c-72f6-42a7-b4e1-9c8a145e327f"
+          ],
+          "seatIds": [
+            "4909ba6c-aa1d-4bcb-bebd-60dbfabe5a44"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d30ba1db-0645-4167-a175-7725417fd2c9 was answered 201 (held until 2026-11-26T03:14:22.843Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a1bacfb1-81ff-496c-bd45-984876567d46"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 784b5668-7e7d-4f3a-8a64-7344382d8083 was answered 201 (held until 2026-11-26T03:14:22.843Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "62f0f3ea-fa7f-4d64-ad2a-954e3b21892b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2d752375-cb05-4d63-9890-f644031dab3a was answered 201 with booking 678c1b8a-b935-4f84-869d-4aa3a4295eca, which does not exist after recovery",
+          "bookingIds": [
+            "678c1b8a-b935-4f84-869d-4aa3a4295eca"
+          ],
+          "seatIds": [
+            "726359bf-3e14-4cde-b04e-0a43f660e0f2"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a1f8f48e-8541-4e96-a4a9-aad97899b155 was answered 201 with booking 41f2c575-949a-48c0-87f1-2e3fa69d484f, which does not exist after recovery",
+          "bookingIds": [
+            "41f2c575-949a-48c0-87f1-2e3fa69d484f"
+          ],
+          "seatIds": [
+            "8cd0519f-13ae-45ba-adf0-e266385447f3"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7974dcdc-c2b0-430c-b99a-85503fad31d1 was answered 201 (held until 2026-11-26T03:14:22.850Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4094a0a8-6711-43ac-977b-67828b761e01"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d1399be8-5e61-4336-8afc-561059ceb251 was answered 201 with booking 6ffb19dc-a8e6-48a1-8792-c07817c6ed8f, which does not exist after recovery",
+          "bookingIds": [
+            "6ffb19dc-a8e6-48a1-8792-c07817c6ed8f"
+          ],
+          "seatIds": [
+            "daea8897-6742-44de-a3d4-73da5a545cd9"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 029c016c-3219-4aa0-a5e1-8396b6d5dc0d was answered 201 (held until 2026-11-26T03:14:22.851Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3c60f85a-f3d1-4bfd-a3ce-b00e114c7f2e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1a86a519-1a69-494a-a2e8-57bad8a95182 was answered 201 (held until 2026-11-26T03:14:22.852Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "528da43b-95ea-4669-96b8-cce678a664a4"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold ab260466-b74e-4755-b646-22de5b9bca28 was answered 201 (held until 2026-11-26T03:14:22.853Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f1ff51a2-329f-4b33-8146-9bd8fd48d920"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold f40bbf91-8186-4489-80d9-11d6a2d87d0c was answered 201 (held until 2026-11-26T03:14:22.856Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "ac3dcdb9-0bcd-4ee5-819a-b24dd44c96bc"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 39b605fe-e78c-46e3-9616-160a1b6e28f1 was answered 201 (held until 2026-11-26T03:14:22.855Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "045005d6-4faf-42d8-adba-4699c80827e3"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold a6988f33-ec0f-47b1-8847-55877e075c0f was answered 201 (held until 2026-11-26T03:14:22.856Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "146d9981-a942-4e95-9405-a5a8bafb3cf9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ee4587a0-cd17-42b1-a0e7-aaf9494fb7b2 was answered 201 with booking d0b5975c-807c-4155-a086-465478f40941, which does not exist after recovery",
+          "bookingIds": [
+            "d0b5975c-807c-4155-a086-465478f40941"
+          ],
+          "seatIds": [
+            "95eed17d-7287-416a-afe6-a257a86ddae4"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e823b698-5d88-4618-ac55-f2e34f708c2a was answered 201 with booking a61e7902-78b0-437d-9a1c-71aee1a3a5e0, which does not exist after recovery",
+          "bookingIds": [
+            "a61e7902-78b0-437d-9a1c-71aee1a3a5e0"
+          ],
+          "seatIds": [
+            "0c84edac-b47e-4b66-89af-af45a2951f07"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold fa977299-908c-45f7-809f-a2e4a23c0ed6 was answered 201 (held until 2026-11-26T03:14:22.866Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "1e26afc5-6cf4-4980-a710-0a4591808b38"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 82107f52-bee8-489c-9d52-d99da30defe7 was answered 201 with booking 53818af2-7b5e-410e-be48-3fdfae492825, which does not exist after recovery",
+          "bookingIds": [
+            "53818af2-7b5e-410e-be48-3fdfae492825"
+          ],
+          "seatIds": [
+            "2348679f-ba54-4ef0-8a7a-3f3ccf4bd8ab"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1a921cd1-4551-42bc-969a-980b6d61f8ad was answered 201 (held until 2026-11-26T03:14:22.873Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "42cd5df9-cdca-47e9-b294-92a029367da2"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e28a216d-0de6-4c0f-a1ea-ece9a8ec0ab5 was answered 201 (held until 2026-11-26T03:14:22.877Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f25ad339-98c5-4f40-a51c-1db47db5035d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6d60fda2-c87e-4a1c-bcc0-5b78cef3a389 was answered 201 (held until 2026-11-26T03:14:22.882Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "714a7703-e79d-482c-aa39-d91d18069b26"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e7292190-b308-4ecf-90b2-8249464ee40a was answered 201 (held until 2026-11-26T03:14:22.887Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "e76d0621-93e5-4900-b7fd-f10a025f77b8"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c4a0b116-666d-4a1e-be5c-b8da8fc321bb was answered 201 with booking 553c1b56-0519-46c7-a909-f93164b1432d, which does not exist after recovery",
+          "bookingIds": [
+            "553c1b56-0519-46c7-a909-f93164b1432d"
+          ],
+          "seatIds": [
+            "4e5217c8-21b9-4b32-b2c8-ea6d6e24cb68"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 6bc70def-8c13-414f-bc1a-f4248e56cf2b was answered 201 with booking a6880e6e-b01e-4ccf-bdde-071949b022c3, which does not exist after recovery",
+          "bookingIds": [
+            "a6880e6e-b01e-4ccf-bdde-071949b022c3"
+          ],
+          "seatIds": [
+            "584bbf56-7bf6-4bfd-8aa1-818979bbbc5b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 21c0eee3-409b-4c0c-88a4-f6f52217da6e was answered 201 with booking 0fe760c4-3c80-4014-965f-f1e6cbc40916, which does not exist after recovery",
+          "bookingIds": [
+            "0fe760c4-3c80-4014-965f-f1e6cbc40916"
+          ],
+          "seatIds": [
+            "105b9622-12bf-47a5-acd6-bcde19fb12f5"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 67410400-b63c-440b-ba48-43a6f580b923 was answered 201 with booking 6f1757bb-1f18-47d8-9aa1-d0ba692fb628, which does not exist after recovery",
+          "bookingIds": [
+            "6f1757bb-1f18-47d8-9aa1-d0ba692fb628"
+          ],
+          "seatIds": [
+            "398d6938-1065-46fe-a355-b1693122c479"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 8a6f47a5-d8f9-4130-9c4a-4b3b33a5c31a was answered 201 (held until 2026-11-26T03:14:22.890Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "8d8e548f-b6d3-43b8-8440-a1aab0776817"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold e91d77f7-1bb8-4138-a9f6-cd0ec04479bc was answered 201 (held until 2026-11-26T03:14:22.891Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "04d79c8a-34a1-4f5c-81e3-987323c91c05"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ba7530bc-a958-4f9d-a7e3-375fd252dd3a was answered 201 with booking 76528cd7-a74c-43e9-88ce-370e4348f664, which does not exist after recovery",
+          "bookingIds": [
+            "76528cd7-a74c-43e9-88ce-370e4348f664"
+          ],
+          "seatIds": [
+            "eddac8a9-6636-4ab3-a3f3-8745848fbd9e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 2696b0e0-1110-4928-8089-6d33de200695 was answered 201 (held until 2026-11-26T03:14:22.895Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "47a2628b-5ba3-4b4a-a0ab-833ebaf62b16"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 881a462e-f8e6-428a-956f-acfd57edefa6 was answered 201 with booking 3d2e59b4-86a6-490f-a6fe-b1ea851198f9, which does not exist after recovery",
+          "bookingIds": [
+            "3d2e59b4-86a6-490f-a6fe-b1ea851198f9"
+          ],
+          "seatIds": [
+            "797fa0bf-5999-4846-b3f0-2159de980720"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e89d88b7-634f-4e94-8c91-57d89a66bcbf was answered 201 with booking 9f808a11-e91e-4bd8-b473-8be0f97e30f3, which does not exist after recovery",
+          "bookingIds": [
+            "9f808a11-e91e-4bd8-b473-8be0f97e30f3"
+          ],
+          "seatIds": [
+            "de477b23-f162-4722-9dcc-988c256b669f"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 13ed776f-1f40-4ffe-9a8a-9120124dfedd was answered 201 (held until 2026-11-26T03:14:22.899Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "54d78775-e418-4e72-92c6-a8661f95be81"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 45a8ec91-ec2d-49d5-86ac-2b59cd99e37c was answered 201 (held until 2026-11-26T03:14:22.899Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a3332ec7-07b7-4648-aff7-5351fd74f4b6"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2c01c1ca-0b1f-4d47-a1ee-8f9b108e87f6 was answered 201 with booking 7da1ccc0-490a-401b-a807-0efede507af8, which does not exist after recovery",
+          "bookingIds": [
+            "7da1ccc0-490a-401b-a807-0efede507af8"
+          ],
+          "seatIds": [
+            "dba54526-a525-44b5-9847-0d85c31c228d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold a9cec0fe-3e0d-4771-b5c1-a24b70ba1cb2 was answered 201 (held until 2026-11-26T03:14:22.901Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "4d5ee8b0-619c-4fbf-aea9-39d79af5fc6f"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7906a0bb-2e47-4925-8394-8a1e255f9dbc was answered 201 (held until 2026-11-26T03:14:22.904Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "e7f355e5-03d2-40bb-8da9-8d4f71bb178c"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 4277b34e-46d8-4fa8-bf70-79c3ca494bc2 was answered 201 (held until 2026-11-26T03:14:22.904Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "7de618ed-5ec7-4090-85f6-39da97cff315"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold b6d2f53d-d9d8-4bd9-96e8-2593decadf9b was answered 201 with booking 0a695d18-1646-48c9-ac8e-26216c857218, which does not exist after recovery",
+          "bookingIds": [
+            "0a695d18-1646-48c9-ac8e-26216c857218"
+          ],
+          "seatIds": [
+            "2d668f62-bff1-4994-b5ac-70ed24a587a1"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 15aaf7e3-6828-417b-a505-571f7f9add5b was answered 201 with booking e56fd61a-55c0-48f3-be1a-1b00a1c3fdf7, which does not exist after recovery",
+          "bookingIds": [
+            "e56fd61a-55c0-48f3-be1a-1b00a1c3fdf7"
+          ],
+          "seatIds": [
+            "e43393d7-4d96-409b-854d-4387f3d815b1"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 882b6268-a217-4e88-b1b9-1c021ca977b7 was answered 201 (held until 2026-11-26T03:14:22.908Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "e11b21d6-0c56-45d2-8697-8c64caffe5f2"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6e4b2150-eedc-450d-8025-ff890e14ac40 was answered 201 (held until 2026-11-26T03:14:22.909Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9d577cc1-f8fb-4720-8e36-0b9a5df1b287"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7da7a13a-0d6b-4564-ba97-01df1c464756 was answered 201 with booking c57a4d85-2cd3-4e57-9219-356b28dc3e55, which does not exist after recovery",
+          "bookingIds": [
+            "c57a4d85-2cd3-4e57-9219-356b28dc3e55"
+          ],
+          "seatIds": [
+            "4acb5c9a-920d-413c-a065-3f42802df029"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 3868c46e-707d-46fd-8db3-dcedcc69f694 was answered 201 with booking 2708107f-9797-4388-abd0-7208f8745541, which does not exist after recovery",
+          "bookingIds": [
+            "2708107f-9797-4388-abd0-7208f8745541"
+          ],
+          "seatIds": [
+            "88933324-3c96-4b96-bb0a-fe678e97f564"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 6946fd0c-ceb6-4d73-8f43-f1d5fab5bb3f was answered 201 (held until 2026-11-26T03:14:22.926Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "808efe87-4ea7-445d-94f3-f45d8839e64e"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 4047cbb4-b550-439b-915e-aec7182672bd was answered 201 with booking bc86e5c5-df14-44e9-a376-c5368031fca7, which does not exist after recovery",
+          "bookingIds": [
+            "bc86e5c5-df14-44e9-a376-c5368031fca7"
+          ],
+          "seatIds": [
+            "1eabadae-1669-4175-9c5f-d3840cd61f95"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8ff6fbcb-595c-4958-b964-fe62f2ba6391 was answered 201 with booking 5cba3cec-0f70-456e-9713-0b64586eae84, which does not exist after recovery",
+          "bookingIds": [
+            "5cba3cec-0f70-456e-9713-0b64586eae84"
+          ],
+          "seatIds": [
+            "de3ef87c-c5be-40ba-9a43-cb1a7483ddee"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold ebf83031-59c0-4604-804d-b4f70d9b03b2 was answered 201 with booking c2a8055d-9b25-4b74-a2c3-d71882d39499, which does not exist after recovery",
+          "bookingIds": [
+            "c2a8055d-9b25-4b74-a2c3-d71882d39499"
+          ],
+          "seatIds": [
+            "d4de9981-dcad-40c7-bc60-560f1bf4a198"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold a660d2c2-315d-4576-a158-d6fc83fbc67d was answered 201 (held until 2026-11-26T03:14:22.937Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "61b134fb-2b34-4752-88ac-7d865608da28"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold ef617854-638e-4589-8920-bd4421fbb073 was answered 201 (held until 2026-11-26T03:14:22.939Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f1773547-25bc-4217-aa97-7a0993400cdb"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e32f8cff-dd32-4aa8-bf36-bbc8604e4514 was answered 201 with booking ca15e57e-bfde-41fb-8481-ba103944dc5f, which does not exist after recovery",
+          "bookingIds": [
+            "ca15e57e-bfde-41fb-8481-ba103944dc5f"
+          ],
+          "seatIds": [
+            "2da87cb1-8147-4d00-914a-b64f662ed10c"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7a30c852-17a1-4b56-a8ff-9dcc0724b3f9 was answered 201 with booking 0f32373d-d23f-4d9f-b08f-52c67a858edf, which does not exist after recovery",
+          "bookingIds": [
+            "0f32373d-d23f-4d9f-b08f-52c67a858edf"
+          ],
+          "seatIds": [
+            "1fd4ac3c-40be-4374-98c7-f2afe2b4c558"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 25d0e5fe-007f-4b19-b42c-cbd70af4905e was answered 201 (held until 2026-11-26T03:14:22.947Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "f687a1ad-4679-4d55-852a-8eed933c66fa"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 4f8a4586-be57-4d49-b7c6-9aa8bee8f3af was answered 201 with booking 081e55ab-87ac-4659-9798-2cf7b638a03e, which does not exist after recovery",
+          "bookingIds": [
+            "081e55ab-87ac-4659-9798-2cf7b638a03e"
+          ],
+          "seatIds": [
+            "eedcd09f-0bff-4211-bb94-55c702bacbb5"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 96d29e7e-2579-4de8-b132-093434c0ab1a was answered 201 with booking ea45da0e-623e-4ba3-935c-2c57a0a617f6, which does not exist after recovery",
+          "bookingIds": [
+            "ea45da0e-623e-4ba3-935c-2c57a0a617f6"
+          ],
+          "seatIds": [
+            "e46e0dae-b6de-4bf7-ae34-0b3f9fc11f87"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 326ee351-f0a2-4958-ae46-844e050a493b was answered 201 (held until 2026-11-26T03:14:22.958Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "b34daa84-05e1-41f7-b983-cf06fe8e836b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7b771da5-914b-4b63-954f-1f83a47e1c9d was answered 201 with booking 216c2239-1aa6-4953-8d07-def7889233b3, which does not exist after recovery",
+          "bookingIds": [
+            "216c2239-1aa6-4953-8d07-def7889233b3"
+          ],
+          "seatIds": [
+            "37dd3598-56f6-48e9-9c16-e137ce9d6ee6"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 08b39b63-9865-4b4f-9f95-41b26f98bb8a was answered 201 with booking 1db537e4-2876-441f-8872-ef74543dc9b4, which does not exist after recovery",
+          "bookingIds": [
+            "1db537e4-2876-441f-8872-ef74543dc9b4"
+          ],
+          "seatIds": [
+            "098e4679-6b3c-4ee3-b18d-6a67ef2678d5"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold cb8bbfc3-0038-4734-b964-2bed39bb9b77 was answered 201 (held until 2026-11-26T03:14:22.961Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "22dbf409-5874-4471-bdf9-cb94583c121b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 8b7358d1-f13d-4225-8604-30831d69e33d was answered 201 with booking 9c52217b-faef-491c-bd6a-ef37765fb7da, which does not exist after recovery",
+          "bookingIds": [
+            "9c52217b-faef-491c-bd6a-ef37765fb7da"
+          ],
+          "seatIds": [
+            "9a70269a-7409-474d-84a6-a8097b86649b"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 79311ef1-9db9-4ec9-b169-a11b6fd88c18 was answered 201 (held until 2026-11-26T03:14:22.967Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "041973f0-552f-4e1e-ae61-dfee55726117"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c3fd1ad2-e72e-4d54-919c-28d9b3b0ffa9 was answered 201 with booking 707622c1-d453-47f4-b1ee-608f962b6dd6, which does not exist after recovery",
+          "bookingIds": [
+            "707622c1-d453-47f4-b1ee-608f962b6dd6"
+          ],
+          "seatIds": [
+            "93d54c68-0942-4f89-81e2-099bf14d2ff2"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 7941297d-cd98-4846-a862-8861b4f1ecd5 was answered 201 with booking f40a19f7-4cbd-464d-a06e-3bf669839b1a, which does not exist after recovery",
+          "bookingIds": [
+            "f40a19f7-4cbd-464d-a06e-3bf669839b1a"
+          ],
+          "seatIds": [
+            "a972ff51-546c-4c80-9a21-9152a9213f4a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold ec155ff7-38c9-41f0-ac0a-101f64b1cf7b was answered 201 (held until 2026-11-26T03:14:22.975Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "8cc48329-15a6-4e61-b6b3-6fb42c20fd9d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7e12052b-ef0a-476e-93a7-0c90eb94fecf was answered 201 (held until 2026-11-26T03:14:22.976Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3ebfbc0d-5af0-455b-8911-f914c0bcefce"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold aca90807-cd35-45b5-a1f1-ea28d7b88280 was answered 201 with booking fcf2e760-37e7-4dc2-a25e-cf2a2229f80c, which does not exist after recovery",
+          "bookingIds": [
+            "fcf2e760-37e7-4dc2-a25e-cf2a2229f80c"
+          ],
+          "seatIds": [
+            "bb041825-54f5-46cf-9f1a-eada2d025ae4"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold c998024f-6da1-452c-8fc4-ce37e63f542c was answered 201 with booking 89af4f44-0326-42bf-876e-445c1675ffe1, which does not exist after recovery",
+          "bookingIds": [
+            "89af4f44-0326-42bf-876e-445c1675ffe1"
+          ],
+          "seatIds": [
+            "6ff3306b-2508-489d-821a-2372d4137a52"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 128c05d3-69e4-4221-bc36-d7cd435335d4 was answered 201 (held until 2026-11-26T03:14:22.979Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "cc1f8a1e-204f-44ca-bc1c-68d832999e05"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7c28fcbc-1648-431e-aa42-afd1894842ff was answered 201 (held until 2026-11-26T03:14:22.980Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "dcf7bcd3-d78b-46ad-b1ba-e4d01b70e1aa"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold bf7f40aa-f3e8-42dd-890e-4fbd3d090d04 was answered 201 (held until 2026-11-26T03:14:22.981Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "56439bd3-6ec2-4e8b-86de-a6553171421e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold c1c56257-1fa4-4a64-8695-daef69efefda was answered 201 (held until 2026-11-26T03:14:22.982Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2dee1da3-0d08-4bde-9770-a7cf4e5416b7"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 3d0dd6e9-70a0-474e-b3dc-600e0971bd7f was answered 201 (held until 2026-11-26T03:14:22.985Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9eef53fb-ac4c-48be-b912-99a8917e12e0"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 964231a8-7f10-45ac-8de7-1cf01ab40e9b was answered 201 (held until 2026-11-26T03:14:22.985Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a4e86d89-28d3-42b0-b104-5ffc8a45cdea"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 3148b97e-219d-43f1-a9b3-3120d5616b85 was answered 201 (held until 2026-11-26T03:14:22.987Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "63110673-682f-4ff7-8fc0-65bc9e953501"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7485f2c7-3e30-490a-bf8a-b241d5088866 was answered 201 (held until 2026-11-26T03:14:22.997Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "c7a8d0ee-a290-474a-b464-6f5a8e260167"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2e364340-a97d-40b7-a846-76b22936ccd8 was answered 201 with booking d0012726-8622-44c6-9cf0-b653c9968e3a, which does not exist after recovery",
+          "bookingIds": [
+            "d0012726-8622-44c6-9cf0-b653c9968e3a"
+          ],
+          "seatIds": [
+            "bc55e9a8-bd06-4d28-a116-34763735bc72"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 9223e82c-34f6-42f9-a997-6bc5c3ec82e8 was answered 201 (held until 2026-11-26T03:14:23.000Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "11a7403a-57eb-4b94-a7bf-9169efd88f9d"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 5efd7a74-128a-4206-8fe2-cc965278a4d9 was answered 201 (held until 2026-11-26T03:14:23.002Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "d35728d1-384a-4591-a30e-5a5631c5861e"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 0701644d-eb02-4d62-bf8a-dd2272ed7eb3 was answered 201 with booking c51c389f-8dcf-4011-8917-317e3faddb11, which does not exist after recovery",
+          "bookingIds": [
+            "c51c389f-8dcf-4011-8917-317e3faddb11"
+          ],
+          "seatIds": [
+            "c97d3eee-ad14-4036-9880-733097ec4172"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold d7988258-7322-46c6-80f2-3606b77ba59d was answered 201 with booking f161d637-1012-473f-a66f-b1e02c37a547, which does not exist after recovery",
+          "bookingIds": [
+            "f161d637-1012-473f-a66f-b1e02c37a547"
+          ],
+          "seatIds": [
+            "93a65c79-b79a-4889-b78a-edd6b4d603ac"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e5be63e9-81a8-487f-af1a-69f01f04da00 was answered 201 with booking 94dd6aa8-314b-47ca-87af-4343c26feadb, which does not exist after recovery",
+          "bookingIds": [
+            "94dd6aa8-314b-47ca-87af-4343c26feadb"
+          ],
+          "seatIds": [
+            "09dc10f5-a4b3-499e-80dc-fce6ce6b1c62"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 1eb8f748-1234-496b-a522-457aea769251 was answered 201 (held until 2026-11-26T03:14:23.012Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "5a912a18-fd49-4d2f-8c59-dbbe792176d9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold e045368e-ba10-4d29-bcdd-572a7ed24ffb was answered 201 with booking a84beca0-125e-4b57-a1d7-7a6eaeb7a65e, which does not exist after recovery",
+          "bookingIds": [
+            "a84beca0-125e-4b57-a1d7-7a6eaeb7a65e"
+          ],
+          "seatIds": [
+            "8e4acab5-a077-4a7f-995a-ce07704a8aa1"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 0ec0e1ea-7270-4ccc-a423-4f2cfdaf21e6 was answered 201 (held until 2026-11-26T03:14:23.018Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "9f2d54ca-a0cd-4cba-808c-ee475f35c6b8"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 03ee9f3a-f421-491a-a0d6-508e81031ce9 was answered 201 (held until 2026-11-26T03:14:23.019Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "0ce119cb-451a-460b-9682-6127c32a6e3b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 89a5ae8b-0333-47e6-9ace-4b40a49f0ff9 was answered 201 with booking 176038e8-ef98-4dec-baa0-7df3e0bcd805, which does not exist after recovery",
+          "bookingIds": [
+            "176038e8-ef98-4dec-baa0-7df3e0bcd805"
+          ],
+          "seatIds": [
+            "7902aa62-42c0-4298-86a6-92d019aa33d3"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 5dfae582-2253-414c-8f37-3952405cf5ef was answered 201 with booking 7b84e3f1-53ee-41fd-9ffd-7ada8890cb5d, which does not exist after recovery",
+          "bookingIds": [
+            "7b84e3f1-53ee-41fd-9ffd-7ada8890cb5d"
+          ],
+          "seatIds": [
+            "2c7db394-efad-4fcb-892b-02704c93a418"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold d906ba44-91b0-4e14-bdef-96f00b515218 was answered 201 (held until 2026-11-26T03:14:23.022Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "265e2e59-202e-4317-9b78-896142faee3b"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold f1b6c709-cc9b-403e-8f4c-20ace7249a3d was answered 201 with booking 270dd05e-0a9f-425a-a65a-7948578cbf6f, which does not exist after recovery",
+          "bookingIds": [
+            "270dd05e-0a9f-425a-a65a-7948578cbf6f"
+          ],
+          "seatIds": [
+            "aa3f8b66-8d26-4776-b168-5cc9fdfedf8e"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold dced6713-93dd-4c63-92cb-cd28710ee7a6 was answered 201 (held until 2026-11-26T03:14:23.026Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "2cabb85a-f467-4142-94a7-8f76cb0d78b9"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold daa55586-17b7-45a2-a35c-dd4606a7cbd5 was answered 201 with booking 2e4d6a03-5f96-4624-96c8-fad59a45678e, which does not exist after recovery",
+          "bookingIds": [
+            "2e4d6a03-5f96-4624-96c8-fad59a45678e"
+          ],
+          "seatIds": [
+            "e227685a-167b-41ce-9316-adbc104d904a"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 7c6bff50-d567-4798-804f-a50fb9d42d7f was answered 201 (held until 2026-11-26T03:14:23.031Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "84a818e3-e032-41fd-a5d5-40ea94050303"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold 166f1333-c9cb-4992-beb9-0d46eca6a908 was answered 201 (held until 2026-11-26T03:14:23.031Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "3f29a01a-50e0-4f94-bfb6-d2613efce617"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9d4c0766-8a09-40cc-84e2-ef2e08f2d396 was answered 201 with booking f81bd7f5-a736-4f28-b245-fd285b8138c3, which does not exist after recovery",
+          "bookingIds": [
+            "f81bd7f5-a736-4f28-b245-fd285b8138c3"
+          ],
+          "seatIds": [
+            "80644269-7c5c-4928-8866-48166407be24"
+          ]
+        },
+        {
+          "kind": "acknowledged-hold-lost",
+          "detail": "hold a2e75399-d798-4e5e-9b18-868ea03bc492 was answered 201 (held until 2026-11-26T03:14:23.034Z), is not past its expiry, and neither the hold nor a Booking from it exists after recovery",
+          "seatIds": [
+            "a0660616-3870-4530-85e5-1d0e4af81c8c"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 13aa5150-745c-4e27-bb36-f256e70c1a1c was answered 201 with booking d9606849-c72e-447b-bf2f-7232197258a9, which does not exist after recovery",
+          "bookingIds": [
+            "d9606849-c72e-447b-bf2f-7232197258a9"
+          ],
+          "seatIds": [
+            "09fd7116-8d5f-40a1-ae19-90323163a975"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 97e28906-e84b-470f-b41a-a2d043a525ca was answered 201 with booking e7d406d6-abe9-498f-a50f-380eb3bbacf3, which does not exist after recovery",
+          "bookingIds": [
+            "e7d406d6-abe9-498f-a50f-380eb3bbacf3"
+          ],
+          "seatIds": [
+            "c384516a-4a75-48be-8c06-d16fa0db8350"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 2db595fb-9c42-4988-9ede-80bb147c47bf was answered 201 with booking 245b5bdf-8616-44a2-ad48-40fb92028e2a, which does not exist after recovery",
+          "bookingIds": [
+            "245b5bdf-8616-44a2-ad48-40fb92028e2a"
+          ],
+          "seatIds": [
+            "f4fb4334-e722-4850-9a99-ee1ba2434366"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 132edf6d-ebe5-4924-8cfe-8f12144bbbcf was answered 201 with booking 38d5dcb3-de81-4bd7-8462-1719114dcbd2, which does not exist after recovery",
+          "bookingIds": [
+            "38d5dcb3-de81-4bd7-8462-1719114dcbd2"
+          ],
+          "seatIds": [
+            "c266d9ac-e780-4806-a0e8-a4c33e235a65"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold a9dc7755-1fc1-40ac-b609-4caeb4164288 was answered 201 with booking e4d9fcb8-e4a2-45ce-8a1f-605de7778d0b, which does not exist after recovery",
+          "bookingIds": [
+            "e4d9fcb8-e4a2-45ce-8a1f-605de7778d0b"
+          ],
+          "seatIds": [
+            "4d07362f-0b40-44a5-9e17-704e615675f4"
+          ]
+        },
+        {
+          "kind": "acknowledged-confirm-lost",
+          "detail": "the Confirm of hold 9841a5a5-6625-4cef-beaa-6eeca27bfac3 was answered 201 with booking 4a34ed0c-252a-4382-aa45-caf24cad826f, which does not exist after recovery",
+          "bookingIds": [
+            "4a34ed0c-252a-4382-aa45-caf24cad826f"
+          ],
+          "seatIds": [
+            "aa2ba133-929b-4e10-9108-5036dd5b8781"
+          ]
+        }
+      ]
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": [
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "3 reaper sweep(s) failed and were logged (the reaper survived each)"
+    }
+  ]
+}

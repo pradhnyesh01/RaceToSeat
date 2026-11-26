@@ -32,7 +32,8 @@ export interface OracleViolation {
 }
 
 export interface OracleResult {
-  oracle: 1 | 2 | 3 | 4;
+  // 5 is the durability Oracle of durabilityOracle.ts (issue #51, ADR-0032).
+  oracle: 1 | 2 | 3 | 4 | 5;
   name: string;
   passed: boolean;
   violations: OracleViolation[];

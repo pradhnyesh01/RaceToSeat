@@ -19,7 +19,9 @@
     "formal:check": "bash formal/check.sh",
     "formal:check:negative": "bash formal/check.sh --negative-control",
     "chaos": "tsx load-harness/chaos/run.ts",
-    "chaos:holds": "tsx load-harness/chaos/runHolds.ts"
+    "chaos:holds": "tsx load-harness/chaos/runHolds.ts",
+    "chaos:restart": "tsx load-harness/chaos/runRestart.ts",
+    "chaos:restart:matrix": "tsx load-harness/chaos/restartMatrix.ts"
   },
   "dependencies": {
     "dotenv": "^16.4.5",

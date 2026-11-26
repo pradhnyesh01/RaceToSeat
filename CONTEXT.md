@@ -53,7 +53,7 @@ The ground-truth check that decides whether a run violated a guarantee, read fro
 _Avoid_: Assertion, test check, verifier
 
 **Correctness violation**:
-An Oracle failure: a Seat claimed by more than one Booking or Hold, a Booking holding fewer Seats than requested, a retried Idempotency Key that produced a second Booking or Hold, or a Seat left unreleased after faults were removed. The only outcome that fails Phase 6.
+An Oracle failure: a Seat claimed by more than one Booking or Hold, a Booking holding fewer Seats than requested, a retried Idempotency Key that produced a second Booking or Hold, a Seat left unreleased after faults were removed, or a Booking the server answered `201` for that is absent after the database was restarted. The only outcome that fails Phase 6.
 _Avoid_: Bug, failure, incident
 
 **Robustness finding**:

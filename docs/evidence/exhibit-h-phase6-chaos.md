@@ -1,6 +1,6 @@
 # Exhibit H — Phase 6 chaos testing: four DB-state Oracles under injected Faults
 
-Phase 6 deliverable (todo.md, issue #52 / C5, under umbrella #42): evidence that the project's single hard guarantee — no Seat claimed twice, no torn or duplicate Booking, nothing left stuck — survives failure, not just the happy path. It consolidates the three chaos tickets that ran (C1 #44 backend-kill, C2 #49 latency/partition/app-SIGKILL, C3 #50 hold/confirm/reaper) into one document. **C4 (#51, Postgres restart under load) was not run**; it is the stretch item first in the cut order. The formal-proof half of Phase 6 is Exhibit G (F5) and is not covered here, except that the two Robustness findings the formal track's model checking exposed in the real implementation (RF1–RF2) are recorded below, separately from the chaos-observed ones.
+Phase 6 deliverable (todo.md, issue #52 / C5, under umbrella #42): evidence that the project's single hard guarantee — no Seat claimed twice, no torn or duplicate Booking, nothing left stuck — survives failure, not just the happy path. It consolidates the three chaos tickets that ran (C1 #44 backend-kill, C2 #49 latency/partition/app-SIGKILL, C3 #50 hold/confirm/reaper) into one document. **C4 (#51, Postgres restart under load) ran last and is section N** (its reports live apart, in `docs/evidence/chaos/c4-restart/`, and are not counted in the headline table, which describes C1–C3 and the fixes). The formal-proof half of Phase 6 is Exhibit G (F5) and is not covered here, except that the two Robustness findings the formal track's model checking exposed in the real implementation (RF1–RF2) are recorded below, separately from the chaos-observed ones.
 
 Every number below is recomputed from the per-run JSON reports in `docs/evidence/chaos/` by `npm run harness:aggregate -- --exhibit h` (`load-harness/exhibitH.ts`). The prose findings records (`chaos-c1-tracer-findings.md`, `chaos-c2-fault-matrix.md`, `chaos-c3-holds-under-fault.md`) were *checked against* the JSON, not copied; the disagreements are listed under "Record consistency check". Definitions (Fault, Ambiguous outcome, Oracle, Correctness violation, Robustness finding) are in `CONTEXT.md`; the reasoning is ADR-0022 (what "correct under chaos" means) and ADR-0023 (negative controls without production toggles).
 
@@ -12,6 +12,7 @@ Every number below is recomputed from the per-run JSON reports in `docs/evidence
 | Measured runs (every run that is not a negative control) | **540** — 516 under a Fault (332 on unmodified code, 184 with the `--survive-uncaught` scaffold), 24 no-Fault baselines/reruns |
 | **Correctness violations** in measured runs (any Oracle failing) | **0** |
 | Negative controls that went red as required | **16 of 16** end-to-end (`expectViolations`); the control's control on the real schema stayed green in 1 of 1 |
+| C4: Postgres restart under load (section N; not counted above) | **39** measured runs on stock Postgres (restart / stop / SIGKILL): **0 Correctness violations**, 90,842 acknowledged Bookings/Holds/Confirms all present afterwards; **9 of 9** negative controls (unsafe Postgres, SIGKILL) flagged by Oracle 5 |
 | Robustness findings (canonical numbering) | **7** chaos-observed (R1–R7) + **2** formal-derived (RF1–RF2, found by model checking, not by a chaos run); R1 fixed by #53 (section E), R2 by #54 (section H), R3 by #55 (section F), R4 by #56 (section G), R5 by #58 (section I), R6 decided by #59 (section J), R7 by #57 (section K), RF1 by #60 (section L), RF2 by #61 (section M); all nine are fixed or decided (filed as fix tickets #53–#61, drafts in `docs/phase6-robustness-ticket-drafts.md`) |
 | Production code changed | None by the chaos tickets themselves (C1–C5: `src/` and `db/schema.sql` untouched, measure-first policy, ADR-0022). The fixes so far change `src/` only — #53 `src/db/pool.ts` (ADR-0024), #55 `src/db/pool.ts`, `src/db/pgErrors.ts`, `src/app.ts` (ADR-0025), #56 adds the timeouts of ADR-0026 (`src/config.ts`, `src/db/poolOptions.ts`, `src/db/queryDeadline.ts`, `src/db/pgErrors.ts`, `src/app.ts`, a hook appended to `src/db/pool.ts`); #58 splits `advisory.ts`'s lock-and-read statement in two (`src/strategies/advisory.ts`, ADR-0027); #57 rewrites the reaper's sweep statement to skip row-locked seats (`src/reaper.ts`, ADR-0029); #59 adds a time budget to `withSerializableTransaction`'s retry loop (`src/db/retryBudget.ts`, `src/config.ts`, two lines in `src/db/pool.ts`, ADR-0028); #54 changes no production code (the `pool.on("error")` listener that closes R2 shipped with #53; #54 adds its regression test and the idle-path evidence); #60 (RF1) is the first fix to touch `db/schema.sql` and the key path of every mechanism: a tombstone table and a `BEFORE INSERT` guard trigger, `findPrior{Booking,Hold}ForKey` in `src/strategies/idempotency.ts`, a tombstone written by the statements that release a row (`src/routes/bookings.ts`, `src/strategies/pessimisticConfirm.ts`, `src/reaper.ts`, `src/db/tombstones.ts`), `410 key_released` in two routes, two config values (ADR-0030); #61 (RF2) re-reads the key before a conflict is answered, in `src/strategies/idempotency.ts` and the five strategies that can answer one (ADR-0031) |
 
@@ -37,13 +38,13 @@ Every number below is recomputed from the per-run JSON reports in `docs/evidence
 | `partition-stall` | Toxiproxy `timeout` toxic (timeout=0) both directions: traffic swallowed, connections stay open. Applied 20–420 ms after the first app transaction appears in Postgres, held 7000 ms (> the 5000 ms timeout), then healed. Base latency 40 ms/chunk so cuts land mid-transaction. **Toxiproxy's heal tears the stalled connections down** (it does not resume them). | C2, as above (unmodified and scaffolded) | 120 |
 | `partition-reset` | Toxiproxy `reset_peer` toxic both directions: every connection RST for 7000 ms, same timing and base latency as above | C2, as above (unmodified and scaffolded) | 120 |
 | `app-sigkill` | `SIGKILL` of the app's whole process tree (the `tsx` wrapper and its server child) 20–270 ms after the first app transaction, then the harness restarts it (~650 ms). One kill per run. | C2, as above | 60 |
-| Postgres restart | **Not run.** C4 (#51) is the stretch item in the cut order and was not started. | — | 0 |
+| Postgres restart | `docker restart` / `docker stop` + `docker start` / `docker kill` + `docker start` of a scratch Postgres container the run created itself, applied after 30 % of a sustained load has been acknowledged; see section N | C4, `runRestart.ts` | 60 |
 
 Toxiproxy 2.12.0 behaviours the network Faults rest on (probed by C2, not assumed): removing a `latency` toxic **flushes** buffered bytes (an in-flight query completes — a lossless slow link); removing a `timeout` toxic does **not** resume the session — the proxy tears the stalled connection down, so both ends see it close; `reset_peer` resets connections immediately. A real partition that TCP retransmits across would not sever connections at heal, so `partition-stall` here is "a partition whose heal severs the connections that lived through it", a harsher heal than a lossless one.
 
 ## Oracles
 
-All four are SQL against stored state after the Fault has cleared (`load-harness/chaos/oracles.ts`, ADR-0022); the only HTTP-derived input is the Idempotency-Key replay, which is an *action*, not evidence. Oracle 2 needs the intended seat set per request, which only the harness's client-side ledger of intent (key → requested seats) can supply.
+The first four are SQL against stored state after the Fault has cleared (`load-harness/chaos/oracles.ts`, ADR-0022); the only HTTP-derived input is the Idempotency-Key replay, which is an *action*, not evidence. Oracle 2 needs the intended seat set per request, which only the harness's client-side ledger of intent (key → requested seats) can supply.
 
 | # | Oracle | Fails (Correctness violation) when… |
 |---|---|---|
@@ -53,6 +54,7 @@ All four are SQL against stored state after the Fault has cleared (`load-harness
 | 4 | Liveness | a Seat is `held` without a Hold, `held` past expiry + grace, or still row-locked by a transaction that never ended |
 | 2 ext | No Booking from an expired Hold (C3, `holdOracles.ts`) | a Booking exists under `hold-confirm:<holdId>` with `created_at >= held_until`, using the Hold's `held_until` snapshotted from the database before the Fault |
 | 3 ext | A live Hold's retried Confirm yields exactly one Booking (C3) | a provably live Hold ends with zero, or more than one, Booking after Confirm was retried (the base Oracle 3 only demands "at most one") |
+| 5 | Durability of acknowledged work (C4, `durabilityOracle.ts`, ADR-0032) | a Booking id the server answered `201` for is absent after recovery, or present with other seats / another key / unbooked seats, or its key now has a second Booking; an acknowledged Hold is neither live, nor a Booking, nor past its expiry; an acknowledged Confirm's Booking is absent. **The one Oracle that reads an HTTP answer, as a promise it then checks; judged before the replay** |
 
 ## Negative controls — every checker shown failing (ADR-0023)
 
@@ -67,8 +69,10 @@ A clean run is only evidence if the same pipeline demonstrably goes red on a run
 | `test/chaos/faultScoping.test.ts` | 1 | Fault confined to an application_name allow-list | C3: `onlyApplicationName` allow-list scoping |
 | `test/chaos/c2.test.ts` | 9 | stall sampler, drain wait, app-kill driver, and (real Toxiproxy) latency / stall-partition / reset-partition behaviour | C2 by hand: neutering `startNetworkFault` and the drain wait fails 4 of 9 (4 of the 9 need a reachable Toxiproxy and are skipped without one) |
 | `test/chaos/holdOracles.test.ts` | 15 | late Booking (+ boundary ±1 µs), live Hold with no/two Bookings, half-applied Reaper shapes, Confirm leaving a Hold behind — each with a clean twin | C3 by hand: neutering the two new Oracles fails 4; late-confirm predicate `false` fails 2; `>` instead of `>=` fails 1 (boundary test); neutering Oracle 4's expiry predicate fails 3; accepting any count in exactly-one fails 2 |
+| `test/chaos/durability.test.ts` | 16 | Oracle 5 against hand-built lost-commit states (Booking gone, re-created under a new id, seat lost, seat rolled back, wrong key, second Booking; Hold gone / expired / confirmed; Confirm gone), each with a clean twin | C4 by hand, five mutations of Oracle 5: lost-Booking check off fails 3 of 16; matching by key instead of acknowledged id fails 8; Hold expiry ignored fails 2; expired Holds flagged fails 1; seat-booked check off fails 1 |
+| `test/chaos/restartFault.test.ts` | 10 | container ownership rules and docker run arguments (no Docker needed), outage windows and write-outage arithmetic | C4: pins the ownership guard (refuses anything not created by the run) and the outage arithmetic; no mutation check recorded |
 
-**59 unit controls** (counted from the test files). Their pass/fail status was recorded by C1/C2/C3 against the shared Postgres; this ticket did not re-run them (another session was using that database), so they are cited, not re-verified. Mutation checks were done once by hand by those tickets.
+**85 unit controls** (counted from the test files). Their pass/fail status was recorded by C1/C2/C3 against the shared Postgres; this ticket did not re-run them (another session was using that database), so they are cited, not re-verified. Mutation checks were done once by hand by those tickets.
 
 ### End-to-end controls (computed from the reports)
 
@@ -661,6 +665,76 @@ Issue #61 (RF2) makes every mechanism re-read the Idempotency Key, once and on a
 | `serializable` | 50 / 50 | 5,000 / 5,000 | 50 / 4950 / 0 / 0 → 50 / 4950 / 0 / 0 | no | 43.0 → 45.1 (+4.8%) | 46.7 → 49.0 (+4.9%) | 2102 → 2009 (−4.4%) |
 | `unique_constraint` *(unchanged: noise control)* | 50 / 50 | 5,000 / 5,000 | 50 / 4950 / 0 / 0 → 50 / 4950 / 0 / 0 | no | 39.9 → 41.0 (+2.7%) | 42.8 → 43.5 (+1.5%) | 2439 → 2423 (−0.7%) |
 
+### N. C4 — a Postgres restart under load (#51, ADR-0032): is an acknowledged COMMIT durable?
+
+Issue #51 (C4) is the one planned chaos scenario that took the database *server* away. Everything before it removed a connection, a link or the app; none of it could test what the formal model assumes about Postgres, that a `COMMIT` the client has been told about is still there afterwards (`CommittedPersists`, `formal/CrashRecovery.tla`; Exhibit G, "What this does not prove"). **39 measured runs, 90,842 acknowledged Bookings / Holds / Confirms: 0 lost, 0 Correctness violations.** 9 of 9 negative controls went red on Oracle 5 with 5,291 acknowledged commits missing, and in 9 of those 9 the other four Oracles stayed green on the same lost-commit state.
+
+**How it was run** (ADR-0032; `npm run chaos:restart`, `npm run chaos:restart:matrix`; code in `load-harness/chaos/restart*.ts`, `durabilityOracle.ts`). Each run creates a Postgres container of its own (`c4-pg-<hex>`, `postgres:17`, a free loopback port; ownership of the container id, name and a run label is re-checked before every stop / kill / start / remove, and no other container, including the compose database, is ever addressed), applies `db/schema.sql`, seeds, issues `CHECKPOINT`, and starts the **unmodified** app (`src/server.ts`, `pessimistic`, no `--survive-uncaught`) against it. A sustained Node client (`restartLoad.ts`; not k6: the load has to outlast a restart and the Booking id of every `201` has to be recorded) applies the load; after 30 % of the operations have been acknowledged the Fault lands. Clients follow the retry contract of ADR-0025/0026: an attempt that gets no answer, a `502`, a `504` or another `5xx` is retried with the same Idempotency Key (up to 60 s), a `409` is a definitive loss. Three ways to take the server away, each repeated three times per load (more on the cells below that say so): `docker restart` (the image's stop signal is `SIGINT`, Postgres's *fast shutdown*: sessions terminated, in-flight transactions rolled back, shutdown checkpoint, immediate restart); `docker stop` then 3 s down then `docker start` (the same orderly shutdown, held down as long as the kill so the two shutdown modes compare at equal outage); `docker kill` (SIGKILL: no shutdown, no checkpoint) then 3 s down then `docker start`, so the server replays its WAL.
+
+After the load has finished and the server is back, **Oracle 5 (durability of acknowledged work, `durabilityOracle.ts`) runs first, before the Idempotency-Key replay**: every Booking id a client was answered `201` for must exist, under the key and seats it was acknowledged for, with its seats `booked` for its user and no second Booking under the key; for Holds, an acknowledged Hold must still be live, have become a Booking, or be past its expiry, and an acknowledged Confirm's Booking must exist. Then every key is replayed and Oracles 1–4 run as in every other chaos run. Oracle 5 is the one place a chaos verdict leans on an HTTP answer, and only in one direction: a `201` is read as a promise the stored state is then asked to have kept (ADR-0032 argues why this does not break ADR-0022's rule).
+
+### N1. The restart and the kill, stock Postgres
+
+Every cell is 3 repeats unless the Runs column says otherwise. *Server unreachable* is the span between the harness's first failed and first successful probe of the server; *client write outage* is the time from the last `201` before the Fault to the first `201` after the server was back; *app lag* is how much of that was the app, from the first moment the server answered to the first `201` the app served. Attempts are individual HTTP tries (a retried request counts each time); "no answer" is a connection error or client timeout.
+
+| Cell (stock Postgres) | Runs | 201s acknowledged | Oracles 1–4 clean | Oracle 5 clean | Acknowledged work lost | Server unreachable, ms (median, range) | Client write outage, ms | App lag after server back, ms | Attempts during outage: 502 / 504 / no answer | Slowest attempt, ms | App crashes / abandoned requests |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| spread — `docker restart` | 3 | 12,000 | 3/3 | 3/3 | 0 | 273 (272–277) | 341 (338–344) | 9 (3–12) | 180 / 0 / 0 | 126 | 0 / 0 |
+| spread — `docker stop` + 3.0 s down | 3 | 12,000 | 3/3 | 3/3 | 0 | 3402 (3393–3422) | 3571 (3561–3587) | 105 (105–110) | 540 / 0 / 0 | 73 | 0 / 0 |
+| spread — `docker kill` (SIGKILL) + 3.0 s down | 3 | 12,000 | 3/3 | 3/3 | 0 | 3385 (3378–3385) | 3582 (3567–3667) | 123 (120–231) | 540 / 0 / 0 | 73 | 0 / 0 |
+| hammer — `docker restart` | 3 | 750 | 3/3 | 3/3 | 0 | 253 (253–255) | 391 (387–401) | 59 (50–67) | 72 / 0 / 0 | 63 | 0 / 0 |
+| hammer — `docker stop` + 3.0 s down | 3 | 750 | 3/3 | 3/3 | 0 | 3344 (3344–3359) | 3631 (3616–3701) | 206 (193–266) | 258 / 0 / 0 | 68 | 0 / 0 |
+| hammer — `docker kill` (SIGKILL) + 3.0 s down | 3 | 750 | 3/3 | 3/3 | 0 | 3375 (3345–3425) | 3630 (3625–3693) | 208 (119–240) | 240 / 0 / 0 | 75 | 0 / 0 |
+| holds — `docker restart` | 3 | 6,783 | 3/3 | 3/3 | 0 | 261 (251–290) | 343 (338–353) | 17 (4–33) | 182 / 0 / 0 | 80 | 0 / 0 |
+| holds — `docker stop` + 3.0 s down | 3 | 6,738 | 3/3 | 3/3 | 0 | 3392 (3358–3395) | 3571 (3564–3585) | 117 (110–159) | 540 / 0 / 0 | 84 | 0 / 0 |
+| holds — `docker kill` (SIGKILL) + 3.0 s down | 3 | 6,749 | 3/3 | 3/3 | 0 | 3382 (3358–3418) | 3565 (3559–3654) | 117 (89–239) | 540 / 0 / 0 | 81 | 0 / 0 |
+| holds, TTL 4 s — `docker restart` | 3 | 6,795 | 3/3 | 3/3 | 0 | 276 (265–279) | 344 (342–345) | 10 (6–16) | 180 / 0 / 0 | 72 | 0 / 0 |
+| holds, TTL 4 s — `docker kill` (SIGKILL) + 3.0 s down | 3 | 6,794 | 3/3 | 3/3 | 0 | 3393 (3355–3405) | 3571 (3568–3647) | 118 (103–231) | 540 / 0 / 0 | 81 | 0 / 0 |
+| spread — `docker kill` (SIGKILL) + 15.0 s down | 3 | 12,000 | 3/3 | 3/3 | 0 | 15439 (15407–15494) | 15656 (15638–15657) | 151 (97–168) | 1620 / 0 / 0 | 88 | 0 / 0 |
+| holds — `docker kill` (SIGKILL) + 15.0 s down | 3 | 6,733 | 3/3 | 3/3 | 0 | 15389 (15370–15396) | 15649 (15643–15750) | 197 (183–315) | 1620 / 0 / 0 | 74 | 0 / 0 |
+
+Across all 39 measured runs the server was unreachable for 3375 (251–15494) ms (median, range); the slowest single attempt was 126 ms, 0 requests were abandoned without a definitive answer, and the app process exited 0 time(s).
+
+### N2. Holds: the reaper across the outage
+
+Hold runs seed 1,500 seats through `POST /holds`, confirm about half, and let the rest expire; the reaper runs inside the app as in production (`REAPER_INTERVAL_MS` 1000 ms). The *TTL 4 s* cells make holds expire while the server is down, so the reaper has a backlog the moment it can reach the database again.
+
+| Cell | Runs | Holds acknowledged | Confirms acknowledged | Holds already expired when the server came back | Reaper cleared that backlog after, ms | Reaper sweeps that failed and were survived | Every seat `available` at the end | Oracle 4 clean |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| holds — `docker restart` | 3 | 4,500 | 2,283 | 0 | — | 0 | 3/3 | 3/3 |
+| holds — `docker stop` + 3.0 s down | 3 | 4,500 | 2,238 | 0 | — | 9 | 3/3 | 3/3 |
+| holds — `docker kill` (SIGKILL) + 3.0 s down | 3 | 4,500 | 2,249 | 0 | — | 9 | 3/3 | 3/3 |
+| holds, TTL 4 s — `docker restart` | 3 | 4,500 | 2,295 | 0 | — | 0 | 3/3 | 3/3 |
+| holds, TTL 4 s — `docker kill` (SIGKILL) + 3.0 s down | 3 | 4,500 | 2,294 | 298 | 476 (417–514) | 9 | 3/3 | 3/3 |
+| holds — `docker kill` (SIGKILL) + 15.0 s down | 3 | 4,500 | 2,233 | 706 | 530 (481–537) | 45 | 3/3 | 3/3 |
+
+### N3. Negative controls and the reference (ADR-0023)
+
+The weakening is in the *server's configuration*, never in `src/` (no test-only toggle in production code): `synchronous_commit=off`, `wal_writer_delay=10000ms` (the maximum), `wal_writer_flush_after=1GB`, `checkpoint_timeout=1h`, `fsync=off`. A commit is then acknowledged while its WAL record still sits in the server's memory, and nothing flushes it for up to 10 s, so a SIGKILL loses every acknowledged commit of that window. The harness checkpoints after seeding, so only the Bookings under test are at risk. The reference is the *same* weakened server restarted orderly: the shutdown checkpoint flushes everything, so nothing may be lost, which shows the control's red comes from the kill and not from the configuration alone.
+
+| Role | Cell | Server configuration | Runs | 201s acknowledged | Runs Oracle 5 flagged | Acknowledged work lost | Runs Oracles 1–4 all clean |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| negative control | spread — `docker kill` | `synchronous_commit=off`, `wal_writer_delay=10000 ms`, `fsync=off` | 3 | 12,000 | 3/3 | 3,667 | 3/3 |
+| negative control | hammer — `docker kill` | `synchronous_commit=off`, `wal_writer_delay=10000 ms`, `fsync=off` | 3 | 753 | 3/3 | 228 | 3/3 |
+| negative control | holds — `docker kill` | `synchronous_commit=off`, `wal_writer_delay=10000 ms`, `fsync=off` | 3 | 6,819 | 3/3 | 1,396 | 3/3 |
+| reference | spread — `docker restart` | `synchronous_commit=off`, `wal_writer_delay=10000 ms`, `fsync=off` | 3 | 12,000 | 0/3 | 0 | 3/3 |
+
+### N4. No-Fault baselines
+
+| Load | Runs | 201s acknowledged | All five Oracles clean | Load duration, ms | Slowest attempt, ms | Attempts that were neither 201 nor 409 |
+| --- | --- | --- | --- | --- | --- | --- |
+| hammer | 3 | 750 | 3/3 | 8034 (7886–8050) | 65 | 0 |
+| holds | 3 | 6,725 | 3/3 | 3328 (3312–3411) | 48 | 0 |
+| spread | 3 | 12,000 | 3/3 | 8527 (8497–8557) | 57 | 0 |
+
+### N5. What this does and does not establish
+
+- **A returned `COMMIT` survived a SIGKILL of the Postgres process in every measured run**, with default durability settings (`synchronous_commit=on`, `fsync=on`), for Bookings, Holds and Confirms. The formal model's assumption holds for the process-kill case, and Oracle 5 demonstrably can see the opposite (section N3). What was not tested: **a machine or kernel crash, or power loss.** `docker kill` ends the Postgres processes but the Linux VM's page cache, and with it every WAL write the server had handed to the OS, survives; `fsync` is therefore not on this path, which is also why `fsync=off` is not what loses commits in the control. Testing fsync honesty would need a way to drop the page cache of the volume, which this harness does not have.
+- The control shows the *checker* is sound for a lost commit under a hard kill; it does not show that stock Postgres cannot lose one under a different Fault.
+- All outages here are *fast-failing*: Docker's published port refuses connections the moment the container stops (`ECONNREFUSED`, every attempt answered within ~126 ms). A server that is gone but still accepting packets (a failover that black-holes the old address) looks like the partition Faults of C2 and R4, not like this; sections C and G cover that case.
+- One app process, one connection pool, one scratch Postgres on one machine; the client count is 30 and the load a few hundred requests per second.
+
+
 ## Robustness findings — canonical numbering (R1–R7)
 
 C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); R1 has since been fixed (#53, section E) and the other six are not, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in `docs/phase6-robustness-ticket-drafts.md`).
@@ -751,7 +825,7 @@ The formal track's crash / ambiguous-commit / idempotent-retry model (F4, #47, m
 
 ## What this does not show
 
-- **Postgres restart (C4, #51) was not run.** No Fault here takes the *database* down. `pg_terminate_backend` kills individual backends; it is not a crash, a failover, or a restart with recovery.
+- **Postgres restart (C4, #51) ran only against a fast-failing scratch server, and only as a process kill.** Sections A–M never take the *database* down (`pg_terminate_backend` kills individual backends); section N does, with a restart and a SIGKILL, but the Docker VM's kernel survives each, so a machine crash or power loss (a lying `fsync`) is untested, and a server that is gone but still swallowing packets is the partition Faults' case, not C4's.
 - **Kill and partition semantics are narrow.** `pg_terminate_backend` fails fast and severs cleanly; it never produced the *commit-sent-but-response-lost* Ambiguous outcome (C3: no Confirm committed-then-lost in 274 kills). That case was exercised only by the network Faults and app-SIGKILL (C2: 1,434 unacknowledged commits across the matrix, all resolved by replay) — and only for Bookings, not for Holds.
 - **Toxiproxy's partition heal severs connections.** `partition-stall` heals by tearing down the stalled connections; a real partition that TCP retransmits across would let some in-flight statements finish. The lossless slow link is covered only by `latency-above`.
 - **One load shape per Fault family.** C1: `deadlock-pairs` only. C2: `hammer-seat` and `deadlock-pairs`, 60 clients, one short burst; the k6 client does not retry, so retry-storm behaviour under a Fault is not modelled. No `spread-seats` or isolation-pattern run under any Fault.
@@ -812,10 +886,14 @@ npx vitest run test/idempotencyKeyRetention.test.ts     # RF1's deterministic ev
 npx tsx load-harness/chaos/matrix.ts --mechanisms pessimistic --loads hammer-seat,deadlock-pairs --faults latency-above --reps 5 --survive-faults none --label-prefix rf2-after- --toxiproxy-api http://localhost:8475
 BOOKING_STRATEGY=<mechanism> npm run harness -- --base-url http://localhost:3000 --pattern hammer-seat --concurrency 100 --repeat 5   # cost; parent commit and fix alternated, 8 rounds, six mechanisms; move the reports to docs/evidence/chaos/rf2-nofault/{before,after}/
 npx vitest run test/strategies   # RF2's deterministic evidence: runIdempotencyKeyRaceContractTests (all six mechanisms) and runHoldKeyRaceContractTests
-npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json
+# C4 (section N), after #51 (ADR-0032); needs Docker, no other service; creates and removes its own c4-pg-<hex> containers:
+npm run chaos:restart -- --variant kill --load spread --label c4-try                     # one run: restart | stop | kill | none x spread | hammer | holds
+npm run chaos:restart -- --variant kill --load spread --profile unsafe --expect-violations   # the negative control (Oracle 5 must go red)
+npm run chaos:restart:matrix -- --reps 3                                                  # every cell of section N, resumable (~25 min); --only long for the 15 s outage
+npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json (and chaos/c4-restart/)
 npx vitest run test/chaos                              # the unit controls
 ```
 
 ## Next step
 
-Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are filed as fix tickets #53–#61 (RF1 #60 is fixed, section L; RF2 #61 is fixed, section M) (drafts in `docs/phase6-robustness-ticket-drafts.md`), which satisfies the umbrella's "every Robustness finding is listed with a follow-up issue link". Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out.
+Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are filed as fix tickets #53–#61 (RF1 #60 is fixed, section L; RF2 #61 is fixed, section M) (drafts in `docs/phase6-robustness-ticket-drafts.md`), which satisfies the umbrella's "every Robustness finding is listed with a follow-up issue link". Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out. C4 (#51) has since run (section N); no new Robustness finding is recorded from it beyond what section N lists.

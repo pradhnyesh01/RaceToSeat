@@ -342,7 +342,7 @@ GitHub — closed to match. The measurement was re-run after all fixes landed; t
 above are the post-fix run. Full test suite passes unmodified (150 tests) and `npm run typecheck`
 is clean. Phase 5 (todo.md, issues #37-#41) is now complete.
 
-Phase 6 (formal proof + chaos testing, umbrella #42) is complete except the optional C4. It was
+Phase 6 (formal proof + chaos testing, umbrella #42) is complete (the optional C4 ran last: see issue #51 below). It was
 scoped through a grilling session (glossary: Fault, Ambiguous outcome, Oracle, Correctness
 violation, Robustness finding in CONTEXT.md) into two independent tracks, each built tracer-first,
 every checker paired with a negative control shown to fail, and a measure-first policy on
@@ -373,9 +373,8 @@ reap creates a second Booking) and RF2 #61 (a concurrent same-key retry can get 
 note R1 needs a per-checkout `client.on("error")`, not only `pool.on("error")`. The F5 mapping
 audit also noted, unticketed: O1 (a losing attempt briefly row-locks seats it won't get, so a
 concurrent confirm can get a spurious 409), O2 (`unique_constraint`'s `ON CONFLICT` waits rather
-than failing fast), O3 (replaying a Hold returns 201 even if it has since expired). **C4 (Postgres
-restart under load, #51) was not run**, so "a returned COMMIT survives the database being killed"
-is assumed by the formal model and tested by neither track. Full test suite passes (413 tests, 4
+than failing fast), O3 (replaying a Hold returns 201 even if it has since expired). C4 (Postgres
+restart under load, #51) was not run at that point; it ran afterwards (see issue #51 below). Full test suite passes (413 tests, 4
 skipped that need a local Toxiproxy server) and `npm run typecheck` is clean. Phase 8's writeup
 should cite both exhibits.
 
@@ -497,6 +496,27 @@ noise control (Exhibit H section M, ADR-0031). Formal: `CrashRecovery.tla` gaine
 Exhibit G's mapping re-pinned and extended. Chaos non-regression: `pessimistic` x `hammer-seat` and
 `deadlock-pairs` x `latency-above`, 5 reps each, unmodified code, all Oracles green and the replay ends
 with exactly one Booking per distinct seat set. No Robustness finding remains unfixed.
+
+Issue #51 (C4, Postgres restart under load) is done and closes the one gap both Phase 6 tracks had: "a
+returned COMMIT survives the database being killed" was assumed by the formal model (`CommittedPersists`) and tested by
+neither track. Each run creates its own scratch Postgres container (`c4-pg-<hex>`, free loopback port; ownership of id,
+name and a run label is re-checked before every stop/kill/start/remove, so the compose database and sibling sessions'
+containers are never addressed), starts the unmodified app against it, applies a sustained Node client (not k6: the load
+must outlast a restart and the Booking id of each `201` must be recorded) and, after 30 % of the work is acknowledged,
+takes the server away three ways: `docker restart` (fast shutdown), `docker stop` held down 3 s, `docker kill` (SIGKILL)
+held down 3 s, then WAL replay on start. A new **Oracle 5** (`durabilityOracle.ts`, ADR-0032) asks the stored state
+whether every `201`'s Booking id (and every acknowledged Hold and Confirm) survived, and runs *before* the key replay
+(which would re-create a lost Booking and hide it); it is the one Oracle that reads an HTTP answer, as a promise it checks.
+Results (Exhibit H section N, `npm run chaos:restart[:matrix]`): 39 measured runs, 90,842 acknowledged
+Bookings/Holds/Confirms, **none lost, zero Correctness violations**, across spread / hammer / hold loads, orderly restart,
+SIGKILL, and a 15 s outage; the app never crashed or abandoned a request, every attempt during the outage was a fast
+`502` (Docker refuses the connection immediately), writes resumed 0.1-0.3 s after the server answered, and the reaper
+survived every failed sweep and cleared a backlog of up to 706 expired holds in ~0.5 s. The negative control (a server
+configured `synchronous_commit=off`, `wal_writer_delay=10s`, then SIGKILLed) lost 5,291 acknowledged commits and was
+flagged in 9 of 9 runs by Oracle 5 alone (Oracles 1-4 stayed green on the lost-commit state, which is why a fifth Oracle
+exists); the same server restarted orderly lost none. Limitation recorded with the result: a killed container keeps the
+Docker VM's page cache, so this tests "the server process dies", not power loss or a lying `fsync`. No new Robustness
+finding. `src/` and `db/schema.sql` untouched.
 
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance

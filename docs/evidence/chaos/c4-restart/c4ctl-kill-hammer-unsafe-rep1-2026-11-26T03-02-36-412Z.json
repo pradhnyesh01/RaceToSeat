@@ -1,0 +1,994 @@
+{
+  "label": "c4ctl-kill-hammer-unsafe-rep1",
+  "ranAt": "2026-11-26T03:02:36.412Z",
+  "args": {
+    "variant": "kill",
+    "load": "hammer",
+    "profile": "unsafe",
+    "strategy": "pessimistic",
+    "seats": 250,
+    "workers": 30,
+    "thinkMs": 20,
+    "triggerFraction": 0.3,
+    "downMs": 3000,
+    "confirmFraction": 0.5,
+    "holdTtlSeconds": 15,
+    "reaperIntervalMs": 1000,
+    "retryDeadlineMs": 60000,
+    "attemptTimeoutMs": 8000,
+    "drainTimeoutMs": 30000,
+    "expectViolations": true,
+    "label": "c4ctl-kill-hammer-unsafe-rep1",
+    "appPort": 3400
+  },
+  "container": {
+    "name": "c4-pg-a0e90291",
+    "image": "postgres:17",
+    "settings": {
+      "synchronous_commit": "off",
+      "fsync": "off",
+      "wal_writer_delay": "10000",
+      "stopSignal": "SIGINT"
+    }
+  },
+  "eventId": "78604157-0668-41a8-85ed-483b4e90b99b",
+  "requestsIssued": 7500,
+  "seats": 250,
+  "acknowledged": {
+    "bookings": 251,
+    "holds": 0,
+    "confirms": 0,
+    "atFault": 75
+  },
+  "fault": {
+    "variant": "kill",
+    "profile": "unsafe",
+    "commandStartedAtMs": 2400,
+    "commandReturnedAtMs": 5781,
+    "heldDownMs": 3000,
+    "firstProbeFailedAtMs": 2462,
+    "dbBackAtMs": 5861,
+    "unreachableMs": 3399
+  },
+  "finals": {
+    "201": 251,
+    "409": 7249
+  },
+  "abandoned": 0,
+  "attempts": 7578,
+  "windows": {
+    "before": {
+      "201": 75,
+      "409": 2175
+    },
+    "during": {
+      "201": 1,
+      "409": 16,
+      "502": 78
+    },
+    "after": {
+      "201": 175,
+      "409": 5058
+    }
+  },
+  "recovery": {
+    "lastCreatedBeforeFaultMs": 2372,
+    "firstCreatedAfterDbBackMs": 5965,
+    "appLagAfterDbBackMs": 104,
+    "writeOutageMs": 3593,
+    "firstFailureAfterFaultMs": 22
+  },
+  "slowestAttemptMs": 56,
+  "loadFinishedAtMs": 11490,
+  "drain": {
+    "drainedAfterMs": 8,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "bookingsCommittedBeforeReplay": 175,
+    "bookingsAnsweredWith201": 251,
+    "committedUnacknowledged": 0
+  },
+  "app": {
+    "exits": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Torn database connection (request in flight, if any, will fail): terminating connection due to unexpected postmaster exit": 24,
+      "Error: Client has encountered a connection error and is not queryable": 3,
+      "error: terminating connection due to unexpected postmaster exit": 4,
+      "severity: 'FATAL',": 4,
+      "Torn database connection (request in flight, if any, will fail): Connection terminated unexpectedly": 33,
+      "ROLLBACK also failed (connection already dead): Client has encountered a connection error and is not queryable; the error it did not replace: Connection terminated unexpectedly": 1,
+      "Error: Connection terminated unexpectedly": 19,
+      "ROLLBACK also failed (connection already dead): Connection terminated unexpectedly; the error it did not replace: (no error; a designed no-commit result)": 1,
+      "Error: connect ECONNREFUSED 127.0.0.1:59473": 52,
+      "code: 'ECONNREFUSED',": 55,
+      "Reaper sweep failed: Error: connect ECONNREFUSED 127.0.0.1:59473": 3
+    },
+    "reaperSweepFailures": 3
+  },
+  "replay": {
+    "tally": {
+      "201": 250,
+      "409": 7250
+    },
+    "networkErrors": 0
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 5,
+      "name": "durability of acknowledged work",
+      "passed": false,
+      "violations": [
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 0ed17d06-e357-40a9-90a7-585809c44d75 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h0-w3) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "0ed17d06-e357-40a9-90a7-585809c44d75"
+          ],
+          "seatIds": [
+            "458d4e48-bb82-483e-9792-f91a3a6606f3"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h0-w3"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking b9a71c40-cc19-41bf-b2bc-68f43cc38c59 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h1-w17) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "b9a71c40-cc19-41bf-b2bc-68f43cc38c59"
+          ],
+          "seatIds": [
+            "dc3d46f6-e98d-4783-968e-381ae6f12b66"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h1-w17"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking c72a913b-68e8-4e3b-98eb-39f7fbbffc96 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h2-w20) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "c72a913b-68e8-4e3b-98eb-39f7fbbffc96"
+          ],
+          "seatIds": [
+            "7fd44b60-941c-4f88-ad31-fef45cc134a2"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h2-w20"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 586d63b6-6234-4311-beaa-55a80fc7f247 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h3-w21) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "586d63b6-6234-4311-beaa-55a80fc7f247"
+          ],
+          "seatIds": [
+            "fc5b2e9d-c880-4c39-8d13-f2c83dbf7b59"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h3-w21"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 3c6cc17b-afb9-40dc-9fd0-44b6cb4c1028 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h4-w22) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "3c6cc17b-afb9-40dc-9fd0-44b6cb4c1028"
+          ],
+          "seatIds": [
+            "a74a24ea-13c9-491d-a72b-383e4563d604"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h4-w22"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking b424c66a-e5b4-43ae-8b17-bab8e65a37ff (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h5-w13) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "b424c66a-e5b4-43ae-8b17-bab8e65a37ff"
+          ],
+          "seatIds": [
+            "a1c57326-2944-4a53-a5f2-9e3aea075ef8"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h5-w13"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 5055d738-25e4-426f-a668-8df893147122 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h6-w5) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "5055d738-25e4-426f-a668-8df893147122"
+          ],
+          "seatIds": [
+            "2ecfe923-df33-4ff6-9255-13c749a55a2a"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h6-w5"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 9a2f9626-1790-4c10-9b62-9408aa86bdd7 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h7-w17) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "9a2f9626-1790-4c10-9b62-9408aa86bdd7"
+          ],
+          "seatIds": [
+            "ec2649a4-b426-4538-a1ca-efec5957ec7f"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h7-w17"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 3bab76fe-5974-43cc-87ac-067101c3cf6f (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h8-w3) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "3bab76fe-5974-43cc-87ac-067101c3cf6f"
+          ],
+          "seatIds": [
+            "234df16c-54c3-4953-bea1-a1d9478853d8"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h8-w3"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 2b715349-2658-4d88-9859-bd87a4d07bcd (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h9-w28) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "2b715349-2658-4d88-9859-bd87a4d07bcd"
+          ],
+          "seatIds": [
+            "7446ecd1-9da8-42eb-82c4-0cd3cbbd9b97"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h9-w28"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking aef6a7fa-fba4-46f8-a7fe-9a9bafe4dcec (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h10-w21) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "aef6a7fa-fba4-46f8-a7fe-9a9bafe4dcec"
+          ],
+          "seatIds": [
+            "0ac1a748-3111-48e4-a789-4f5a42680f7f"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h10-w21"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 9c3dce16-f175-4cb6-829c-3b6a4b3763e4 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h11-w10) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "9c3dce16-f175-4cb6-829c-3b6a4b3763e4"
+          ],
+          "seatIds": [
+            "bbe87998-f4b2-4e77-b468-ad8805c51fb9"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h11-w10"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking ee99810f-2c58-4f3e-b92e-b67555d6867e (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h12-w1) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "ee99810f-2c58-4f3e-b92e-b67555d6867e"
+          ],
+          "seatIds": [
+            "fb7c623c-7d0f-44b0-bb9c-b1b84c41ac21"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h12-w1"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 39ed68e0-e586-48a9-99e9-207c86d5fa80 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h13-w18) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "39ed68e0-e586-48a9-99e9-207c86d5fa80"
+          ],
+          "seatIds": [
+            "8f8f3013-063b-497d-9eb9-1269e82b2340"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h13-w18"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 9c8992dc-4d21-4a8c-b88d-572a075fe4f1 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h14-w14) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "9c8992dc-4d21-4a8c-b88d-572a075fe4f1"
+          ],
+          "seatIds": [
+            "3d2f77e1-d630-471d-a1b2-9d65a8dc0399"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h14-w14"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking aa72e19b-4750-4245-bc4e-5d6ffb875d21 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h15-w1) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "aa72e19b-4750-4245-bc4e-5d6ffb875d21"
+          ],
+          "seatIds": [
+            "c7f03fd3-eb7f-49f3-a558-b99c6a65e9e4"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h15-w1"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 3a56da7c-9f90-49fc-8967-2924c424fa83 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h16-w28) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "3a56da7c-9f90-49fc-8967-2924c424fa83"
+          ],
+          "seatIds": [
+            "2ce00a7c-9585-473d-a4f0-7831fc292a4b"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h16-w28"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 220b5ec1-8728-427c-88f0-e2152eb984fa (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h17-w9) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "220b5ec1-8728-427c-88f0-e2152eb984fa"
+          ],
+          "seatIds": [
+            "0beea50d-1155-49ca-a1ca-8c5922220d5e"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h17-w9"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking ff02b6f7-a4a4-4571-8758-d39fc3e888ad (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h18-w11) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "ff02b6f7-a4a4-4571-8758-d39fc3e888ad"
+          ],
+          "seatIds": [
+            "2719d9de-d907-4653-96dd-693224c8a0f3"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h18-w11"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 2dd6d161-dad3-4c87-9e22-eb80fcee2740 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h19-w14) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "2dd6d161-dad3-4c87-9e22-eb80fcee2740"
+          ],
+          "seatIds": [
+            "88ff7b2b-20ca-4682-b171-6bbe1e8f66b0"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h19-w14"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 5db51760-c190-47bc-809b-0b34bc35ad2d (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h20-w21) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "5db51760-c190-47bc-809b-0b34bc35ad2d"
+          ],
+          "seatIds": [
+            "dd38c36c-a052-4c63-9c5d-8290348071fa"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h20-w21"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 0102943a-f5c7-406e-97ed-5157ad25daba (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h21-w14) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "0102943a-f5c7-406e-97ed-5157ad25daba"
+          ],
+          "seatIds": [
+            "77c7ec6a-5c4c-4e04-b9ba-fd8d6c3a43e7"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h21-w14"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking acfe1010-e08e-46bf-9980-2c1a68888a96 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h22-w3) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "acfe1010-e08e-46bf-9980-2c1a68888a96"
+          ],
+          "seatIds": [
+            "7c84d4bc-3e6a-4feb-b21d-e5d21636762d"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h22-w3"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 2f80d1f7-1fda-4c43-9324-f4e7c8cae436 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h23-w9) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "2f80d1f7-1fda-4c43-9324-f4e7c8cae436"
+          ],
+          "seatIds": [
+            "cb940ea4-3ce8-4c62-ba03-1fb09b5ca6be"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h23-w9"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 46489e76-9f45-42b2-bcf4-4ea5534e9922 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h24-w29) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "46489e76-9f45-42b2-bcf4-4ea5534e9922"
+          ],
+          "seatIds": [
+            "d7184c9d-9683-4874-9bd2-9da67a36f9c8"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h24-w29"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 6c108c7f-ac49-432d-84e0-f00ddcd18f81 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h25-w10) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "6c108c7f-ac49-432d-84e0-f00ddcd18f81"
+          ],
+          "seatIds": [
+            "0b25e070-f7e5-48ea-8caf-2ab6d4e8ef9a"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h25-w10"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 032e9f2b-4e24-4fe8-9178-9d18d705e51a (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h26-w12) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "032e9f2b-4e24-4fe8-9178-9d18d705e51a"
+          ],
+          "seatIds": [
+            "43db1195-95eb-4979-80d4-96885a4d3ec3"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h26-w12"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking e3c9e8b6-281f-48ee-9681-206c6e97c44c (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h27-w13) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "e3c9e8b6-281f-48ee-9681-206c6e97c44c"
+          ],
+          "seatIds": [
+            "195021e8-f954-4984-a0b7-d401a891edd0"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h27-w13"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 5c682699-d266-4067-9cb9-60e92224302a (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h28-w21) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "5c682699-d266-4067-9cb9-60e92224302a"
+          ],
+          "seatIds": [
+            "b17e11d9-8f31-490c-bbb2-cc4ec5e573ce"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h28-w21"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking fadda335-91ae-4b19-a693-26f04cc25c7b (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h29-w27) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "fadda335-91ae-4b19-a693-26f04cc25c7b"
+          ],
+          "seatIds": [
+            "23231b6b-e934-4bdc-bba3-6956ec8d4045"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h29-w27"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 196a523c-e723-4f5c-97c4-2e5ff951e11f (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h30-w28) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "196a523c-e723-4f5c-97c4-2e5ff951e11f"
+          ],
+          "seatIds": [
+            "3c0b550f-b7b5-4fcc-ac7e-e2391bad8973"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h30-w28"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking cf66390b-2eba-4a2c-8192-78efe78ef124 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h31-w13) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "cf66390b-2eba-4a2c-8192-78efe78ef124"
+          ],
+          "seatIds": [
+            "3e05b8c8-7e81-4141-a7c2-cdd526a84ab9"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h31-w13"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 060c376e-7b6e-4347-85a1-6686ed9026c6 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h32-w26) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "060c376e-7b6e-4347-85a1-6686ed9026c6"
+          ],
+          "seatIds": [
+            "20b7a705-c404-4c74-91fc-80ee8c62870f"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h32-w26"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 6a959b13-f41d-41b6-bf8f-bdd63e7e9612 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h33-w18) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "6a959b13-f41d-41b6-bf8f-bdd63e7e9612"
+          ],
+          "seatIds": [
+            "da22a1c8-2c39-4490-82fd-4283bdf94076"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h33-w18"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking f1aa71de-fd6d-4335-9b14-182afabd3745 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h34-w19) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "f1aa71de-fd6d-4335-9b14-182afabd3745"
+          ],
+          "seatIds": [
+            "6a86dfb2-c456-4eb1-b5a7-c50b940e7aa3"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h34-w19"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 5dbc3940-ea21-40a1-afb8-4a7706062dd5 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h35-w27) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "5dbc3940-ea21-40a1-afb8-4a7706062dd5"
+          ],
+          "seatIds": [
+            "8cd40f11-3127-4c9b-9185-3a377d57226e"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h35-w27"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 5f55cb1c-e201-4069-8dcd-b9d45ebef0c4 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h36-w17) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "5f55cb1c-e201-4069-8dcd-b9d45ebef0c4"
+          ],
+          "seatIds": [
+            "c55bdf3d-7be7-4e50-9f8c-7fecdc7d11b5"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h36-w17"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 029e8c45-9886-4ab4-b7ed-e3d899228226 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h37-w28) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "029e8c45-9886-4ab4-b7ed-e3d899228226"
+          ],
+          "seatIds": [
+            "2b654c63-2149-4e93-84ac-ae95400aff1f"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h37-w28"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 7dae791f-d937-4a3c-867a-68a37f887ddc (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h38-w8) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "7dae791f-d937-4a3c-867a-68a37f887ddc"
+          ],
+          "seatIds": [
+            "588871ed-cebe-4026-b4b8-62742d6361f0"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h38-w8"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking e4418de8-feab-44a9-85af-f34130d36a8c (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h39-w16) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "e4418de8-feab-44a9-85af-f34130d36a8c"
+          ],
+          "seatIds": [
+            "2919a0d5-745a-4bfc-a5a1-5df2d7054a37"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h39-w16"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking ab793e80-d2df-43f3-a16f-df3c16f8278e (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h40-w29) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "ab793e80-d2df-43f3-a16f-df3c16f8278e"
+          ],
+          "seatIds": [
+            "bf87b298-37bf-4b01-96f7-9c385673f3cf"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h40-w29"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 34c7a33c-1c07-432f-8191-c547d183dd74 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h41-w9) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "34c7a33c-1c07-432f-8191-c547d183dd74"
+          ],
+          "seatIds": [
+            "244d93af-5fba-4989-806d-10029929a6c4"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h41-w9"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 33b8aa7d-904f-43de-904b-d4f5f031a9ee (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h42-w3) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "33b8aa7d-904f-43de-904b-d4f5f031a9ee"
+          ],
+          "seatIds": [
+            "45af9e80-6ff9-451d-96be-b95b8766f76c"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h42-w3"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 8a73019e-1a42-4f26-8553-e54b488c83fb (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h43-w28) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "8a73019e-1a42-4f26-8553-e54b488c83fb"
+          ],
+          "seatIds": [
+            "3c3c6a9c-12be-4bf2-b526-24b20af236f3"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h43-w28"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 4dd8d5f1-91b7-4948-b3f4-561eadb5b0eb (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h44-w6) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "4dd8d5f1-91b7-4948-b3f4-561eadb5b0eb"
+          ],
+          "seatIds": [
+            "28e9f2ed-9bd8-4e7a-ad95-aa0ab56ab75c"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h44-w6"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking fdc14216-f8bc-4762-9087-7c5e46479922 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h45-w3) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "fdc14216-f8bc-4762-9087-7c5e46479922"
+          ],
+          "seatIds": [
+            "4072adc3-c83e-47a5-8805-3080e1e57ce4"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h45-w3"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 3ea07620-06f9-4ab3-82c9-7106616f08d1 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h46-w15) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "3ea07620-06f9-4ab3-82c9-7106616f08d1"
+          ],
+          "seatIds": [
+            "2eff4f4b-0484-44d8-b903-53486f46ee00"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h46-w15"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking cb038fd6-43d7-4984-92e7-8acd1a3eef9d (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h47-w10) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "cb038fd6-43d7-4984-92e7-8acd1a3eef9d"
+          ],
+          "seatIds": [
+            "b6aac932-3876-4919-a667-5f7f026a9cb9"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h47-w10"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 659884bd-a938-47ef-a8f0-9ea062ad0454 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h48-w29) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "659884bd-a938-47ef-a8f0-9ea062ad0454"
+          ],
+          "seatIds": [
+            "086068b5-28c0-43ee-a967-042c35514468"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h48-w29"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 51ea0698-458b-415b-a327-dd868ee296f2 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h49-w26) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "51ea0698-458b-415b-a327-dd868ee296f2"
+          ],
+          "seatIds": [
+            "37a0113b-bceb-4911-a775-959ef3362f82"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h49-w26"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 91646233-9aea-4106-a06e-36c88de79abd (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h50-w18) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "91646233-9aea-4106-a06e-36c88de79abd"
+          ],
+          "seatIds": [
+            "998294f1-0306-4691-bdbe-517e30cfcd68"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h50-w18"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking f1ef56a5-2bf1-4a7d-95e3-6d5b2e53e23f (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h51-w26) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "f1ef56a5-2bf1-4a7d-95e3-6d5b2e53e23f"
+          ],
+          "seatIds": [
+            "e56afc7d-b0d6-4831-91dd-4ed2108b0dcb"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h51-w26"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking c2536770-1a9c-4859-828e-f6a15d29e40d (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h52-w26) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "c2536770-1a9c-4859-828e-f6a15d29e40d"
+          ],
+          "seatIds": [
+            "e7993df3-0f0b-4a06-b6a3-13a8ac4e9abd"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h52-w26"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking cf459cb6-b1bc-45aa-befb-cea3eede441e (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h53-w0) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "cf459cb6-b1bc-45aa-befb-cea3eede441e"
+          ],
+          "seatIds": [
+            "a697972c-aee7-4b1a-b73e-058a190660c5"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h53-w0"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 27411c73-4836-466f-bbac-b5648c1506fc (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h54-w29) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "27411c73-4836-466f-bbac-b5648c1506fc"
+          ],
+          "seatIds": [
+            "b25d764d-425f-4a04-bdef-6f74e72e81d8"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h54-w29"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 093119df-a479-43be-92fe-8f8f99eae87a (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h55-w18) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "093119df-a479-43be-92fe-8f8f99eae87a"
+          ],
+          "seatIds": [
+            "e7aaa3e4-73a7-4dee-8276-dea6652bb453"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h55-w18"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 6be87be2-db1b-40bf-b7d0-917942d7184d (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h56-w19) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "6be87be2-db1b-40bf-b7d0-917942d7184d"
+          ],
+          "seatIds": [
+            "17eedff9-10a1-4ee5-a176-f051f80036a1"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h56-w19"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking c8fa6f69-0141-46e5-ba31-8204f12bcb65 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h57-w27) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "c8fa6f69-0141-46e5-ba31-8204f12bcb65"
+          ],
+          "seatIds": [
+            "a6809907-7b33-495d-ba8c-65d04b898745"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h57-w27"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 8ff008ac-6a28-4d95-8dfa-79eab8b5480f (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h58-w27) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "8ff008ac-6a28-4d95-8dfa-79eab8b5480f"
+          ],
+          "seatIds": [
+            "f28b66af-8ce4-4ab1-b0a9-84bdf3d9f81c"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h58-w27"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 0a228518-40b5-4ab8-afdd-b6374053de0f (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h59-w0) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "0a228518-40b5-4ab8-afdd-b6374053de0f"
+          ],
+          "seatIds": [
+            "1c60768e-7f86-4b10-84e7-908c628c7441"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h59-w0"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking c73e8ccd-d3f8-499d-b6e5-e66873a5d05e (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h60-w7) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "c73e8ccd-d3f8-499d-b6e5-e66873a5d05e"
+          ],
+          "seatIds": [
+            "a2b3a8e7-8000-4236-b08a-47af6c0e871c"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h60-w7"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking fa0fc5a5-b407-4f5d-a562-34957a9c271f (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h61-w7) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "fa0fc5a5-b407-4f5d-a562-34957a9c271f"
+          ],
+          "seatIds": [
+            "6c1f4325-078d-43cd-964f-7466b4ea7750"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h61-w7"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 8f765bd6-89a6-477e-ad7c-ad6a66ee536e (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h62-w15) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "8f765bd6-89a6-477e-ad7c-ad6a66ee536e"
+          ],
+          "seatIds": [
+            "7ecb5ed1-0f79-4461-8320-829a20c7f0ce"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h62-w15"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 262ead6b-b643-48f3-be13-5b6db9db1854 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h63-w20) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "262ead6b-b643-48f3-be13-5b6db9db1854"
+          ],
+          "seatIds": [
+            "1d56feb2-586b-4b2e-8477-ea7029b33e5e"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h63-w20"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 44b441eb-daac-4019-a216-fa53715c9188 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h64-w10) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "44b441eb-daac-4019-a216-fa53715c9188"
+          ],
+          "seatIds": [
+            "8f73c874-8247-4857-9d86-7347513f8a0d"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h64-w10"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 01347ef2-502d-4603-abfc-3ca26ade3804 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h65-w3) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "01347ef2-502d-4603-abfc-3ca26ade3804"
+          ],
+          "seatIds": [
+            "3d7aca6b-f4d4-4df9-a282-f34b3b1ed814"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h65-w3"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking e14fadcf-502d-4e17-98bd-a25c4e1da34c (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h66-w17) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "e14fadcf-502d-4e17-98bd-a25c4e1da34c"
+          ],
+          "seatIds": [
+            "a1a82b71-171a-4577-a44b-358b63251364"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h66-w17"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking dde29b36-dc2b-4e3d-92d2-bbf77e6a2912 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h67-w21) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "dde29b36-dc2b-4e3d-92d2-bbf77e6a2912"
+          ],
+          "seatIds": [
+            "2b110acb-155d-4fe1-837f-ca5a424f04d3"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h67-w21"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 7eac50c9-f593-4cda-b832-80b9c858c278 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h68-w27) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "7eac50c9-f593-4cda-b832-80b9c858c278"
+          ],
+          "seatIds": [
+            "8edb5095-cd79-444d-97dd-ceb7f57e3211"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h68-w27"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking ba578f59-5c99-4d56-95fb-0f2d88bc3374 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h69-w22) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "ba578f59-5c99-4d56-95fb-0f2d88bc3374"
+          ],
+          "seatIds": [
+            "8900a593-ab13-453b-9337-486d27a8d94a"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h69-w22"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 63e4a183-ca14-4fe7-92ba-fa7f65997c0f (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h70-w16) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "63e4a183-ca14-4fe7-92ba-fa7f65997c0f"
+          ],
+          "seatIds": [
+            "58f38f8e-868a-4cd4-b420-076f8133beb8"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h70-w16"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking f374d9e2-3a50-43cd-9248-e4b21b199f42 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h71-w27) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "f374d9e2-3a50-43cd-9248-e4b21b199f42"
+          ],
+          "seatIds": [
+            "f8c4bca7-7768-47c2-9edf-c72b3f04524d"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h71-w27"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking 5556c890-c334-43bb-a7cd-a8ac0da85ebb (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h72-w9) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "5556c890-c334-43bb-a7cd-a8ac0da85ebb"
+          ],
+          "seatIds": [
+            "480cb18f-4b10-4ef5-b7ea-90a4daf76826"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h72-w9"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking e5ea2822-e024-4b8d-8ea4-774bf5d920e9 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h73-w21) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "e5ea2822-e024-4b8d-8ea4-774bf5d920e9"
+          ],
+          "seatIds": [
+            "b17bb809-5eeb-4d3a-8d78-31c79a3920bc"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h73-w21"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking a03197da-528d-4a3e-b432-0010dcf57c82 (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h74-w29) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "a03197da-528d-4a3e-b432-0010dcf57c82"
+          ],
+          "seatIds": [
+            "ede7936d-37fd-4be8-92a3-a2205b027df3"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h74-w29"
+        },
+        {
+          "kind": "acknowledged-booking-lost",
+          "detail": "booking d13bff1a-07fc-4f45-b684-6642b99fb49d (key 9a85c285-6a73-40d9-a9ac-a3cc116ce735-h75-w24) was answered 201 but no such booking exists after recovery",
+          "bookingIds": [
+            "d13bff1a-07fc-4f45-b684-6642b99fb49d"
+          ],
+          "seatIds": [
+            "e93a778e-bbad-4579-8764-5ec5e7ec2cdd"
+          ],
+          "idempotencyKey": "9a85c285-6a73-40d9-a9ac-a3cc116ce735-h75-w24"
+        }
+      ]
+    }
+  ],
+  "correctnessViolation": true,
+  "robustnessObservations": [
+    {
+      "id": "reaper-sweep-failed",
+      "detail": "3 reaper sweep(s) failed and were logged (the reaper survived each)"
+    }
+  ]
+}

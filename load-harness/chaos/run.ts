@@ -194,7 +194,7 @@ export function withPort(connectionString: string, port: number): string {
 
 // --- seeding & ledger -------------------------------------------------------
 
-interface LedgerEntry extends BookingIntent {
+export interface LedgerEntry extends BookingIntent {
   userId: string;
 }
 
@@ -474,7 +474,7 @@ export async function runK6(script: string, env: Record<string, string>, appPort
 
 // --- recovery replay ----------------------------------------------------------
 
-async function replayLedger(
+export async function replayLedger(
   appPort: number,
   ledger: LedgerEntry[],
 ): Promise<{ tally: Record<string, number>; networkErrors: number }> {

@@ -17,6 +17,7 @@
 // `--survive-uncaught`-scaffolded runs is never merged. Every aggregate below
 // is computed per variant, and the renderer keeps them in separate sections.
 import { readdir, readFile } from "node:fs/promises";
+import { renderC4Section, type LoadedC4Report } from "./exhibitHC4.js";
 
 // ---------------------------------------------------------------------------
 // Report shape (only the fields this exhibit reads)
@@ -779,7 +780,7 @@ export async function countUnitControls(testDir: URL, files: string[]): Promise<
 // ---------------------------------------------------------------------------
 // Rendering
 
-function renderHeadline(all: LoadedChaosReport[], fileCount: number, r5BeforeCount = 0): string {
+function renderHeadline(all: LoadedChaosReport[], fileCount: number, r5BeforeCount = 0, c4: LoadedC4Report[] = []): string {
   const controls = all.filter((x) => x.report.args.expectViolations);
   const measured = all.filter((x) => !x.report.args.expectViolations);
   const withFault = measured.filter((x) => x.report.args.fault !== "none");
@@ -795,13 +796,22 @@ function renderHeadline(all: LoadedChaosReport[], fileCount: number, r5BeforeCou
       ["Measured runs (every run that is not a negative control)", `**${fmtInt(measured.length)}** — ${fmtInt(withFault.length)} under a Fault (${fmtInt(unmodFault.length)} on unmodified code, ${fmtInt(scaffoldFault.length)} with the \`--survive-uncaught\` scaffold), ${fmtInt(measured.length - withFault.length)} no-Fault baselines/reruns`],
       ["**Correctness violations** in measured runs (any Oracle failing)", `**${violations.length}**${violations.length ? ` (${violations.map((v) => v.report.label).join(", ")})` : ""}`],
       ["Negative controls that went red as required", `**${flagged.length} of ${controls.length}** end-to-end (\`expectViolations\`); the control's control on the real schema stayed green in ${twins.filter((t) => !t.report.correctnessViolation).length} of ${twins.length}`],
+      ...(c4.length
+        ? [
+            [
+              "C4: Postgres restart under load (section N; not counted above)",
+              `**${c4.filter((x) => !x.report.args.expectViolations && x.report.args.profile === "safe" && x.report.args.variant !== "none").length}** measured runs on stock Postgres (restart / stop / SIGKILL): **${c4.filter((x) => !x.report.args.expectViolations && x.report.args.profile === "safe").filter((x) => x.report.correctnessViolation).length} Correctness violations**, ${fmtInt(c4.filter((x) => !x.report.args.expectViolations && x.report.args.profile === "safe" && x.report.args.variant !== "none").reduce((n, x) => n + (x.report.args.load === "holds" ? x.report.acknowledged.holds + x.report.acknowledged.confirms : x.report.acknowledged.bookings), 0))} acknowledged Bookings/Holds/Confirms all present afterwards; **${c4.filter((x) => x.report.args.expectViolations && !x.report.oracles.find((o) => o.oracle === 5)?.passed).length} of ${c4.filter((x) => x.report.args.expectViolations).length}** negative controls (unsafe Postgres, SIGKILL) flagged by Oracle 5`,
+            ],
+          ]
+        : []),
       ["Robustness findings (canonical numbering)", `**${CANONICAL_FINDINGS.length}** chaos-observed (R1–R7) + **${FORMAL_FINDINGS.length}** formal-derived (RF1–RF2, found by model checking, not by a chaos run); R1 fixed by #53 (section E), R2 by #54 (section H), R3 by #55 (section F), R4 by #56 (section G), R5 by #58 (section I), R6 decided by #59 (section J), R7 by #57 (section K), RF1 by #60 (section L), RF2 by #61 (section M); all nine are fixed or decided (filed as fix tickets #53–#61, drafts in \`docs/phase6-robustness-ticket-drafts.md\`)`],
       ["Production code changed", "None by the chaos tickets themselves (C1–C5: `src/` and `db/schema.sql` untouched, measure-first policy, ADR-0022). The fixes so far change `src/` only — #53 `src/db/pool.ts` (ADR-0024), #55 `src/db/pool.ts`, `src/db/pgErrors.ts`, `src/app.ts` (ADR-0025), #56 adds the timeouts of ADR-0026 (`src/config.ts`, `src/db/poolOptions.ts`, `src/db/queryDeadline.ts`, `src/db/pgErrors.ts`, `src/app.ts`, a hook appended to `src/db/pool.ts`); #58 splits `advisory.ts`'s lock-and-read statement in two (`src/strategies/advisory.ts`, ADR-0027); #57 rewrites the reaper's sweep statement to skip row-locked seats (`src/reaper.ts`, ADR-0029); #59 adds a time budget to `withSerializableTransaction`'s retry loop (`src/db/retryBudget.ts`, `src/config.ts`, two lines in `src/db/pool.ts`, ADR-0028); #54 changes no production code (the `pool.on(\"error\")` listener that closes R2 shipped with #53; #54 adds its regression test and the idle-path evidence); #60 (RF1) is the first fix to touch `db/schema.sql` and the key path of every mechanism: a tombstone table and a `BEFORE INSERT` guard trigger, `findPrior{Booking,Hold}ForKey` in `src/strategies/idempotency.ts`, a tombstone written by the statements that release a row (`src/routes/bookings.ts`, `src/strategies/pessimisticConfirm.ts`, `src/reaper.ts`, `src/db/tombstones.ts`), `410 key_released` in two routes, two config values (ADR-0030); #61 (RF2) re-reads the key before a conflict is answered, in `src/strategies/idempotency.ts` and the five strategies that can answer one (ADR-0031)"],
     ],
   );
 }
 
-function renderFaultParameters(all: LoadedChaosReport[]): string {
+function renderFaultParameters(all: LoadedChaosReport[], c4Count = 0): string {
+  const c4Ran = c4Count > 0;
   const c2 = reportsOf(inGroups(all, "c2-unmodified", "c2-scaffolded"));
   const by = (f: string) => c2.filter((r) => r.args.fault === f);
   const to = uniq(c2.map((r) => r.args.requestTimeoutMs)).join("/");
@@ -852,13 +862,15 @@ function renderFaultParameters(all: LoadedChaosReport[]): string {
       "C2, as above",
       String(by("app-sigkill").length),
     ],
-    ["Postgres restart", "**Not run.** C4 (#51) is the stretch item in the cut order and was not started.", "—", "0"],
+    c4Ran
+      ? ["Postgres restart", "`docker restart` / `docker stop` + `docker start` / `docker kill` + `docker start` of a scratch Postgres container the run created itself, applied after 30 % of a sustained load has been acknowledged; see section N", "C4, `runRestart.ts`", String(c4Count)]
+      : ["Postgres restart", "**Not run.** C4 (#51) is the stretch item in the cut order and was not started.", "—", "0"],
   ];
   return mdTable(["Fault", "What it does (parameters read from the reports)", "Where", "Runs"], rows);
 }
 
-function renderOracleDefinitions(): string {
-  return `All four are SQL against stored state after the Fault has cleared (\`load-harness/chaos/oracles.ts\`, ADR-0022); the only HTTP-derived input is the Idempotency-Key replay, which is an *action*, not evidence. Oracle 2 needs the intended seat set per request, which only the harness's client-side ledger of intent (key → requested seats) can supply.
+function renderOracleDefinitions(c4Ran = false): string {
+  return `${c4Ran ? "The first four" : "All four"} are SQL against stored state after the Fault has cleared (\`load-harness/chaos/oracles.ts\`, ADR-0022); the only HTTP-derived input is the Idempotency-Key replay, which is an *action*, not evidence. Oracle 2 needs the intended seat set per request, which only the harness's client-side ledger of intent (key → requested seats) can supply.
 
 ${mdTable(
   ["#", "Oracle", "Fails (Correctness violation) when…"],
@@ -869,6 +881,9 @@ ${mdTable(
     ["4", "Liveness", "a Seat is `held` without a Hold, `held` past expiry + grace, or still row-locked by a transaction that never ended"],
     ["2 ext", "No Booking from an expired Hold (C3, `holdOracles.ts`)", "a Booking exists under `hold-confirm:<holdId>` with `created_at >= held_until`, using the Hold's `held_until` snapshotted from the database before the Fault"],
     ["3 ext", "A live Hold's retried Confirm yields exactly one Booking (C3)", "a provably live Hold ends with zero, or more than one, Booking after Confirm was retried (the base Oracle 3 only demands \"at most one\")"],
+    ...(c4Ran
+      ? [["5", "Durability of acknowledged work (C4, `durabilityOracle.ts`, ADR-0032)", "a Booking id the server answered `201` for is absent after recovery, or present with other seats / another key / unbooked seats, or its key now has a second Booking; an acknowledged Hold is neither live, nor a Booking, nor past its expiry; an acknowledged Confirm's Booking is absent. **The one Oracle that reads an HTTP answer, as a promise it then checks; judged before the replay**"]]
+      : []),
   ],
 )}`;
 }
@@ -880,6 +895,8 @@ function renderUnitControls(counts: UnitControlCount[] | null): string {
     "c2.test.ts": "C2 by hand: neutering `startNetworkFault` and the drain wait fails 4 of 9 (4 of the 9 need a reachable Toxiproxy and are skipped without one)",
     "holdOracles.test.ts": "C3 by hand: neutering the two new Oracles fails 4; late-confirm predicate `false` fails 2; `>` instead of `>=` fails 1 (boundary test); neutering Oracle 4's expiry predicate fails 3; accepting any count in exactly-one fails 2",
     "faultScoping.test.ts": "C3: `onlyApplicationName` allow-list scoping",
+    "durability.test.ts": "C4 by hand, five mutations of Oracle 5: lost-Booking check off fails 3 of 16; matching by key instead of acknowledged id fails 8; Hold expiry ignored fails 2; expired Holds flagged fails 1; seat-booked check off fails 1",
+    "restartFault.test.ts": "C4: pins the ownership guard (refuses anything not created by the run) and the outage arithmetic; no mutation check recorded",
   };
   const covers: Record<string, string> = {
     "oracles.test.ts": "each of Oracles 1–4 against a hand-corrupted scratch DB (double-booked seat, torn/extra/missing-seat Booking, duplicated/replaced/vanished key, held seat with no Hold, expired-never-reaped Hold, leaked row lock), each with a clean-state twin",
@@ -887,6 +904,8 @@ function renderUnitControls(counts: UnitControlCount[] | null): string {
     "c2.test.ts": "stall sampler, drain wait, app-kill driver, and (real Toxiproxy) latency / stall-partition / reset-partition behaviour",
     "holdOracles.test.ts": "late Booking (+ boundary ±1 µs), live Hold with no/two Bookings, half-applied Reaper shapes, Confirm leaving a Hold behind — each with a clean twin",
     "faultScoping.test.ts": "Fault confined to an application_name allow-list",
+    "durability.test.ts": "Oracle 5 against hand-built lost-commit states (Booking gone, re-created under a new id, seat lost, seat rolled back, wrong key, second Booking; Hold gone / expired / confirmed; Confirm gone), each with a clean twin",
+    "restartFault.test.ts": "container ownership rules and docker run arguments (no Docker needed), outage windows and write-outage arithmetic",
   };
   if (!counts) return "_Test files not found next to this module; unit-control counts unavailable._";
   const total = sum(counts.map((c) => c.tests));
@@ -1869,6 +1888,8 @@ ${mdTable(
 }
 
 export interface ExhibitHInputs {
+  // C4 (#51) Postgres-restart reports, read from docs/evidence/chaos/c4-restart/ (their own shape, never classified with the rest).
+  c4Reports?: LoadedC4Report[];
   reports: LoadedChaosReport[];
   unitControls: UnitControlCount[] | null;
   // R4 (#56) no-regression rows; see NoRegressionRow. Empty when no r4-nofault reports exist.
@@ -1884,7 +1905,8 @@ export interface ExhibitHInputs {
   rf2NoRegression?: { before: NoRegressionRow[]; after: NoRegressionRow[] };
 }
 
-export function renderExhibitH({ reports: allReports, unitControls, noRegression = [], r5NoRegression, r6NoRegression = [], rf2NoRegression }: ExhibitHInputs): string {
+export function renderExhibitH({ reports: allReports, unitControls, noRegression = [], r5NoRegression, r6NoRegression = [], rf2NoRegression, c4Reports = [] }: ExhibitHInputs): string {
+  const c4Ran = c4Reports.length > 0;
   // Everything except section E and the headline's file count describes the
   // pre-fix evidence; the post-fix `r1-after` reruns (issue #53) are kept out
   // of it so no earlier number moves.
@@ -1915,13 +1937,13 @@ export function renderExhibitH({ reports: allReports, unitControls, noRegression
 
   return `# Exhibit H — Phase 6 chaos testing: four DB-state Oracles under injected Faults
 
-Phase 6 deliverable (todo.md, issue #52 / C5, under umbrella #42): evidence that the project's single hard guarantee — no Seat claimed twice, no torn or duplicate Booking, nothing left stuck — survives failure, not just the happy path. It consolidates the three chaos tickets that ran (C1 #44 backend-kill, C2 #49 latency/partition/app-SIGKILL, C3 #50 hold/confirm/reaper) into one document. **C4 (#51, Postgres restart under load) was not run**; it is the stretch item first in the cut order. The formal-proof half of Phase 6 is Exhibit G (F5) and is not covered here, except that the two Robustness findings the formal track's model checking exposed in the real implementation (RF1–RF2) are recorded below, separately from the chaos-observed ones.
+Phase 6 deliverable (todo.md, issue #52 / C5, under umbrella #42): evidence that the project's single hard guarantee — no Seat claimed twice, no torn or duplicate Booking, nothing left stuck — survives failure, not just the happy path. It consolidates the three chaos tickets that ran (C1 #44 backend-kill, C2 #49 latency/partition/app-SIGKILL, C3 #50 hold/confirm/reaper) into one document. ${c4Ran ? "**C4 (#51, Postgres restart under load) ran last and is section N** (its reports live apart, in `docs/evidence/chaos/c4-restart/`, and are not counted in the headline table, which describes C1–C3 and the fixes)" : "**C4 (#51, Postgres restart under load) was not run**; it is the stretch item first in the cut order"}. The formal-proof half of Phase 6 is Exhibit G (F5) and is not covered here, except that the two Robustness findings the formal track's model checking exposed in the real implementation (RF1–RF2) are recorded below, separately from the chaos-observed ones.
 
 Every number below is recomputed from the per-run JSON reports in \`docs/evidence/chaos/\` by \`npm run harness:aggregate -- --exhibit h\` (\`load-harness/exhibitH.ts\`). The prose findings records (\`chaos-c1-tracer-findings.md\`, \`chaos-c2-fault-matrix.md\`, \`chaos-c3-holds-under-fault.md\`) were *checked against* the JSON, not copied; the disagreements are listed under "Record consistency check". Definitions (Fault, Ambiguous outcome, Oracle, Correctness violation, Robustness finding) are in \`CONTEXT.md\`; the reasoning is ADR-0022 (what "correct under chaos" means) and ADR-0023 (negative controls without production toggles).
 
 ## Headline
 
-${renderHeadline(all, allReports.length, r5BeforeReports.length)}
+${renderHeadline(all, allReports.length, r5BeforeReports.length, c4Reports)}
 
 **Read the zero with its caveat.** The unmodified application dies on the first torn connection (R1/R2): ${unmodCrashed.length} of ${unmodFaultRuns.length} unmodified runs under a connection-tearing Fault (backend-kill, idle-pool-kill, partition-stall, partition-reset) ended with the process exiting, and in the four C1 unmodified backend-kill runs ${c1Unanswered.map((c) => `${c.unans} of ${c.of}`).join(", ")} requests (respectively) got no answer. In ${unanswered} of ${unmodC2PartitionStall.length} unmodified \`partition-stall\` runs *every* request went unanswered (the partition outlasted the client timeout). So **the unmodified runs mostly judge little**: "all four Oracles pass" is honest there, but largely because almost nothing ran before the process was gone, and the harness's restart plus full key replay then produced a clean state. The meaningful evidence that the Oracles hold *across many Faults and ongoing traffic* is the \`--survive-uncaught\` scaffolded runs — which are reported separately (ADR-0022) and never merged with the unmodified ones. Neither is evidence about a production deployment with a process supervisor: the harness restart is a stand-in for one.
 
@@ -1936,13 +1958,13 @@ ${renderHeadline(all, allReports.length, r5BeforeReports.length)}
 
 ## Fault matrix
 
-${renderFaultParameters(all)}
+${renderFaultParameters(all, c4Reports.length)}
 
 Toxiproxy 2.12.0 behaviours the network Faults rest on (probed by C2, not assumed): removing a \`latency\` toxic **flushes** buffered bytes (an in-flight query completes — a lossless slow link); removing a \`timeout\` toxic does **not** resume the session — the proxy tears the stalled connection down, so both ends see it close; \`reset_peer\` resets connections immediately. A real partition that TCP retransmits across would not sever connections at heal, so \`partition-stall\` here is "a partition whose heal severs the connections that lived through it", a harsher heal than a lossless one.
 
 ## Oracles
 
-${renderOracleDefinitions()}
+${renderOracleDefinitions(c4Ran)}
 
 ## Negative controls — every checker shown failing (ADR-0023)
 
@@ -2075,7 +2097,11 @@ ${renderRf1After(rf1BeforeReports, rf1AfterReports)}
 
 ${renderRf2After(rf2BeforeReports, rf2AfterReports, rf2NoRegression)}
 
-## Robustness findings — canonical numbering (R1–R7)
+${c4Ran ? `### N. C4 — a Postgres restart under load (#51, ADR-0032): is an acknowledged COMMIT durable?
+
+${renderC4Section(c4Reports)}
+
+` : ""}## Robustness findings — canonical numbering (R1–R7)
 
 C2 and C3 each independently labelled a different finding "R5". This exhibit uses one list; the three earlier records are left as written, with a short pointer note at the top of each mapping their numbers to these. **C2's R5 (advisory) and R6 keep their numbers; C3's R5 (stalled reaper) becomes R7.** None of the seven is a Correctness violation (all four Oracles stayed intact); R1 has since been fixed (#53, section E) and the other six are not, per the measure-first policy; each is filed as its own fix ticket: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57 (drafts in \`docs/phase6-robustness-ticket-drafts.md\`).
 
@@ -2110,7 +2136,7 @@ ${renderClaims(claims)}
 
 ## What this does not show
 
-- **Postgres restart (C4, #51) was not run.** No Fault here takes the *database* down. \`pg_terminate_backend\` kills individual backends; it is not a crash, a failover, or a restart with recovery.
+${c4Ran ? "- **Postgres restart (C4, #51) ran only against a fast-failing scratch server, and only as a process kill.** Sections A–M never take the *database* down (`pg_terminate_backend` kills individual backends); section N does, with a restart and a SIGKILL, but the Docker VM's kernel survives each, so a machine crash or power loss (a lying `fsync`) is untested, and a server that is gone but still swallowing packets is the partition Faults' case, not C4's." : "- **Postgres restart (C4, #51) was not run.** No Fault here takes the *database* down. `pg_terminate_backend` kills individual backends; it is not a crash, a failover, or a restart with recovery."}
 - **Kill and partition semantics are narrow.** \`pg_terminate_backend\` fails fast and severs cleanly; it never produced the *commit-sent-but-response-lost* Ambiguous outcome (C3: no Confirm committed-then-lost in 274 kills). That case was exercised only by the network Faults and app-SIGKILL (C2: ${fmtInt(sum(c2all.map((r) => r.ambiguity?.committedUnacknowledged ?? 0)))} unacknowledged commits across the matrix, all resolved by replay) — and only for Bookings, not for Holds.
 - **Toxiproxy's partition heal severs connections.** \`partition-stall\` heals by tearing down the stalled connections; a real partition that TCP retransmits across would let some in-flight statements finish. The lossless slow link is covered only by \`latency-above\`.
 - **One load shape per Fault family.** C1: \`deadlock-pairs\` only. C2: \`hammer-seat\` and \`deadlock-pairs\`, 60 clients, one short burst; the k6 client does not retry, so retry-storm behaviour under a Fault is not modelled. No \`spread-seats\` or isolation-pattern run under any Fault.
@@ -2171,12 +2197,16 @@ npx vitest run test/idempotencyKeyRetention.test.ts     # RF1's deterministic ev
 npx tsx load-harness/chaos/matrix.ts --mechanisms pessimistic --loads hammer-seat,deadlock-pairs --faults latency-above --reps 5 --survive-faults none --label-prefix rf2-after- --toxiproxy-api http://localhost:8475
 BOOKING_STRATEGY=<mechanism> npm run harness -- --base-url http://localhost:3000 --pattern hammer-seat --concurrency 100 --repeat 5   # cost; parent commit and fix alternated, 8 rounds, six mechanisms; move the reports to docs/evidence/chaos/rf2-nofault/{before,after}/
 npx vitest run test/strategies   # RF2's deterministic evidence: runIdempotencyKeyRaceContractTests (all six mechanisms) and runHoldKeyRaceContractTests
-npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json
+# C4 (section N), after #51 (ADR-0032); needs Docker, no other service; creates and removes its own c4-pg-<hex> containers:
+npm run chaos:restart -- --variant kill --load spread --label c4-try                     # one run: restart | stop | kill | none x spread | hammer | holds
+npm run chaos:restart -- --variant kill --load spread --profile unsafe --expect-violations   # the negative control (Oracle 5 must go red)
+npm run chaos:restart:matrix -- --reps 3                                                  # every cell of section N, resumable (~25 min); --only long for the 15 s outage
+npm run harness:aggregate -- --exhibit h               # this exhibit, from docs/evidence/chaos/*.json (and chaos/c4-restart/)
 npx vitest run test/chaos                              # the unit controls
 \`\`\`
 
 ## Next step
 
-Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are filed as fix tickets #53–#61 (RF1 #60 is fixed, section L; RF2 #61 is fixed, section M) (drafts in \`docs/phase6-robustness-ticket-drafts.md\`), which satisfies the umbrella's "every Robustness finding is listed with a follow-up issue link". Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out.
+Seven chaos-observed (R1–R7) and two formal-derived (RF1–RF2) Robustness findings are filed as fix tickets #53–#61 (RF1 #60 is fixed, section L; RF2 #61 is fixed, section M) (drafts in \`docs/phase6-robustness-ticket-drafts.md\`), which satisfies the umbrella's "every Robustness finding is listed with a follow-up issue link". Phase 6 stays open until the formal Exhibit G (F5) lands and the umbrella is closed out.${c4Ran ? " C4 (#51) has since run (section N); no new Robustness finding is recorded from it beyond what section N lists." : ""}
 `;
 }

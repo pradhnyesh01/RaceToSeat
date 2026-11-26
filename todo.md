@@ -79,7 +79,7 @@ ADRs 0021–0023 are written as the relevant tickets land, not up front.
 - [x] #44 C1 (tracer): fault driver, four DB-state oracles + corrupted-state unit tests, scratch-DB (no UNIQUE) negative control; backend-kill vs `pessimistic`, measured on unmodified code
 - [x] #49 C2: latency, partition+heal, app SIGKILL across all six mechanisms
 - [x] #50 C3: hold/confirm/reaper under fault (`pessimistic`)
-- [ ] #51 C4 (stretch): Postgres restart under load
+- [x] #51 C4 (stretch): Postgres restart under load (Exhibit H section N, ADR-0032)
 - [x] #52 C5: Exhibit H; each Robustness finding filed as its own fix ticket with before/after rerun: R1 #53, R2 #54, R3 #55, R4 #56, R5 #58, R6 #59, R7 #57, RF1 #60, RF2 #61 (original drafts in `docs/phase6-robustness-ticket-drafts.md`)
   (Finding numbering reconciled in Exhibit H: C3's "R5" stalled reaper is canonical R7; formal-derived findings are RF1-RF2.)
 
@@ -90,7 +90,7 @@ oracles, every negative control.
 - [x] **Deliverable:** Exhibits G and H exist, `npm run formal:check` passes, every negative
   control is shown to fail, chaos report shows zero Correctness violations, Robustness
   findings listed with follow-up issue links
-  (Done 2026-11-25 except the optional C4. Exhibit G: [docs/evidence/exhibit-g-phase6-formal.md](docs/evidence/exhibit-g-phase6-formal.md); Exhibit H: [docs/evidence/exhibit-h-phase6-chaos.md](docs/evidence/exhibit-h-phase6-chaos.md). Robustness fix tickets #53-#61 are filed and NOT yet fixed. C4 (Postgres restart, #51) was not run, so "a returned COMMIT is durable" is assumed by the formal model and untested by the chaos track.)
+  (Done 2026-11-25; C4 ran 2026-11-26. Exhibit G: [docs/evidence/exhibit-g-phase6-formal.md](docs/evidence/exhibit-g-phase6-formal.md); Exhibit H: [docs/evidence/exhibit-h-phase6-chaos.md](docs/evidence/exhibit-h-phase6-chaos.md). Robustness fix tickets #53-#61 are filed and fixed. C4 (Postgres restart, #51) ran: no acknowledged commit lost across restarts/SIGKILLs of Postgres in 39 runs; power loss untested.)
 
 ## Phase 7 — Stretch: Scale-Out Angle (optional)
 - [ ] Implement actor-model or per-seat-queue variant (Redis-backed or in-process)
