@@ -4,3 +4,7 @@ dist/
 *.log
 .DS_Store
 formal/.cache/
+
+# Personal learning material generated from this codebase — not part of
+# the project's own deliverable, so kept local rather than committed.
+docs/learning/
