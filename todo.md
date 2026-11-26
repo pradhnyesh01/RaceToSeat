@@ -26,36 +26,36 @@ phase ends with a working, demonstrable system plus a piece of evidence.
 - [x] **Deliverable:** before/after comparison vs. naive baseline — [docs/evidence/exhibit-b-phase1-correctness.md](docs/evidence/exhibit-b-phase1-correctness.md)
 
 ## Phase 2 — Mechanism Expansion + Benchmark Harness
-- [ ] Implement optimistic locking (version column + retry-on-conflict)
-- [ ] Implement Postgres advisory locks (`pg_advisory_xact_lock`)
-- [ ] Implement SERIALIZABLE isolation level approach
-- [ ] Extend benchmark harness: parameterize by mechanism, concurrency level,
+- [x] Implement optimistic locking (version column + retry-on-conflict)
+- [x] Implement Postgres advisory locks (`pg_advisory_xact_lock`)
+- [x] Implement SERIALIZABLE isolation level approach
+- [x] Extend benchmark harness: parameterize by mechanism, concurrency level,
       contention pattern (all-same-seat vs. spread-across-seats)
-- [ ] Capture throughput, p50/p99 latency, conflict/retry rate per mechanism
-- [ ] **Deliverable:** comparison table/plot across all 5 mechanisms × multiple load levels
+- [x] Capture throughput, p50/p99 latency, conflict/retry rate per mechanism
+- [x] **Deliverable:** comparison table/plot across all 5 mechanisms × multiple load levels
 
 ## Phase 3 — Multi-Seat Transactions & Deadlocks
-- [ ] Extend API to accept multiple `seat_ids` per booking request
-- [ ] Construct adversarial workload (overlapping seat sets, opposite lock order)
-- [ ] Run adversarial load against naive multi-seat locking — capture deadlocks/hangs
-- [ ] Implement consistent lock ordering (sort seat_ids before acquiring)
-- [ ] Implement timeout + exponential-backoff retry as fallback layer
-- [ ] Re-run adversarial load — confirm deadlock rate drops to zero
-- [ ] **Deliverable:** deadlock rate before/after ordering fix, same load
+- [x] Extend API to accept multiple `seat_ids` per booking request
+- [x] Construct adversarial workload (overlapping seat sets, opposite lock order)
+- [x] Run adversarial load against naive multi-seat locking — capture deadlocks/hangs
+- [x] Implement consistent lock ordering (sort seat_ids before acquiring)
+- [x] Implement timeout + exponential-backoff retry as fallback layer
+- [x] Re-run adversarial load — confirm deadlock rate drops to zero
+- [x] **Deliverable:** deadlock rate before/after ordering fix, same load
 
 ## Phase 4 — Cross-Seat Isolation Verification
-- [ ] Design test: hammer seat A with 1,000+ concurrent requests
-- [ ] Simultaneously run normal-latency requests against seats B–Z
-- [ ] Measure whether B–Z latency/throughput degrades
-- [ ] Set and check against an explicit threshold (e.g. <10% p99 degradation)
-- [ ] **Deliverable:** isolation test report with numbers, not assumption
+- [x] Design test: hammer seat A with 1,000+ concurrent requests
+- [x] Simultaneously run normal-latency requests against seats B–Z
+- [x] Measure whether B–Z latency/throughput degrades
+- [x] Set and check against an explicit threshold (e.g. <10% p99 degradation)
+- [x] **Deliverable:** isolation test report with numbers, not assumption
 
 ## Phase 5 — Realistic Booking Flow (stretch)
-- [ ] Add `held` status with TTL to seat state machine
-- [ ] Implement reaper (background worker / Redis TTL) to release expired holds
-- [ ] Implement `POST /holds` and `POST /holds/{id}/confirm` endpoints
-- [ ] Load test: expire holds mid-flight under concurrent confirm attempts
-- [ ] **Deliverable:** evidence of no double-confirm, no permanently stuck seats
+- [x] Add `held` status with TTL to seat state machine
+- [x] Implement reaper (background worker / Redis TTL) to release expired holds
+- [x] Implement `POST /holds` and `POST /holds/{id}/confirm` endpoints
+- [x] Load test: expire holds mid-flight under concurrent confirm attempts
+- [x] **Deliverable:** evidence of no double-confirm, no permanently stuck seats
 
 > Note: this phase no longer includes a standalone "idempotency-key dedupe table" (an earlier draft of
 > this roadmap called for one). It's superseded by the `UNIQUE` constraint on `bookings.idempotency_key`
@@ -98,12 +98,17 @@ oracles, every negative control.
 - [ ] (Optional) discuss/prototype sharding by venue/event
 
 ## Phase 8 — Writeup
-- [ ] Write comparative mechanism analysis (throughput/latency/failure-mode tradeoffs)
-- [ ] Include deadlock before/after evidence (Phase 3)
-- [ ] Include isolation test results (Phase 4)
-- [ ] Include proof + chaos results (Phase 6)
-- [ ] State explicit recommendation: which mechanism for which scenario
-- [ ] Add a short "how this differs from the standard tutorial version" note
+- [x] Write comparative mechanism analysis (throughput/latency/failure-mode tradeoffs)
+- [x] Include deadlock before/after evidence (Phase 3)
+- [x] Include isolation test results (Phase 4)
+- [x] Include proof + chaos results (Phase 6)
+- [x] State explicit recommendation: which mechanism for which scenario
+- [x] Add a short "how this differs from the standard tutorial version" note
+
+(Done 2026-11-26, umbrella #72. [README.md](README.md); [docs/writeup.md](docs/writeup.md);
+[docs/recommendation-matrix.md](docs/recommendation-matrix.md); [Exhibit I](docs/evidence/exhibit-i-phase8-no-backstop.md)
+(the Mechanisms with the Backstop removed); four generated charts in [docs/charts/](docs/charts/) (`npm run charts`);
+`test/docsDrift.test.ts` keeps the documents' links and embedded charts from drifting.)
 
 ---
 
