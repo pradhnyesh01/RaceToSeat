@@ -1,8 +1,20 @@
 # RaceToSeat
 
-A concurrency-safe seat booking backend for a fixed-inventory reservation system (movie theater seats), built to compare five database concurrency-control mechanisms against a hard per-seat mutual-exclusion guarantee.
+A concurrency-safe seat booking backend for a fixed-inventory reservation system (movie theater seats), built to compare five database concurrency-control mechanisms, plus an unguarded control, against a hard per-seat mutual-exclusion guarantee.
 
 ## Language
+
+**Mechanism**:
+One of the five interchangeable ways of claiming Seats that the project compares: unique constraint, pessimistic locking, optimistic locking, advisory locks, serializable isolation. All five serve the same API and are selected per process. A Mechanism is judged on its cost and its failure behaviour; every one of them also sits on the Backstop, so a Mechanism's *own* contribution to correctness is only visible with the Backstop removed.
+_Avoid_: Strategy, approach, algorithm (a strategy is the code that implements a Mechanism, not the thing being compared)
+
+**Control**:
+The deliberately unguarded read-then-write way of claiming Seats, kept as the baseline every Mechanism is compared against. It is not a Mechanism. With the Backstop in place it no longer double-books, so its measured rows describe "the Control on top of the Backstop"; only the project's earliest evidence shows it without one.
+_Avoid_: Naive mechanism, baseline mechanism
+
+**Backstop**:
+The uniqueness guarantee the shared schema enforces beneath every Mechanism and the Control: a Seat can belong to at most one Booking, whichever way the claim was made. It is why the Control stopped double-booking, and why "all six pass" does not by itself show that each Mechanism is correct on its own. The unique-constraint Mechanism is the Backstop with nothing placed in front of it; the other four place a coordination step in front of it.
+_Avoid_: Constraint (the unique-constraint Mechanism is a different thing: the same guarantee relied on as the *only* defense), safety net, fallback
 
 **Event**:
 One bookable instance of a showing at a venue — what a moviegoer calls a showtime. The concrete domain is movie theaters; this is not modeled as a generic reservable-thing abstraction for other domains (concerts, flights).
