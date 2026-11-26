@@ -50,7 +50,7 @@ const RELEASED_KEY_CONSTRAINT = "idempotency_tombstones_pkey";
 export async function findPriorBookingForKey(
   client: PoolClient,
   idempotencyKey: string,
-): Promise<BookSeatResult | undefined> {
+): Promise<Extract<BookSeatResult, { kind: "idempotent_replay" | "key_released" }> | undefined> {
   const res = await client.query<{ state: "live" | "released"; id: string; at: Date; reason: KeyReleaseReason | null }>(
     `SELECT 'live' AS state, id, created_at AS at, NULL AS reason FROM bookings WHERE idempotency_key = $1
      UNION ALL
@@ -66,6 +66,34 @@ export async function findPriorBookingForKey(
   return row.state === "live"
     ? { kind: "idempotent_replay", bookingId: row.id, createdAt: row.at }
     : { kind: "key_released", reason: row.reason!, releasedId: row.id };
+}
+
+// RF2 (issue #61, ADR-0031): the last thing a 409 must do. Every mechanism looks the key
+// up before its transaction, so a same-key retry whose original commits after that lookup
+// reaches its own conflict check (a seat that is now taken, a lock the original's commit
+// just released, a lost CAS) and, with nothing but that observation, would answer 409 for a
+// request that in fact succeeded. So before a conflict is answered, the key is read once more
+// - a fresh statement, on the connection that just finished its transaction, so it sees
+// everything committed up to now - and whatever it means (a live Booking: replay; a released
+// one: key_released, exactly as the first lookup would have answered) wins over the 409.
+// A different key wanting the same seat finds nothing and stays a 409. The cost is one
+// indexed read, and only on a path that is already losing; a created / replayed / 404 / 503
+// outcome pays nothing. Not for retry_exhausted (ADR-0012/0015): that is the "never learned
+// whether the seat was taken" answer, a 503 the client retries, not a refusal.
+export async function replayInsteadOfConflict(
+  client: PoolClient,
+  idempotencyKey: string,
+  result: BookSeatResult,
+): Promise<BookSeatResult> {
+  if (result.kind !== "conflict") {
+    return result;
+  }
+  const prior = await findPriorBookingForKey(client, idempotencyKey);
+  // The retries the attempt spent still happened (X-Booking-Retries), whatever it ended as.
+  if (!prior) {
+    return result;
+  }
+  return result.retries === undefined ? prior : { ...prior, retries: result.retries };
 }
 
 // The fallback for every mechanism's shared race: two requests carrying the
@@ -178,6 +206,18 @@ export async function findPriorHoldForKey(
   return row.state === "live"
     ? { kind: "idempotent_replay", holdId: row.id, seatIds: row.seat_ids!, heldUntil: row.held_until! }
     : { kind: "key_released", reason: row.reason!, releasedId: row.id };
+}
+
+// Hold's counterpart to replayInsteadOfConflict (RF2, ADR-0031).
+export async function replayHoldInsteadOfConflict(
+  client: PoolClient,
+  idempotencyKey: string,
+  result: HoldSeatsResult,
+): Promise<HoldSeatsResult> {
+  if (result.kind !== "conflict") {
+    return result;
+  }
+  return (await findPriorHoldForKey(client, idempotencyKey)) ?? result;
 }
 
 // Hold's counterpart to resolveIdempotencyKeyRace, against holds' own unique

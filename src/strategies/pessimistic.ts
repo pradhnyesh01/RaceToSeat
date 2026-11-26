@@ -1,7 +1,12 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
 import { isLockNotAvailable } from "../db/pgErrors.js";
-import { findPriorBookingForKey, insertBookingForSeats, runTransactionalBooking } from "./idempotency.js";
+import {
+  findPriorBookingForKey,
+  insertBookingForSeats,
+  replayInsteadOfConflict,
+  runTransactionalBooking,
+} from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -31,7 +36,7 @@ export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSea
     // (not localeCompare) is the collation-safe choice for UUID strings.
     const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
 
-    return await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
+    const result = await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
       let seatRes;
       try {
         seatRes = await txClient.query<{ id: string; status: string }>(
@@ -73,6 +78,10 @@ export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSea
       const { bookingId, createdAt } = await insertBookingForSeats(txClient, seatIds, input.userId, input.idempotencyKey);
       return { kind: "created", bookingId, createdAt };
     });
+    // RF2 (ADR-0031): the lookup above ran before BEGIN, so an original that committed after it
+    // makes this a conflict (a taken seat, or the lock its commit just released/another
+    // transaction holds) that is really a replay. Re-read the key before answering 409.
+    return await replayInsteadOfConflict(client, input.idempotencyKey, result);
   } finally {
     client.release();
   }

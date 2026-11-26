@@ -1,7 +1,12 @@
 import type { PoolClient } from "pg";
 import { config } from "../config.js";
 import { pool } from "../db/pool.js";
-import { findPriorBookingForKey, normalizeSeatIds, runDeadlockRetryBooking } from "./idempotency.js";
+import {
+  findPriorBookingForKey,
+  normalizeSeatIds,
+  replayInsteadOfConflict,
+  runDeadlockRetryBooking,
+} from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -89,7 +94,7 @@ export async function bookSeatOptimistic(
 
     const seatIds = normalizeSeatIds(input.seatIds);
 
-    return await runDeadlockRetryBooking(
+    const result = await runDeadlockRetryBooking(
       client,
       input.idempotencyKey,
       async (txClient, deadlockAttempt) => {
@@ -155,6 +160,10 @@ export async function bookSeatOptimistic(
       },
       (result) => result.kind === "created",
     );
+    // RF2 (ADR-0031): a same-key retry whose original committed after the lookup above loses its
+    // CAS (the seat is booked at a newer version) and then reads 'booked' - a conflict that is
+    // really a replay. Re-read the key before answering 409.
+    return await replayInsteadOfConflict(client, input.idempotencyKey, result);
   } finally {
     client.release();
   }

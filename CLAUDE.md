@@ -476,6 +476,28 @@ tables were re-pinned/recomputed for the Crash rows. Existing databases need `np
 is untouched; it edits the same helpers (`resolveIdempotencyKeyRace`). One Robustness finding remains
 unfixed (RF2 only; R7 shipped in #68, ADR-0029).
 
+Issue #61 (finding RF2, formal-derived) is done: a same-key retry can no longer be told 409 once its
+original's key is committed (ADR-0031). Every mechanism looks the key up before its transaction, so an
+original that committed after that lookup made the retry reach its own conflict check (a taken seat, a
+lock the original's commit just released, a lost CAS) and answer 409. Survey: five mechanisms could
+(`pessimistic` booking and hold, `advisory`, `naive` via its unlocked read, `optimistic` even after waiting
+on the original's row lock, `serializable`), each reproduced by a deterministic test that failed before the
+fix (`runIdempotencyKeyRaceContractTests` in `test/bookingContract.ts`, `runHoldKeyRaceContractTests`,
+staged with `interceptQuery`, which now also supports pg-pool's callback `connect()` that `pool.query`
+uses); `unique_constraint` cannot (its same-key INSERT precedes the seat claim) and its test passes
+before and after; confirm was never affected. The fix is one shared rule, `replayInsteadOfConflict` /
+`replayHoldInsteadOfConflict` in `src/strategies/idempotency.ts`: before a `conflict` is answered, re-read
+the key once on a fresh read (the same live-or-tombstone query, so the answer is a replay or RF1's
+`410 key_released`; a different key finds nothing and stays 409). It deliberately follows *every* refusal,
+not just a taken-seat one: TLC showed a retry's `NOWAIT` can fail on an unrelated transaction's lock
+while its key is committed (`CrashRecheckTakenOnly`). Cost: one indexed statement per *losing* request,
+nothing for winners; measured +3% to +11% on p50 in `hammer-seat` at concurrency 100 against a +2.7%
+noise control (Exhibit H section M, ADR-0031). Formal: `CrashRecovery.tla` gained a `Recheck` step and
+`RecheckMode`; `CrashFindingSpuriousConflict` is now a positive check (12 positive, 52 negative);
+Exhibit G's mapping re-pinned and extended. Chaos non-regression: `pessimistic` x `hammer-seat` and
+`deadlock-pairs` x `latency-above`, 5 reps each, unmodified code, all Oracles green and the replay ends
+with exactly one Booking per distinct seat set. No Robustness finding remains unfixed.
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

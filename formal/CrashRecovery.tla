@@ -28,7 +28,10 @@
 (*   Begin      the fast-path lookup of the key: a committed row with this *)
 (*              key -> replay, no transaction at all                       *)
 (*   Lock       SELECT ... FOR UPDATE NOWAIT: a seat locked by another     *)
-(*              in-flight transaction, or not 'available' -> 409           *)
+(*              in-flight transaction, or not 'available' -> a refusal     *)
+(*   Recheck    (RF2, ADR-0031) before a refusal is answered 409 the key   *)
+(*              is read once more on a fresh read: a committed row with    *)
+(*              it -> replay, a tombstone -> 410, else 409                 *)
 (*   InsertKey  INSERT INTO bookings|holds (idempotency_key). The UNIQUE   *)
 (*              index entry of an in-flight insert makes a same-key        *)
 (*              inserter WAIT; if the other commits this one gets a        *)
@@ -59,6 +62,8 @@ CONSTANTS
     CrashMode,   \* "clean" | "loseCommitted" | "keepUncommitted" | "keepLocks" | "keepPending"
     ExpiryMode,  \* "checked" | "unchecked": does Confirm check the Hold's expiry?
     CancelMode,  \* "on" | "off"
+    RecheckMode, \* "recheck" | "taken" | "none": is a refusal re-read against the key before it is answered 409? (RF2, ADR-0031)
+                 \* "taken" re-reads only a refusal caused by a taken seat, not one caused by a lock another transaction holds
     TombMode,    \* "retain" | "forget": does a released Booking/Hold leave its key a tombstone? (RF1, ADR-0030)
     GuardMode,   \* "on" | "off": does the INSERT itself refuse a tombstoned key (the trigger)?
     TrackStage   \* TRUE only for the witness configs: remember the step a Crash hit
@@ -68,6 +73,7 @@ ASSUME KeyMode    \in {"unique", "none"}
 ASSUME CrashMode  \in {"clean", "loseCommitted", "keepUncommitted", "keepLocks", "keepPending"}
 ASSUME ExpiryMode \in {"checked", "unchecked"}
 ASSUME CancelMode \in {"on", "off"}
+ASSUME RecheckMode \in {"recheck", "taken", "none"}
 ASSUME TombMode   \in {"retain", "forget"}
 ASSUME GuardMode  \in {"on", "off"}
 ASSUME TrackStage \in BOOLEAN
@@ -123,10 +129,12 @@ SameBKey(r, q) == r # q /\ IsBooker(r) /\ IsBooker(q)
 SameHKey(r, q) == r # q /\ Kind(r) = "hold" /\ Kind(q) = "hold" /\ Key(r) = Key(q)
 SameKey(r, q)  == SameBKey(r, q) \/ SameHKey(r, q)
 
-InFlight == {"begun", "locked", "keyed", "unacked", "clocked"}
+\* "refused": the Lock step found a conflict; the answer is not yet given (RF2's re-read comes first).
+InFlight == {"begun", "locked", "keyed", "unacked", "clocked", "refused"}
 \* "released": the key's Booking/Hold existed and was released (tombstone) -> 410 key_released.
 \* "race_released": the same, found only at the INSERT (guard trigger -> unique violation -> resolve).
-Answered == {"created", "replay", "race_replay", "released", "race_released", "conflict", "not_found", "expired"}
+\* "late_replay": the same, found by the re-read that precedes a 409 (RF2).
+Answered == {"created", "replay", "race_replay", "late_replay", "released", "race_released", "conflict", "not_found", "expired"}
 Terminal == Answered \cup {"crashed"}
 
 Avail(S) == \A s \in S : seat[s] = "available"
@@ -202,13 +210,40 @@ Begin(r) ==
 Lock(r) ==
     /\ Kind(r) \in {"book", "hold"} /\ pc[r] = "begun"
     /\ IF (\E q \in Requests \ {r} : locked[q] \cap Want(r) # {}) \/ ~Avail(Want(r))
-          THEN /\ pc'     = Only(pc, r, "conflict")
-               /\ sawKey' = Only(sawKey, r, KeyCommitted(r))
+          THEN /\ IF RecheckMode = "recheck"
+                      \/ (RecheckMode = "taken" /\ ~(\E q \in Requests \ {r} : locked[q] \cap Want(r) # {}))
+                     THEN /\ pc'     = Only(pc, r, "refused")
+                          /\ UNCHANGED sawKey
+                     ELSE /\ pc'     = Only(pc, r, "conflict")
+                          /\ sawKey' = Only(sawKey, r, KeyCommitted(r))
                /\ UNCHANGED locked
           ELSE /\ pc'     = Only(pc, r, "locked")
                /\ locked' = Only(locked, r, Want(r))
                /\ UNCHANGED sawKey
     /\ UNCHANGED <<prof, seat, pendKey, holdRows, bookRows, expired, known, liveAtCheck,
+                   nconf, reaped, cancelled, durable, solo, ncrash, crashedAt>>
+
+\* RF2 (ADR-0031): the step that closes the window. A refusal -- a seat locked by another
+\* open transaction (an in-flight original, a losing attempt, a confirm) or already taken -- is
+\* not answered 409 until the key has been read once more, on a fresh read taken AFTER the
+\* refusal was observed (findPriorBookingForKey / findPriorHoldForKey on the connection that
+\* just ended its transaction): a committed row with the key -> replay; a tombstone -> 410
+\* key_released (as at Begin); neither -> 409. The attempt holds no locks here and has written
+\* nothing, so a crash at this step is the same as one at "begun" and is not modeled separately.
+\* sawKey records what this read saw, so an answered 409 carries "no committed row at that read".
+Recheck(r) ==
+    /\ pc[r] = "refused"
+    /\ IF KeyCommitted(r)
+          THEN /\ pc'     = Only(pc, r, "late_replay")
+               /\ known'  = LearnHold(r)
+               /\ UNCHANGED sawKey
+          ELSE IF KeyReleased(r)
+          THEN /\ pc'     = Only(pc, r, "released")
+               /\ UNCHANGED <<known, sawKey>>
+          ELSE /\ pc'     = Only(pc, r, "conflict")
+               /\ sawKey' = Only(sawKey, r, KeyCommitted(r))
+               /\ UNCHANGED known
+    /\ UNCHANGED <<prof, seat, locked, pendKey, holdRows, bookRows, expired, liveAtCheck,
                    nconf, reaped, cancelled, durable, solo, ncrash, crashedAt>>
 
 \* INSERT INTO bookings|holds (..., idempotency_key). With the UNIQUE constraint:
@@ -416,7 +451,7 @@ Terminated ==
 
 Next ==
     \/ \E r \in Requests :
-         \/ Begin(r) \/ Lock(r) \/ InsertKey(r) \/ Commit(r) \/ Ack(r)
+         \/ Begin(r) \/ Lock(r) \/ Recheck(r) \/ InsertKey(r) \/ Commit(r) \/ Ack(r)
          \/ CLock(r) \/ CCommit(r)
          \/ Crash(r)
          \/ Expire(r) \/ Reap(r) \/ Cancel(r)
@@ -426,7 +461,7 @@ Spec == Init /\ [][Next]_vars
 
 \* Fairness: every attempt that can take a step eventually does. Crashes, time and
 \* cancellation have none -- the environment may or may not use them.
-Progress(r) == Begin(r) \/ Lock(r) \/ InsertKey(r) \/ Commit(r) \/ Ack(r) \/ CLock(r) \/ CCommit(r)
+Progress(r) == Begin(r) \/ Lock(r) \/ Recheck(r) \/ InsertKey(r) \/ Commit(r) \/ Ack(r) \/ CLock(r) \/ CCommit(r)
 SpecFair   == Spec /\ \A r \in Requests : WF_vars(Progress(r))
 
 \* TLC symmetry: requests, seats and keys are interchangeable. Safety configs only
@@ -559,10 +594,12 @@ BookingKeyCreatesAtMostOne ==
 HoldKeyCreatesAtMostOne ==
     \A r, q \in Requests : SameHKey(r, q) => ~(durable[r] /\ durable[q])
 
-\* ---- Findings: expected to be VIOLATED (CrashFindingSpuriousConflict.cfg) -----
-
-\* (RF2) A concurrent same-key book / hold attempt can be told 409 although the key's row is
-\* committed (the original committed between this attempt's lookup and its lock).
+\* ---- RF2 (issue #61, ADR-0031): a concurrent same-key attempt is never falsely refused ----
+\* A same-key book / hold attempt is never told 409 although the key's row is committed at the
+\* moment the 409 is decided. Before the fix (RecheckMode "none": the 409 followed the lock
+\* observation directly, with the key last read at Begin) it was FALSE: the original could commit
+\* between the attempt's lookup and its lock (CrashNoRecheck keeps that as a negative control).
+\* With the re-read it holds (CrashFindingSpuriousConflict, now a positive check).
 KeyNeverFalselyRefused == \A r \in Requests : pc[r] \in {"conflict", "not_found"} => ~sawKey[r]
 
 -----------------------------------------------------------------------------
@@ -605,6 +642,13 @@ NoReplayAfterAmbiguousConfirm ==
 NoReleasedBooking == ~(\E r \in Requests : Kind(r) = "book" /\ pc[r] = "released")
 NoReleasedHold    == ~(\E r \in Requests : Kind(r) = "hold" /\ pc[r] = "released")
 NoReleasedRace    == ~(\E r \in Requests : pc[r] = "race_released")
+
+\* RF2: the re-read before a 409 turns it into a replay, including the lock-failure half: the
+\* attempt's seats are locked by another open transaction while the key's row is already committed.
+NoLateReplay == ~(\E r \in Requests : pc[r] = "late_replay")
+NoLateReplayWhileLocked ==
+    ~(\E r, q \in Requests :
+        /\ pc[r] = "refused" /\ KeyCommitted(r) /\ q # r /\ locked[q] \cap Want(r) # {})
 
 \* The lookup-then-insert race ends in a unique violation resolved to a replay.
 NoKeyRaceReplay == ~(\E r \in Requests : pc[r] = "race_replay")

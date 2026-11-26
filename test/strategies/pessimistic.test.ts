@@ -7,6 +7,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyRaceContractTests,
   runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
@@ -20,6 +21,7 @@ runBookingContractTests("pessimistic", createApp);
 runBookingConcurrencyContractTest("pessimistic", createApp);
 runMultiSeatBookingContractTests("pessimistic", createApp);
 runIdempotencyKeyReleaseContractTest("pessimistic", createApp);
+runIdempotencyKeyRaceContractTests("pessimistic", createApp, withHeldRowLock);
 runCrossSeatIsolationContractTest("pessimistic", createApp, withHeldRowLock);
 
 describe("POST /bookings (pessimistic strategy) — multi-seat NOWAIT precedence", () => {

@@ -2,7 +2,12 @@ import type { PoolClient } from "pg";
 import { config } from "../config.js";
 import { pool } from "../db/pool.js";
 import { isLockNotAvailable } from "../db/pgErrors.js";
-import { findPriorHoldForKey, normalizeSeatIds, runTransactionalHold } from "./idempotency.js";
+import {
+  findPriorHoldForKey,
+  normalizeSeatIds,
+  replayHoldInsteadOfConflict,
+  runTransactionalHold,
+} from "./idempotency.js";
 import type { HoldSeatsInput, HoldSeatsResult } from "./types.js";
 
 export type { HoldSeatsResult };
@@ -27,7 +32,7 @@ export async function holdSeatsPessimistic(input: HoldSeatsInput): Promise<HoldS
     // can't enter a wait-for cycle (ADR-0006).
     const seatIds = normalizeSeatIds(input.seatIds);
 
-    return await runTransactionalHold(client, input.idempotencyKey, async (txClient) => {
+    const result = await runTransactionalHold(client, input.idempotencyKey, async (txClient) => {
       let seatRes;
       try {
         seatRes = await txClient.query<{ id: string; status: string }>(
@@ -86,6 +91,9 @@ export async function holdSeatsPessimistic(input: HoldSeatsInput): Promise<HoldS
 
       return { kind: "created", holdId, seatIds, heldUntil: updateRes.rows[0]!.held_until };
     });
+    // RF2 (ADR-0031): same as bookSeatPessimistic - a conflict is re-read against the key
+    // before it is answered, since the original may have committed after the lookup above.
+    return await replayHoldInsteadOfConflict(client, input.idempotencyKey, result);
   } finally {
     client.release();
   }

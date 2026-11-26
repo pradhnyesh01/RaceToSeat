@@ -912,7 +912,12 @@ async function mainExhibitH(evidenceDir: URL, outPath: string) {
     before: await loadNoRegressionRows(new URL("r5-nofault/before/", chaosDir), evidenceDir),
     after: await loadNoRegressionRows(new URL("r5-nofault/after/", chaosDir), evidenceDir),
   };
-  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression, r5NoRegression, r6NoRegression }));
+  // RF2 (#61): the same no-Fault hammer-seat runs on the parent commit and on the fix, all six mechanisms.
+  const rf2NoRegression = {
+    before: await loadNoRegressionRows(new URL("rf2-nofault/before/", chaosDir), evidenceDir),
+    after: await loadNoRegressionRows(new URL("rf2-nofault/after/", chaosDir), evidenceDir),
+  };
+  await writeFile(outPath, renderExhibitH({ reports, unitControls, noRegression, r5NoRegression, r6NoRegression, rf2NoRegression }));
 
   const measured = reports.filter((r) => !r.report.args.expectViolations);
   const violations = measured.filter((r) => r.report.correctnessViolation);

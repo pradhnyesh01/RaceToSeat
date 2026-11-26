@@ -1,0 +1,135 @@
+{
+  "strategy": "unique_constraint",
+  "pattern": "hammer-seat",
+  "concurrency": 100,
+  "eventId": "d4704009-ec2e-4b89-bd2d-2e8222902040",
+  "seatId": "9275ce60-02cc-4eeb-8db6-d0025e120694",
+  "runs": [
+    {
+      "attempt": 1,
+      "ranAt": "2026-11-26T02:32:29.484Z",
+      "durationMs": 452,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 99,
+        "503": 0,
+        "other": 0
+      },
+      "retriesTotal": 0,
+      "latency": {
+        "p50Ms": 130.536,
+        "p99Ms": 132.87467999999998
+      },
+      "throughputRps": 727.57433990818,
+      "winningBookingIds": [
+        "4b6846ed-c165-44e8-8c8e-1abce1611c3b"
+      ],
+      "winningUserIds": [
+        "load-user-81"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    },
+    {
+      "attempt": 2,
+      "ranAt": "2026-11-26T02:32:29.989Z",
+      "durationMs": 407,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 99,
+        "503": 0,
+        "other": 0
+      },
+      "retriesTotal": 0,
+      "latency": {
+        "p50Ms": 37.319,
+        "p99Ms": 39.928169999999994
+      },
+      "throughputRps": 2283.7828579258685,
+      "winningBookingIds": [
+        "5292247e-51c6-4004-841e-22030beb0283"
+      ],
+      "winningUserIds": [
+        "load-user-6"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    },
+    {
+      "attempt": 3,
+      "ranAt": "2026-11-26T02:32:30.413Z",
+      "durationMs": 366,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 99,
+        "503": 0,
+        "other": 0
+      },
+      "retriesTotal": 0,
+      "latency": {
+        "p50Ms": 28.9005,
+        "p99Ms": 31.146430000000002
+      },
+      "throughputRps": 2808.9098620825257,
+      "winningBookingIds": [
+        "52a925f6-8ab9-4ee9-9ae5-b0eeddd779f2"
+      ],
+      "winningUserIds": [
+        "load-user-24"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    },
+    {
+      "attempt": 4,
+      "ranAt": "2026-11-26T02:32:30.793Z",
+      "durationMs": 377,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 99,
+        "503": 0,
+        "other": 0
+      },
+      "retriesTotal": 0,
+      "latency": {
+        "p50Ms": 38.9135,
+        "p99Ms": 40.29123
+      },
+      "throughputRps": 2248.6058643640945,
+      "winningBookingIds": [
+        "faa03715-2f2b-40ba-8dc4-083530a200c6"
+      ],
+      "winningUserIds": [
+        "load-user-13"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    },
+    {
+      "attempt": 5,
+      "ranAt": "2026-11-26T02:32:31.185Z",
+      "durationMs": 378,
+      "httpStatusTally": {
+        "201": 1,
+        "409": 99,
+        "503": 0,
+        "other": 0
+      },
+      "retriesTotal": 0,
+      "latency": {
+        "p50Ms": 34.716499999999996,
+        "p99Ms": 36.23509
+      },
+      "throughputRps": 2453.6264599077435,
+      "winningBookingIds": [
+        "42173c10-4640-4d89-98e9-3cff26c24db0"
+      ],
+      "winningUserIds": [
+        "load-user-24"
+      ],
+      "winningBookingCount": 1,
+      "doubleBooked": false
+    }
+  ],
+  "anyDoubleBooked": false
+}

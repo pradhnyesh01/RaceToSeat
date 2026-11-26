@@ -7,6 +7,7 @@ const {
   runHoldConcurrencyContractTest,
   runHoldConfirmContractTests,
   runHoldContractTests,
+  runHoldKeyRaceContractTests,
   runHoldKeyReleaseContractTests,
   runMultiSeatHoldContractTests,
 } = await import("../holdContract.js");
@@ -21,6 +22,7 @@ runHoldConcurrencyContractTest("pessimistic", createApp);
 runMultiSeatHoldContractTests("pessimistic", createApp);
 runHoldConfirmContractTests("pessimistic", createApp);
 runHoldKeyReleaseContractTests("pessimistic", createApp);
+runHoldKeyRaceContractTests("pessimistic", createApp, withHeldRowLock);
 
 describe("POST /holds (pessimistic strategy) — NOWAIT conflict", () => {
   beforeEach(resetDb);

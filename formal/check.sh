@@ -51,20 +51,25 @@ LC_NEGATIVE=(
 )
 
 # F4 (CrashRecovery.tla): configs named Crash*. Same name:expect form; "@temporal" as above.
-# CrashFindingSpuriousConflict is not a control but a documented finding (RF2): the invariant is
-# violated on purpose, because the behavior it names is real (README "Findings"). RF1 (#60) is
-# fixed: CrashFindingKeyReuse / CrashFindingHoldKeyReuse (a key creates at most one Booking / Hold
-# ever) are now POSITIVE checks, and what they used to show is kept as the negative controls
-# CrashForgetKeys* (no tombstone: today's pre-fix behavior) and CrashNoInsertGuard* (tombstone
-# lookup but no insert-time guard: the lookup-then-insert window).
-CR_POSITIVE=(CrashSafety CrashFindingKeyReuse CrashFindingHoldKeyReuse CrashLiveRecovery)
+# Both formal-derived findings are fixed, so their configs are POSITIVE checks now.
+# RF1 (#60): CrashFindingKeyReuse / CrashFindingHoldKeyReuse (a key creates at most one Booking / Hold
+# ever); what they used to show is kept as the negative controls CrashForgetKeys* (no tombstone: the
+# pre-fix behavior) and CrashNoInsertGuard* (tombstone lookup but no insert-time guard: the
+# lookup-then-insert window).
+# RF2 (#61): CrashFindingSpuriousConflict (KeyNeverFalselyRefused: a refusal is re-read against the
+# key before it is answered 409); the pre-fix behavior is the negative control CrashNoRecheck,
+# CrashRecheckTakenOnly (re-read only a taken-seat refusal, not a lock-failure one) shows the re-read
+# must cover both, and CrashWitnessLateReplay* are vacuity guards showing it actually fires
+# (including with the seats locked by another transaction).
+CR_POSITIVE=(CrashSafety CrashFindingKeyReuse CrashFindingHoldKeyReuse CrashFindingSpuriousConflict CrashLiveRecovery)
 CR_NEGATIVE=(
   CrashNoLookup:AmbiguousRetryNotRefused CrashNoKeyDedupe:KeyAtMostOneBooking CrashNoKeyDedupeHold:KeyAtMostOneHold
   CrashLoseCommitted:CommittedPersists CrashKeepLocks:NoOrphanState CrashKeepUncommitted:SeatStatusAgrees
   CrashNoExpiryCheck:NoConfirmOnExpired
   CrashForgetKeys:BookingKeyCreatesAtMostOne CrashForgetKeysHold:HoldKeyCreatesAtMostOne
   CrashNoInsertGuard:BookingKeyCreatesAtMostOne CrashNoInsertGuardHold:HoldKeyCreatesAtMostOne
-  CrashFindingSpuriousConflict:KeyNeverFalselyRefused
+  CrashNoRecheck:KeyNeverFalselyRefused CrashRecheckTakenOnly:KeyNeverFalselyRefused
+  CrashWitnessLateReplay:NoLateReplay CrashWitnessLateReplayLocked:NoLateReplayWhileLocked
   CrashWitnessReleasedBooking:NoReleasedBooking CrashWitnessReleasedHold:NoReleasedHold
   CrashWitnessReleasedRace:NoReleasedRace
   CrashWitnessAmbiguousCommit:NoAmbiguousCommit CrashWitnessReplayAmbiguousBooking:NoReplayAfterAmbiguousBooking

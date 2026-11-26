@@ -1,6 +1,6 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
-import { findPriorBookingForKey, runTransactionalBooking } from "./idempotency.js";
+import { findPriorBookingForKey, replayInsteadOfConflict, runTransactionalBooking } from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -43,7 +43,7 @@ export async function bookSeatAdvisory(input: BookSeatInput): Promise<BookSeatRe
     // (not localeCompare) is the collation-safe choice for UUID strings.
     const seatIds = input.seatIds.map((seatId) => seatId.toLowerCase()).sort();
 
-    return await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
+    const result = await runTransactionalBooking(client, input.idempotencyKey, async (txClient) => {
       // Statement 1: take the locks. Existence is judged here (a seat's row is
       // never deleted, so even a snapshot that predates a concurrent commit
       // is right about it); availability is deliberately NOT read here — see
@@ -98,6 +98,8 @@ export async function bookSeatAdvisory(input: BookSeatInput): Promise<BookSeatRe
 
       return { kind: "created", bookingId: booking.id, createdAt: booking.created_at };
     });
+    // RF2 (ADR-0031): see bookSeatPessimistic - the key is re-read before a conflict is answered.
+    return await replayInsteadOfConflict(client, input.idempotencyKey, result);
   } finally {
     client.release();
   }

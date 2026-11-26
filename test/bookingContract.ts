@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
 import { pool } from "../src/db/pool.js";
-import { resetDb, seedEventWithSeats } from "./testDb.js";
+import { interceptQuery, resetDb, seedEventWithSeats } from "./testDb.js";
 
 // Shared behavioural contract every booking strategy must satisfy,
 // parameterized so each mechanism's thin test file (naive, unique_constraint,
@@ -472,5 +472,199 @@ export function runIdempotencyKeyReleaseContractTest(
       const seatRes = await pool.query("SELECT status FROM seats WHERE id = $1", [seatIdsByLabel.B1]);
       expect(seatRes.rows[0]).toMatchObject({ status: "available" });
     });
+  });
+}
+
+// RF2 (issue #61, ADR-0031): a same-key retry racing the original's commit must
+// replay it, not be told 409. Every mechanism looks the key up before its
+// transaction, so each has the window "the lookup misses, the original commits,
+// the retry reaches its own conflict check"; this drives exactly that, on the
+// real code path, by committing the original (a genuine POST /bookings through
+// the same app) right after the retry's own key lookup returns empty.
+// `withHeldSeat`, for the two mechanisms whose losing path is a failed
+// non-blocking lock (pessimistic, advisory), also drives the lock-failure half:
+// an unrelated open transaction holds the seat's lock while the retry runs.
+export function runIdempotencyKeyRaceContractTests(
+  strategyLabel: string,
+  createApp: () => FastifyInstance,
+  withHeldSeat?: <T>(lockSeatId: string, fn: () => Promise<T>) => Promise<T>,
+): void {
+  describe(`POST /bookings (${strategyLabel} strategy) — same-key retry racing the original (RF2)`, () => {
+    beforeEach(resetDb);
+
+    // Runs `retryPayload` through the app, committing `originalPayload` (via the
+    // same app) in the gap after the retry's key lookup found nothing.
+    async function retryWhileOriginalCommitsAfterLookup(
+      app: FastifyInstance,
+      originalPayload: object,
+      retryPayload: object,
+    ) {
+      let original: Awaited<ReturnType<FastifyInstance["inject"]>> | undefined;
+      const intercept = interceptQuery(
+        "SELECT 'live'",
+        async () => {
+          original = await app.inject({ method: "POST", url: "/bookings", payload: originalPayload });
+        },
+        (result) => (result as { rows: unknown[] }).rows.length === 0,
+      );
+      let retry;
+      try {
+        retry = await app.inject({ method: "POST", url: "/bookings", payload: retryPayload });
+      } finally {
+        intercept.restore();
+      }
+      expect(intercept.wasTriggered()).toBe(true);
+      return { original: original!, retry };
+    }
+
+    it("replays the original when it commits between the retry's key lookup and its conflict check", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+
+      const { original, retry } = await retryWhileOriginalCommitsAfterLookup(app, payload, payload);
+
+      expect(original.statusCode).toBe(201);
+      expect(retry.statusCode).toBe(201);
+      expect(retry.json()).toMatchObject({ id: (original.json() as { id: string }).id });
+      const bookings = await pool.query("SELECT id FROM bookings WHERE idempotency_key = $1", [payload.idempotency_key]);
+      expect(bookings.rows).toHaveLength(1);
+    });
+
+    it("replays a multi-seat original the same way", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1", "A2"]);
+      const app = createApp();
+      const payload = {
+        seat_ids: [seatIdsByLabel.A1, seatIdsByLabel.A2],
+        user_id: "user-1",
+        idempotency_key: randomUUID(),
+      };
+
+      const { original, retry } = await retryWhileOriginalCommitsAfterLookup(app, payload, payload);
+
+      expect(retry.statusCode).toBe(201);
+      expect(retry.json()).toMatchObject({ id: (original.json() as { id: string }).id });
+      expect((await pool.query("SELECT 1 FROM bookings")).rows).toHaveLength(1);
+    });
+
+    it("still answers 409 when the winner of the same seat carries a DIFFERENT key (a genuine conflict is never a replay)", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const winner = { seat_ids: [seatIdsByLabel.A1], user_id: "user-2", idempotency_key: randomUUID() };
+      const loser = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+
+      const { original, retry } = await retryWhileOriginalCommitsAfterLookup(app, winner, loser);
+
+      expect(original.statusCode).toBe(201);
+      expect(retry.statusCode).toBe(409);
+      const bookings = await pool.query("SELECT idempotency_key FROM bookings");
+      expect(bookings.rows).toEqual([{ idempotency_key: winner.idempotency_key }]);
+    });
+
+    it("still answers 410, not 409, when the original committed and was cancelled before the retry's conflict check", async () => {
+      // RF1's answer for a released key must survive the RF2 re-check: the re-check reads the
+      // same live-or-tombstone view as the first lookup. Seat B1 is taken by someone else so the
+      // retry's own seat is a conflict whichever way the key is read.
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+      let originalId: string | undefined;
+      const intercept = interceptQuery(
+        "SELECT 'live'",
+        async () => {
+          const original = await app.inject({ method: "POST", url: "/bookings", payload });
+          originalId = (original.json() as { id: string }).id;
+          await app.inject({ method: "DELETE", url: `/bookings/${originalId}` });
+          // Another user takes the freed seat, so the retry meets a taken seat, not a free one.
+          await app.inject({
+            method: "POST",
+            url: "/bookings",
+            payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-2", idempotency_key: randomUUID() },
+          });
+        },
+        (result) => (result as { rows: unknown[] }).rows.length === 0,
+      );
+      let retry;
+      try {
+        retry = await app.inject({ method: "POST", url: "/bookings", payload });
+      } finally {
+        intercept.restore();
+      }
+
+      expect(retry.statusCode).toBe(410);
+      expect(retry.json()).toMatchObject({ outcome: "key_released", reason: "cancelled", released_id: originalId });
+    });
+
+    if (withHeldSeat) {
+      it("still answers 409 with no replay while the original is in flight (its seat lock held, nothing committed)", async () => {
+        const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+        const app = createApp();
+        const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+
+        const retry = await withHeldSeat(seatIdsByLabel.A1!, () =>
+          app.inject({ method: "POST", url: "/bookings", payload }),
+        );
+
+        expect(retry.statusCode).toBe(409);
+        expect((await pool.query("SELECT 1 FROM bookings")).rows).toHaveLength(0);
+      });
+
+      it("replays a COMMITTED original even when the seat's lock is momentarily held by an unrelated transaction", async () => {
+        // The lock-failure half of RF2: a loser that row-locks the seat before discovering it
+        // is taken (O1), or an in-flight Confirm, holds the lock while the retry's non-blocking
+        // acquisition runs, yet the key's row is already committed, so 409 would be false.
+        // Staged as: the original sits open and uncommitted while the retry's lookup runs (so it
+        // misses); the original then commits, and an unrelated transaction takes the seat's lock
+        // and keeps it until the retry has answered.
+        const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+        const seatId = seatIdsByLabel.A1!;
+        const app = createApp();
+        const key = randomUUID();
+
+        const original = await pool.connect();
+        await original.query("BEGIN");
+        const { rows } = await original.query<{ id: string }>(
+          "INSERT INTO bookings (user_id, idempotency_key) VALUES ('user-1', $1) RETURNING id",
+          [key],
+        );
+        const originalId = rows[0]!.id;
+        await original.query("INSERT INTO booking_seats (booking_id, seat_id) VALUES ($1, $2)", [originalId, seatId]);
+        await original.query("UPDATE seats SET status = 'booked', booked_by = 'user-1', version = version + 1 WHERE id = $1", [seatId]);
+
+        let retryAnswered!: () => void;
+        const retryDone = new Promise<void>((resolve) => (retryAnswered = resolve));
+        let holder: Promise<unknown> | undefined;
+        const intercept = interceptQuery(
+          "SELECT 'live'",
+          async () => {
+            await original.query("COMMIT");
+            original.release();
+            await new Promise<void>((held) => {
+              holder = withHeldSeat(seatId, async () => {
+                held();
+                await retryDone;
+              });
+            });
+          },
+          (result) => (result as { rows: unknown[] }).rows.length === 0,
+        );
+        let retry;
+        try {
+          retry = await app.inject({
+            method: "POST",
+            url: "/bookings",
+            payload: { seat_ids: [seatId], user_id: "user-1", idempotency_key: key },
+          });
+        } finally {
+          intercept.restore();
+          retryAnswered();
+          await holder;
+        }
+
+        expect(intercept.wasTriggered()).toBe(true);
+        expect(retry.statusCode).toBe(201);
+        expect(retry.json()).toMatchObject({ id: originalId });
+      });
+    }
   });
 }
