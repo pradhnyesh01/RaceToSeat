@@ -30,6 +30,12 @@
 // load-harness/exhibitH.ts to keep this file's size in check; this file only
 // wires the mode up.
 //
+// Issue #73 (Phase 8, W1) adds a fifth mode, "i": Exhibit I, each Mechanism run
+// with the Backstop removed, reading the chaos-harness reports written to
+// docs/evidence/exhibit-i/ (its own directory, so Exhibit H's loader over
+// docs/evidence/chaos/ never sees them). The rendering lives in
+// load-harness/exhibitI.ts; this file only wires the mode up.
+//
 // Usage: tsx load-harness/aggregate.ts [--exhibit c|e|f|h|i] [--out <path>]
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";

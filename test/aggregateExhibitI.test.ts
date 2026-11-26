@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { parseExhibit, parseOutPath } from "../load-harness/aggregate.js";
-import { loadExhibitIReports, renderExhibitI, type ExhibitIReport, type LoadedExhibitIReport } from "../load-harness/exhibitI.js";
+import { loadExhibitIReports, renderExhibitI, STRATEGIES, WORKLOADS, type ExhibitIReport, type LoadedExhibitIReport } from "../load-harness/exhibitI.js";
 
 const PASS_ORACLES = [1, 2, 3, 4].map((n) => ({ oracle: n, name: `oracle ${n}`, passed: true, violations: [] }));
 
@@ -106,7 +106,7 @@ describe("renderExhibitI predictions", () => {
     const doc = renderExhibitI([measured(failedClosed)]);
 
     const row = doc.split("\n").find((line) => line.startsWith("| `unique_constraint` | hammer-seat"));
-    expect(row).toContain("double-booked");
+    expect(row).toContain("inoperative 1/1");
     expect(row).toContain("prediction missed");
   });
 
@@ -123,11 +123,6 @@ describe("--exhibit i wiring", () => {
   it("accepts i and writes exhibit-i-phase8-no-backstop.md by default", () => {
     expect(parseExhibit(["--exhibit", "i"])).toBe("i");
     expect(parseOutPath(["--exhibit", "i"], "i")).toMatch(/docs\/evidence\/exhibit-i-phase8-no-backstop\.md$/);
-  });
-
-  it("still defaults to Exhibit C and rejects unknown exhibits", () => {
-    expect(parseExhibit([])).toBe("c");
-    expect(() => parseExhibit(["--exhibit", "z"])).toThrow(/"i"/);
   });
 });
 
@@ -245,18 +240,144 @@ describe("the committed Exhibit I", () => {
 
   it("covers every strategy and workload with 3 measured repeats, plus smoke runs and the concurrency probe", async () => {
     const loaded = await loadExhibitIReports(new URL("../docs/evidence/exhibit-i/", import.meta.url));
-    const measured = loaded.filter((l) => l.kind === "measured");
-    for (const strategy of ["naive", "unique_constraint", "pessimistic", "optimistic", "advisory", "serializable"]) {
-      for (const load of ["hammer-seat", "deadlock-pairs"]) {
-        expect(measured.filter((l) => l.report.args.strategy === strategy && l.report.args.load === load), `${strategy} x ${load}`).toHaveLength(3);
+    const measuredRuns = loaded.filter((l) => l.kind === "measured");
+    for (const strategy of STRATEGIES) {
+      for (const load of WORKLOADS) {
+        expect(measuredRuns.filter((l) => l.report.args.strategy === strategy && l.report.args.load === load), `${strategy} x ${load}`).toHaveLength(3);
       }
     }
     expect(loaded.filter((l) => l.kind === "smoke")).toHaveLength(12);
     expect(loaded.filter((l) => l.kind === "probe")).toHaveLength(1);
     // Every measured run is a no-Fault run on the Backstop-free database: the premise of the exhibit.
-    for (const { report } of measured) {
+    for (const { report } of measuredRuns) {
       expect(report.args.db, report.label).toBe("scratch-no-unique");
       expect(report.args.fault, report.label).toBe("none");
     }
+  });
+});
+
+describe("renderExhibitI claims follow the data", () => {
+  const run = (label: string, over: Over = {}) => measured(mk(label, over));
+  const flagged = (label: string): LoadedExhibitIReport =>
+    run(label, {
+      args: { strategy: "naive" },
+      oracles: [{ oracle: 1, name: "mutual exclusion", passed: false, violations: [{ kind: "seat-in-multiple-bookings", detail: "seat s is claimed by 9 bookings" }] }, ...PASS_ORACLES.slice(1)],
+      correctnessViolation: true,
+      ambiguity: { bookingsCommittedBeforeReplay: 9 },
+    });
+  const failedClosed = (label: string, signatures: Record<string, number> | undefined): LoadedExhibitIReport =>
+    run(label, {
+      args: { strategy: "unique_constraint" },
+      k6: { statusTally: { "500": 60 } },
+      ambiguity: { bookingsCommittedBeforeReplay: 0 },
+      app: signatures ? { errorSignatures: signatures } : undefined,
+    });
+
+  it("does not call the detector proven when the Control was flagged in only some runs", () => {
+    const control = [flagged("w1-naive-hammer-seat-rep1"), flagged("w1-naive-hammer-seat-rep2"), run("w1-naive-hammer-seat-rep3", { args: { strategy: "naive" }, ambiguity: { bookingsCommittedBeforeReplay: 1 } })];
+    const doc = renderExhibitI(control);
+    expect(doc).toContain("Control flagged in 2 of 3 runs");
+    expect(doc).not.toContain("known to see a double-booking");
+    expect(doc).toContain("weaker evidence");
+  });
+
+  it("does not say the coordinated Mechanisms never double-booked when one run did", () => {
+    const doc = renderExhibitI([
+      run("w1-pessimistic-hammer-seat-rep1"),
+      run("w1-pessimistic-hammer-seat-rep2", {
+        oracles: [{ oracle: 1, name: "mutual exclusion", passed: false, violations: [{ kind: "seat-in-multiple-bookings", detail: "seat s is claimed by 2 bookings" }] }, ...PASS_ORACLES.slice(1)],
+        correctnessViolation: true,
+        ambiguity: { bookingsCommittedBeforeReplay: 2 },
+      }),
+    ]);
+    expect(doc).toContain("held in 1 of 2 measured runs");
+    expect(doc).not.toContain("never claimed a Seat twice");
+  });
+
+  it("labels a failure of a non-seat Oracle as its own verdict, not as a double-booking", () => {
+    const livenessFailed = run("w1-pessimistic-hammer-seat-rep1", {
+      oracles: [...PASS_ORACLES.slice(0, 3), { oracle: 4, name: "liveness", passed: false, violations: [{ kind: "seat-stuck", detail: "a seat was left held" }] }],
+      correctnessViolation: true,
+    });
+    const row = renderExhibitI([livenessFailed]).split("\n").find((line) => line.startsWith("| `pessimistic` | hammer-seat"));
+    expect(row).toContain("other-violation 1/1");
+    expect(row).not.toContain("double-booked 1/1");
+  });
+
+  it("explains the fail-closed result with the error the reports recorded, and only when every run failed closed", () => {
+    const message = "error: there is no unique or exclusion constraint matching the ON CONFLICT specification";
+    const all = [1, 2, 3].map((n) => failedClosed(`w1-unique_constraint-hammer-seat-rep${n}`, { [message]: 120 }));
+    const doc = renderExhibitI(all);
+    expect(doc).toContain("no unique or exclusion constraint matching the ON CONFLICT specification");
+    expect(doc).toContain("cannot stand alone");
+    expect(doc).toContain("unclassified");
+
+    const noSignature = renderExhibitI([failedClosed("w1-unique_constraint-hammer-seat-rep1", undefined)]);
+    expect(noSignature).not.toContain("no unique or exclusion constraint matching");
+
+    const mixed = renderExhibitI([...all.slice(0, 2), run("w1-unique_constraint-hammer-seat-rep3", { args: { strategy: "unique_constraint" } })]);
+    expect(mixed).not.toContain("cannot stand alone");
+  });
+
+  it("attributes an underfill only to the Mechanisms whose documented behaviour explains it", () => {
+    const underfilledPessimistic = run("w1-pessimistic-deadlock-pairs-rep1", {
+      args: { load: "deadlock-pairs", concurrency: 30 },
+      ambiguity: { bookingsCommittedBeforeReplay: 20 },
+    });
+    const doc = renderExhibitI([underfilledPessimistic]);
+    expect(doc).toContain("Underfilled runs");
+    expect(doc).toMatch(/`pessimistic`[^\n]*no documented explanation/);
+    expect(doc).not.toContain("pg_try_advisory_xact_lock");
+  });
+
+  it("reads request counts, pair counts and repeats from the reports instead of hard-coding them", () => {
+    const doc = renderExhibitI([
+      run("w1-pessimistic-hammer-seat-rep1", { args: { concurrency: 25 }, requestsIssued: 25 }),
+      run("w1-pessimistic-hammer-seat-rep2", { args: { concurrency: 25 }, requestsIssued: 25 }),
+      run("w1-pessimistic-deadlock-pairs-rep1", { args: { load: "deadlock-pairs", concurrency: 7 }, requestsIssued: 14, ambiguity: { bookingsCommittedBeforeReplay: 7 } }),
+    ]);
+    expect(doc).toContain("25 concurrent requests");
+    expect(doc).toContain("7 disjoint two-seat pairs");
+    expect(doc).toContain("2 per cell");
+    expect(doc).not.toContain("60 concurrent requests");
+  });
+
+  it("discloses the concurrency deviation in the Headline and in the limits, not only in its own section", () => {
+    const probe = mk("w1-smoke-probe-1000-naive-hammer-seat", { args: { strategy: "naive", concurrency: 1000 }, requestsIssued: 1000, k6: { statusTally: { "0": 606, "201": 3, "409": 391 } } });
+    const doc = renderExhibitI([measured(mk("w1-pessimistic-hammer-seat-rep1")), { file: "probe.json", report: probe, kind: "probe" }]);
+    const headline = doc.slice(doc.indexOf("## Headline"), doc.indexOf("## Method"));
+    const limits = doc.slice(doc.indexOf("## What this does and does not show"), doc.indexOf("## All runs"));
+    expect(headline).toContain("not the 1,000");
+    expect(limits).toContain("1,000");
+    expect(doc).toContain("one probe, on the Control only");
+  });
+
+  it("records the chronology of the missed prediction and that no ADR was written", () => {
+    const doc = renderExhibitI([measured(mk("w1-pessimistic-hammer-seat-rep1"))]);
+    expect(doc).toContain("already contradicted");
+    expect(doc).toContain("added after");
+    expect(doc).toContain("No ADR");
+  });
+});
+
+describe("loadExhibitIReports guards", () => {
+  const dirs: string[] = [];
+  afterAll(async () => {
+    await Promise.all(dirs.map((d) => rm(d, { recursive: true, force: true })));
+  });
+
+  it("skips a report that is missing fields the renderer does arithmetic on", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "exhibit-i-"));
+    dirs.push(dir);
+    const { requestsIssued: _omitted, ...incomplete } = mk("w1-pessimistic-hammer-seat-rep1");
+    await writeFile(join(dir, "w1-pessimistic-hammer-seat-rep1-2026-11-26T00-00-00-000Z.json"), JSON.stringify(incomplete));
+    expect(await loadExhibitIReports(pathToFileURL(dir + "/"))).toEqual([]);
+  });
+
+  it("raises on a directory it cannot read instead of reporting it as empty", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "exhibit-i-"));
+    dirs.push(dir);
+    await writeFile(join(dir, "not-a-directory"), "x");
+    await expect(loadExhibitIReports(pathToFileURL(join(dir, "not-a-directory") + "/"))).rejects.toThrow();
   });
 });

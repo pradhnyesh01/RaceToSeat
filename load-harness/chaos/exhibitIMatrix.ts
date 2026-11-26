@@ -21,9 +21,10 @@ import { spawn } from "node:child_process";
 import { mkdirSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import "dotenv/config";
+import { STRATEGIES, WORKLOADS } from "../exhibitI.js";
 
-const ALL_STRATEGIES = ["naive", "unique_constraint", "pessimistic", "optimistic", "advisory", "serializable"];
-const ALL_LOADS = ["hammer-seat", "deadlock-pairs"];
+const ALL_STRATEGIES: string[] = [...STRATEGIES];
+const ALL_LOADS: string[] = [...WORKLOADS];
 
 // Per-load request count, as in matrix.ts: at or under ~60 so the load generator alone
 // cannot saturate macOS's 128-deep listen backlog (a deadlock-pairs "concurrency" is a
