@@ -396,3 +396,81 @@ export function runCrossSeatIsolationContractTest(
     });
   });
 }
+
+// RF1 (ADR-0030): an Idempotency Key outlives its Booking. Book -> cancel ->
+// retry with the SAME key must not create a second Booking (the retry is a
+// stale duplicate of an attempt that already happened and was undone); it is
+// answered 410 key_released instead of a replay of an id that no longer
+// exists, and a fresh key for the same seat still books normally. The key
+// lookup lives in every mechanism's own code path (and in its race fallback),
+// so this runs once per mechanism rather than once overall.
+export function runIdempotencyKeyReleaseContractTest(
+  strategyLabel: string,
+  createApp: () => FastifyInstance,
+): void {
+  describe(`POST /bookings (${strategyLabel} strategy) — idempotency key after cancel (RF1)`, () => {
+    beforeEach(resetDb);
+
+    it("answers 410 and creates nothing when a cancelled booking's key is retried", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const payload = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+
+      const first = await app.inject({ method: "POST", url: "/bookings", payload });
+      expect(first.statusCode).toBe(201);
+      const { id: bookingId } = first.json() as { id: string };
+      expect((await app.inject({ method: "DELETE", url: `/bookings/${bookingId}` })).statusCode).toBe(204);
+
+      const retry = await app.inject({ method: "POST", url: "/bookings", payload });
+
+      expect(retry.statusCode).toBe(410);
+      expect(retry.json()).toMatchObject({ outcome: "key_released", reason: "cancelled", released_id: bookingId });
+
+      const bookingsRes = await pool.query("SELECT 1 FROM bookings WHERE idempotency_key = $1", [payload.idempotency_key]);
+      expect(bookingsRes.rows).toHaveLength(0);
+      const seatRes = await pool.query("SELECT status, booked_by FROM seats WHERE id = $1", [seatIdsByLabel.A1]);
+      expect(seatRes.rows[0]).toMatchObject({ status: "available", booked_by: null });
+    });
+
+    it("still books the freed seat under a fresh key after the stale retry was refused", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1"]);
+      const app = createApp();
+      const stale = { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: randomUUID() };
+      const { id } = (await app.inject({ method: "POST", url: "/bookings", payload: stale })).json() as { id: string };
+      await app.inject({ method: "DELETE", url: `/bookings/${id}` });
+      await app.inject({ method: "POST", url: "/bookings", payload: stale });
+
+      const fresh = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: { ...stale, idempotency_key: randomUUID() },
+      });
+
+      expect(fresh.statusCode).toBe(201);
+    });
+
+    it("refuses the stale key even for a different seat set, and answers it before looking at seats", async () => {
+      const { seatIdsByLabel } = await seedEventWithSeats(["A1", "B1"]);
+      const app = createApp();
+      const key = randomUUID();
+      const { id } = (
+        await app.inject({
+          method: "POST",
+          url: "/bookings",
+          payload: { seat_ids: [seatIdsByLabel.A1], user_id: "user-1", idempotency_key: key },
+        })
+      ).json() as { id: string };
+      await app.inject({ method: "DELETE", url: `/bookings/${id}` });
+
+      const retry = await app.inject({
+        method: "POST",
+        url: "/bookings",
+        payload: { seat_ids: [seatIdsByLabel.B1], user_id: "user-2", idempotency_key: key },
+      });
+
+      expect(retry.statusCode).toBe(410);
+      const seatRes = await pool.query("SELECT status FROM seats WHERE id = $1", [seatIdsByLabel.B1]);
+      expect(seatRes.rows[0]).toMatchObject({ status: "available" });
+    });
+  });
+}

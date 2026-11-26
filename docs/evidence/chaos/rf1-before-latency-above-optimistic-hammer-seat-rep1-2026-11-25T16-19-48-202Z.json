@@ -1,0 +1,154 @@
+{
+  "label": "rf1-before-latency-above-optimistic-hammer-seat-rep1",
+  "ranAt": "2026-11-25T16:19:48.202Z",
+  "args": {
+    "strategy": "optimistic",
+    "load": "hammer-seat",
+    "concurrency": 60,
+    "fault": "latency-above",
+    "killScope": "in-transaction",
+    "surviveUncaught": false,
+    "killIntervalMs": 40,
+    "killFraction": 0.5,
+    "db": "scratch",
+    "expectViolations": false,
+    "label": "rf1-before-latency-above-optimistic-hammer-seat-rep1",
+    "appPort": 3295,
+    "proxyPort": 5495,
+    "toxiproxyApi": "http://localhost:8495",
+    "proxyUpstream": "racetoseat-postgres:5432",
+    "requestTimeoutMs": 5000,
+    "latencyBelowMs": 100,
+    "latencyAboveMs": 800,
+    "partitionStartMs": 20,
+    "partitionJitterMs": 400,
+    "partitionMs": 8000,
+    "baseLatencyMs": 0,
+    "drainTimeoutMs": 30000,
+    "appKillFirstMs": 20,
+    "appKillIntervalMs": 1500,
+    "appKillMax": 1
+  },
+  "eventId": "cd3ac086-b600-4897-aa19-8787acddc6a6",
+  "requestsIssued": 60,
+  "fault": {
+    "kind": "latency-above",
+    "scope": "in-transaction",
+    "intervalMs": 40,
+    "fraction": 0.5
+  },
+  "baseLatencyMs": 0,
+  "networkFault": {
+    "kind": "latency-above",
+    "appliedAtMs": 2,
+    "healedAtMs": 2362,
+    "latencyMs": 800
+  },
+  "stall": {
+    "samples": 43,
+    "peakOpenTx": 0,
+    "peakIdleInTx": 0,
+    "peakLockHolders": 0,
+    "maxOpenTxAgeMs": 0,
+    "timeline": [
+      [
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1050,
+        0,
+        0,
+        0
+      ],
+      [
+        2047,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "drain": {
+    "drainedAfterMs": 2,
+    "timedOut": false,
+    "stuck": []
+  },
+  "ambiguity": {
+    "requestsWithoutAnswer": 0,
+    "bookingsCommittedBeforeReplay": 0,
+    "bookingsAnsweredWith201": 0,
+    "committedUnacknowledged": 0
+  },
+  "requestTimeoutMs": 5000,
+  "appName": "c2-app-56fa0b11",
+  "k6": {
+    "statusTally": {
+      "504": 60
+    },
+    "transportErrors": {},
+    "durationMs": 2349,
+    "maxRequestMs": 2026,
+    "p50RequestMs": 2021,
+    "p95RequestMs": 2025,
+    "clientTimeouts": 0
+  },
+  "app": {
+    "exits": [],
+    "injectedKills": [],
+    "restarts": 0,
+    "errorSignatures": {
+      "Error: Connection terminated due to connection timeout": 60,
+      "[cause]: Error: Connection terminated unexpectedly": 60
+    }
+  },
+  "replay": {
+    "tally": {
+      "201": 1,
+      "409": 59
+    },
+    "networkErrors": 0
+  },
+  "serverTimeouts": {
+    "idle_in_transaction_session_timeout": "0",
+    "idle_session_timeout": "0",
+    "lock_timeout": "0",
+    "statement_timeout": "0",
+    "tcp_keepalives_idle": "7200"
+  },
+  "oracles": [
+    {
+      "oracle": 1,
+      "name": "mutual exclusion",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 2,
+      "name": "no torn state",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 3,
+      "name": "idempotent recovery",
+      "passed": true,
+      "violations": []
+    },
+    {
+      "oracle": 4,
+      "name": "liveness",
+      "passed": true,
+      "violations": []
+    }
+  ],
+  "correctnessViolation": false,
+  "robustnessObservations": [
+    {
+      "id": "timeouts-classified",
+      "detail": "60 request(s) answered HTTP 504 (the designed timeout outcome, ADR-0026: a database bound fired, outcome unknown, retry with the same key)"
+    }
+  ]
+}

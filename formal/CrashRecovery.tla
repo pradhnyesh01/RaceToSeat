@@ -59,6 +59,8 @@ CONSTANTS
     CrashMode,   \* "clean" | "loseCommitted" | "keepUncommitted" | "keepLocks" | "keepPending"
     ExpiryMode,  \* "checked" | "unchecked": does Confirm check the Hold's expiry?
     CancelMode,  \* "on" | "off"
+    TombMode,    \* "retain" | "forget": does a released Booking/Hold leave its key a tombstone? (RF1, ADR-0030)
+    GuardMode,   \* "on" | "off": does the INSERT itself refuse a tombstoned key (the trigger)?
     TrackStage   \* TRUE only for the witness configs: remember the step a Crash hit
 
 ASSUME LookupMode \in {"lookup", "skip"}
@@ -66,6 +68,8 @@ ASSUME KeyMode    \in {"unique", "none"}
 ASSUME CrashMode  \in {"clean", "loseCommitted", "keepUncommitted", "keepLocks", "keepPending"}
 ASSUME ExpiryMode \in {"checked", "unchecked"}
 ASSUME CancelMode \in {"on", "off"}
+ASSUME TombMode   \in {"retain", "forget"}
+ASSUME GuardMode  \in {"on", "off"}
 ASSUME TrackStage \in BOOLEAN
 
 VARIABLES
@@ -120,7 +124,9 @@ SameHKey(r, q) == r # q /\ Kind(r) = "hold" /\ Kind(q) = "hold" /\ Key(r) = Key(
 SameKey(r, q)  == SameBKey(r, q) \/ SameHKey(r, q)
 
 InFlight == {"begun", "locked", "keyed", "unacked", "clocked"}
-Answered == {"created", "replay", "race_replay", "conflict", "not_found", "expired"}
+\* "released": the key's Booking/Hold existed and was released (tombstone) -> 410 key_released.
+\* "race_released": the same, found only at the INSERT (guard trigger -> unique violation -> resolve).
+Answered == {"created", "replay", "race_replay", "released", "race_released", "conflict", "not_found", "expired"}
 Terminal == Answered \cup {"crashed"}
 
 Avail(S) == \A s \in S : seat[s] = "available"
@@ -130,6 +136,17 @@ Only(f, r, v) == [f EXCEPT ![r] = v]
 \* A committed row carries r's key (what findExisting*ByIdempotencyKey sees;
 \* uncommitted rows are invisible to a plain read).
 KeyCommitted(r) == \E q \in Requests : SameKey(r, q) /\ (bookRows[q] # {} \/ holdRows[q] # {})
+
+\* The Booking/Hold r's key once created has been released (Cancel / Confirm / reap). Under
+\* TombMode "retain" its tombstone, committed in the same statement as the release, is what
+\* findPriorBookingForKey / findPriorHoldForKey and the guard trigger see (ADR-0030); under "forget"
+\* (today's pre-RF1 behavior, kept as a negative control) the key leaves with its row.
+\* Only a book / hold attempt consults it: a confirm's synthesized key never does (it answers
+\* 404 once its hold is gone, as before). The retention horizon is not modeled -- the model is
+\* "within the retention window".
+RowReleased(q) == IF IsBooker(q) THEN cancelled[q] ELSE reaped[q] \/ nconf[q] > 0
+KeyReleased(r) == /\ TombMode = "retain" /\ Kind(r) \in {"book", "hold"}
+                  /\ \E q \in Requests : SameKey(r, q) /\ Kind(q) \in {"book", "hold"} /\ RowReleased(q)
 
 \* A replay of a Hold teaches the client the Hold's id.
 LearnHold(r) == [q \in Requests |->
@@ -158,8 +175,9 @@ Init ==
     /\ crashedAt   = [r \in Requests |-> "none"]
 
 \* Step 1 of every attempt: the fast-path key lookup. A committed row with this
-\* key means the client gets that row back and no transaction is opened. `skip`
-\* (negative control) removes the lookup from the retry path.
+\* key means the client gets that row back and no transaction is opened; a tombstone for it
+\* (its row was released) means 410 key_released, again with no transaction. One query sees
+\* both. `skip` (negative control) removes the lookup from the retry path.
 \* solo[] records whether any same-key attempt overlapped this one.
 Begin(r) ==
     /\ pc[r] = "idle"
@@ -170,6 +188,9 @@ Begin(r) ==
     /\ IF LookupMode = "lookup" /\ KeyCommitted(r)
           THEN /\ pc'    = Only(pc, r, "replay")
                /\ known' = LearnHold(r)
+          ELSE IF LookupMode = "lookup" /\ KeyReleased(r)
+          THEN /\ pc'    = Only(pc, r, "released")
+               /\ UNCHANGED known
           ELSE /\ pc'    = Only(pc, r, "begun")
                /\ UNCHANGED known
     /\ UNCHANGED <<prof, seat, locked, pendKey, holdRows, bookRows, expired, liveAtCheck,
@@ -195,8 +216,10 @@ Lock(r) ==
 \*     (not enabled) until that transaction ends;
 \*   - a committed same-key row: unique violation, rollback, resolve to the winner's
 \*     row (resolveIdempotencyKeyRace) -> "race_replay";
+\*   - a tombstoned key (the original was released since this attempt's lookup): the guard
+\*     trigger raises a unique violation, rollback, resolve -> "race_released" (410);
 \*   - otherwise the row is written, uncommitted.
-\* KeyMode "none" drops the constraint (negative control).
+\* KeyMode "none" drops the constraint, GuardMode "off" the trigger (negative controls).
 InsertKey(r) ==
     /\ Kind(r) \in {"book", "hold"} /\ pc[r] = "locked"
     /\ ~(KeyMode = "unique" /\ \E q \in Requests : pendKey[q] /\ SameKey(r, q))
@@ -205,6 +228,10 @@ InsertKey(r) ==
                /\ locked'  = Only(locked, r, {})
                /\ known'   = LearnHold(r)
                /\ UNCHANGED pendKey
+          ELSE IF GuardMode = "on" /\ KeyReleased(r)
+          THEN /\ pc'      = Only(pc, r, "race_released")
+               /\ locked'  = Only(locked, r, {})
+               /\ UNCHANGED <<pendKey, known>>
           ELSE /\ pc'      = Only(pc, r, "keyed")
                /\ pendKey' = Only(pendKey, r, TRUE)
                /\ UNCHANGED <<locked, known>>
@@ -367,8 +394,9 @@ Reap(h) ==
     /\ UNCHANGED <<prof, pc, locked, pendKey, bookRows, expired, known, liveAtCheck, nconf,
                    cancelled, durable, solo, sawKey, ncrash, crashedAt>>
 
-\* DELETE /bookings/:id, for a Booking from either path. The row (and with it the
-\* idempotency key) is deleted outright (ADR-0020).
+\* DELETE /bookings/:id, for a Booking from either path. The row is deleted outright
+\* (ADR-0020); its key survives as a tombstone written by the same statement (ADR-0030,
+\* RowReleased / KeyReleased above). Likewise Confirm and the Reaper for a Hold's key.
 Cancel(r) ==
     /\ CancelMode = "on"
     /\ IsBooker(r) /\ bookRows[r] # {}
@@ -493,8 +521,10 @@ CleanConflict ==
     \A r \in Requests : (solo[r] /\ pc[r] \in {"conflict", "not_found"}) => ~sawKey[r]
 
 \* Idempotency record lifetime: a key may create a second Booking/Hold only after the first
-\* was released (Booking cancelled; Hold reaped or confirmed) -- the key lives exactly as
-\* long as its row (ADR-0020). Holds: with the UNIQUE constraint in force.
+\* was released (Booking cancelled; Hold reaped or confirmed). True under both TombModes -- it
+\* is the weak form, what the UNIQUE column alone gives. The strong form, which only the
+\* tombstone gives, is BookingKeyCreatesAtMostOne / HoldKeyCreatesAtMostOne below.
+\* Holds: with the UNIQUE constraint in force.
 KeyReuseOnlyAfterRelease ==
     /\ \A r, q \in Requests :
          SameBKey(r, q) /\ durable[r] /\ durable[q] => cancelled[r] \/ cancelled[q]
@@ -516,16 +546,22 @@ AmbiguousRetryNotRefused ==
 ConfirmNeverFalselyRefused ==
     \A r \in Requests : (Kind(r) = "confirm" /\ pc[r] \in {"conflict", "not_found"}) => ~sawKey[r]
 
-\* ---- Findings: expected to be VIOLATED (CrashFinding*.cfg) -------------------
-
-\* (1) "A retried key never yields a second Booking/Hold", in its strongest, history-based
-\* form, is false: after Cancel (Booking) or Reap / Confirm (Hold) the key is free again.
+\* ---- RF1 (issue #60, ADR-0030): a key creates at most one Booking/Hold, EVER ---
+\* History-based, the project glossary's "must never produce two Bookings or two Holds".
+\* With the UNIQUE column as the key's only home (TombMode "forget", the behavior before
+\* RF1) it was FALSE: after Cancel (Booking) or Reap / Confirm (Hold) the key was free
+\* again (CrashForgetKeys / CrashForgetKeysHold keep that as a negative control). With
+\* tombstones and the insert guard it holds (CrashFindingKeyReuse / CrashFindingHoldKeyReuse,
+\* now positive checks); without the guard it fails on the lookup-then-insert window
+\* (CrashNoInsertGuard*). Within the retention window -- the horizon is not modeled.
 BookingKeyCreatesAtMostOne ==
     \A r, q \in Requests : SameBKey(r, q) => ~(durable[r] /\ durable[q])
 HoldKeyCreatesAtMostOne ==
     \A r, q \in Requests : SameHKey(r, q) => ~(durable[r] /\ durable[q])
 
-\* (2) A concurrent same-key book / hold attempt can be told 409 although the key's row is
+\* ---- Findings: expected to be VIOLATED (CrashFindingSpuriousConflict.cfg) -----
+
+\* (RF2) A concurrent same-key book / hold attempt can be told 409 although the key's row is
 \* committed (the original committed between this attempt's lookup and its lock).
 KeyNeverFalselyRefused == \A r \in Requests : pc[r] \in {"conflict", "not_found"} => ~sawKey[r]
 
@@ -563,6 +599,12 @@ NoReplayAfterAmbiguousHold ==
 NoReplayAfterAmbiguousConfirm ==
     ~(\E r, q \in Requests : SameBKey(r, q) /\ Kind(r) = "confirm" /\ pc[q] = "crashed" /\ durable[q]
                              /\ pc[r] = "replay")
+
+\* RF1: a stale retry after Cancel / Confirm / reap is answered "released" (booking, hold),
+\* including the race where it only learns so at the INSERT (the guard).
+NoReleasedBooking == ~(\E r \in Requests : Kind(r) = "book" /\ pc[r] = "released")
+NoReleasedHold    == ~(\E r \in Requests : Kind(r) = "hold" /\ pc[r] = "released")
+NoReleasedRace    == ~(\E r \in Requests : pc[r] = "race_released")
 
 \* The lookup-then-insert race ends in a unique violation resolved to a replay.
 NoKeyRaceReplay == ~(\E r \in Requests : pc[r] = "race_replay")

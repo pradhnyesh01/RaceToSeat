@@ -27,6 +27,16 @@ export function registerHoldsRoutes(app: FastifyInstance): void {
         // either otherwise.
         reply.status(201).send({ id: result.holdId, seat_ids: result.seatIds, held_until: result.heldUntil });
         return;
+      case "key_released":
+        // ADR-0030: the key's Hold was confirmed or expired and reaped. 410,
+        // same contract as POST /bookings' key_released.
+        reply.status(410).send({
+          error: `This idempotency key was already used by a hold that has since been ${result.reason}`,
+          outcome: "key_released",
+          reason: result.reason,
+          released_id: result.releasedId,
+        });
+        return;
       case "conflict":
         reply.status(409).send({ error: "Seat is not available" });
         return;

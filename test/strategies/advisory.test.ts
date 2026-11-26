@@ -7,6 +7,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
 const { resetDb, seedEventWithSeats } = await import("../testDb.js");
@@ -18,6 +19,7 @@ afterAll(() => pool.end());
 runBookingContractTests("advisory", createApp);
 runBookingConcurrencyContractTest("advisory", createApp);
 runMultiSeatBookingContractTests("advisory", createApp);
+runIdempotencyKeyReleaseContractTest("advisory", createApp);
 
 // Holds the exact advisory-lock key the strategy would derive for
 // `lockSeatId` open in an uncommitted transaction on a separate connection,

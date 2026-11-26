@@ -7,6 +7,7 @@ const {
   runBookingConcurrencyContractTest,
   runBookingContractTests,
   runCrossSeatIsolationContractTest,
+  runIdempotencyKeyReleaseContractTest,
   runMultiSeatBookingContractTests,
 } = await import("../bookingContract.js");
 const { commitBookingOnClient, interceptQuery, resetDb, seedEventWithSeats } = await import("../testDb.js");
@@ -17,6 +18,7 @@ afterAll(() => pool.end());
 
 runBookingContractTests("serializable", createApp);
 runMultiSeatBookingContractTests("serializable", createApp);
+runIdempotencyKeyReleaseContractTest("serializable", createApp);
 
 // checkZeroRetries: false — under real SERIALIZABLE contention, a losing
 // request can only discover the seat was taken by retrying the whole

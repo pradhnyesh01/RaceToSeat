@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { pool } from "../db/pool.js";
 import { isLockNotAvailable } from "../db/pgErrors.js";
-import { findExistingBookingByIdempotencyKey, insertBookingForSeats, runTransactionalBooking } from "./idempotency.js";
+import { findPriorBookingForKey, insertBookingForSeats, runTransactionalBooking } from "./idempotency.js";
 import type { BookSeatInput, BookSeatResult } from "./types.js";
 
 export type { BookSeatResult };
@@ -22,9 +22,9 @@ export type { BookSeatResult };
 export async function bookSeatPessimistic(input: BookSeatInput): Promise<BookSeatResult> {
   const client: PoolClient = await pool.connect();
   try {
-    const existingBooking = await findExistingBookingByIdempotencyKey(client, input.idempotencyKey);
-    if (existingBooking) {
-      return { kind: "idempotent_replay", bookingId: existingBooking.id, createdAt: existingBooking.createdAt };
+    const prior = await findPriorBookingForKey(client, input.idempotencyKey);
+    if (prior) {
+      return prior;
     }
 
     // Lowercased once, then a plain default sort — see naive.ts for why this

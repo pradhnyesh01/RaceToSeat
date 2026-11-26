@@ -1,14 +1,17 @@
 import { createApp } from "./app.js";
 import { config, strategySupportsHolds } from "./config.js";
 import { pool } from "./db/pool.js";
+import { startTombstonePruner, type TombstonePruner } from "./db/tombstones.js";
 import { startReaper, type Reaper } from "./reaper.js";
 
 const app = createApp();
 
 let reaper: Reaper | undefined;
+let pruner: TombstonePruner | undefined;
 
 async function shutdown(): Promise<void> {
   reaper?.stop();
+  pruner?.stop();
   try {
     await app.close();
   } finally {
@@ -38,4 +41,7 @@ app.listen({ port: config.port }, (err) => {
   if (strategySupportsHolds()) {
     reaper = startReaper(pool, config.reaperIntervalMs);
   }
+  // Unlike the reaper, for every mechanism: Cancel (and so tombstones) exists
+  // under all six (ADR-0030).
+  pruner = startTombstonePruner(pool, config.idempotencyPruneIntervalMs);
 });

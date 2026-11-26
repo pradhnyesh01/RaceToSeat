@@ -1,4 +1,6 @@
 import type { Pool } from "pg";
+import { config } from "./config.js";
+import { tombstoneInsertSql } from "./db/tombstones.js";
 
 // The automatic counterpart to confirm's own lazy expiry check (ADR-0018):
 // releases every expired hold's seat(s) back to `available` and deletes the
@@ -75,8 +77,12 @@ export async function runReaperSweep(sweepPool: Pool): Promise<void> {
      ),
      deleted_hold_seats AS (
        DELETE FROM hold_seats WHERE seat_id IN (SELECT id FROM expired) RETURNING hold_id
+     ),
+     deleted_holds AS (
+       DELETE FROM holds WHERE id IN (SELECT hold_id FROM deleted_hold_seats) RETURNING id, idempotency_key
      )
-     DELETE FROM holds WHERE id IN (SELECT hold_id FROM deleted_hold_seats)`,
+     ${tombstoneInsertSql({ kind: "hold", reason: "expired", sourceCte: "deleted_holds", retentionParam: 1 })}`,
+    [config.idempotencyRetentionSeconds],
   );
 }
 

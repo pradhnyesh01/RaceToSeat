@@ -452,6 +452,30 @@ from 0 of 12 to 12 of 12 and the bait seats were reaped once their locks cleared
 every guarantee (all seats `available`, zero Hold rows left, all Oracles green, 3 negative controls still
 red). Exhibit H gained section K. The remaining Robustness findings (RF1, RF2) stay unfixed.
 
+Issue #60 (finding RF1, formal-derived) is done: an Idempotency Key now outlives its Booking/Hold row
+(ADR-0030). Before, the key's only home was the `UNIQUE` column of the live row and ADR-0020 deletes that
+row on Cancel, Confirm and reap, so book -> cancel -> retry (and hold -> expire -> reap -> retry) with the
+same key created a second Booking/Hold, contradicting `CONTEXT.md`. The decision was to retain the key, not
+amend the contract, because the case that matters is a stale duplicate request, which would otherwise
+silently re-book a seat the user just cancelled. New table `idempotency_tombstones` (`db/schema.sql`),
+written by the same statement that releases the row (`src/db/tombstones.ts`: `DELETE /bookings/:id`,
+confirm's teardown for the hold's own key, the reaper's sweep), retained `IDEMPOTENCY_RETENTION_SECONDS`
+(24 h) and pruned by a timer started for every mechanism. A retry in the window answers **`410 Gone`,
+`outcome: "key_released"`** with the reason and the released id (a deliberate contract change: a client that
+cancels and re-books with the *same* key now gets 410), via `findPriorBookingForKey` / `findPriorHoldForKey`
+(one `UNION ALL` query, in every mechanism's first step). A `BEFORE INSERT` trigger on `bookings`/`holds`
+closes the lookup-then-insert window for all six mechanisms' inserts at once; `hold-confirm:<id>` keys need
+no retirement (a confirm after Cancel is still 404). The formal model mirrors it (`TombMode`, `GuardMode`):
+`CrashFindingKeyReuse` / `CrashFindingHoldKeyReuse` are positive checks now (11 positive, 49 negative),
+the old behavior and the guard-less variant are negative controls. Measured cost: server-side +3 µs per
+insert, +2.6 µs per lookup, +12 µs per release; end to end `hammer-seat` unchanged and `spread-seats`
+roughly 10% slower, not separable from noise (ADR-0030). Chaos non-regression: `hammer-seat` x
+`latency-above`, all six mechanisms, 3 reps before and after, all Oracles green, replay still resolves
+exactly one Booking, 0 spurious 410. No Oracle added. Exhibit H gained section L; Exhibit G's mapping and
+tables were re-pinned/recomputed for the Crash rows. Existing databases need `npm run db:migrate`. RF2 (#61)
+is untouched; it edits the same helpers (`resolveIdempotencyKeyRace`). One Robustness finding remains
+unfixed (RF2 only; R7 shipped in #68, ADR-0029).
+
 Before extending the implementation,
 read all three planning docs in full; they define scope, sequencing, and acceptance
 criteria that should govern implementation decisions:

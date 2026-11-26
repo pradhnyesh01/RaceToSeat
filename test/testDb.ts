@@ -4,7 +4,7 @@ import type { PoolClient } from "pg";
 import { pool } from "../src/db/pool.js";
 
 export async function resetDb(): Promise<void> {
-  await pool.query("TRUNCATE hold_seats, holds, booking_seats, bookings, seats, events RESTART IDENTITY CASCADE");
+  await pool.query("TRUNCATE idempotency_tombstones, hold_seats, holds, booking_seats, bookings, seats, events RESTART IDENTITY CASCADE");
 }
 
 export async function seedEventWithSeats(seatLabels: string[]): Promise<{ eventId: string; seatIdsByLabel: Record<string, string> }> {

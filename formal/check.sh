@@ -51,15 +51,22 @@ LC_NEGATIVE=(
 )
 
 # F4 (CrashRecovery.tla): configs named Crash*. Same name:expect form; "@temporal" as above.
-# CrashFinding* are not controls but documented findings: the invariant is violated on purpose,
-# because the behavior it names is real (README "Findings").
-CR_POSITIVE=(CrashSafety CrashLiveRecovery)
+# CrashFindingSpuriousConflict is not a control but a documented finding (RF2): the invariant is
+# violated on purpose, because the behavior it names is real (README "Findings"). RF1 (#60) is
+# fixed: CrashFindingKeyReuse / CrashFindingHoldKeyReuse (a key creates at most one Booking / Hold
+# ever) are now POSITIVE checks, and what they used to show is kept as the negative controls
+# CrashForgetKeys* (no tombstone: today's pre-fix behavior) and CrashNoInsertGuard* (tombstone
+# lookup but no insert-time guard: the lookup-then-insert window).
+CR_POSITIVE=(CrashSafety CrashFindingKeyReuse CrashFindingHoldKeyReuse CrashLiveRecovery)
 CR_NEGATIVE=(
   CrashNoLookup:AmbiguousRetryNotRefused CrashNoKeyDedupe:KeyAtMostOneBooking CrashNoKeyDedupeHold:KeyAtMostOneHold
   CrashLoseCommitted:CommittedPersists CrashKeepLocks:NoOrphanState CrashKeepUncommitted:SeatStatusAgrees
   CrashNoExpiryCheck:NoConfirmOnExpired
-  CrashFindingKeyReuse:BookingKeyCreatesAtMostOne CrashFindingHoldKeyReuse:HoldKeyCreatesAtMostOne
+  CrashForgetKeys:BookingKeyCreatesAtMostOne CrashForgetKeysHold:HoldKeyCreatesAtMostOne
+  CrashNoInsertGuard:BookingKeyCreatesAtMostOne CrashNoInsertGuardHold:HoldKeyCreatesAtMostOne
   CrashFindingSpuriousConflict:KeyNeverFalselyRefused
+  CrashWitnessReleasedBooking:NoReleasedBooking CrashWitnessReleasedHold:NoReleasedHold
+  CrashWitnessReleasedRace:NoReleasedRace
   CrashWitnessAmbiguousCommit:NoAmbiguousCommit CrashWitnessReplayAmbiguousBooking:NoReplayAfterAmbiguousBooking
   CrashWitnessReplayAmbiguousHold:NoReplayAfterAmbiguousHold CrashWitnessReplayAmbiguousConfirm:NoReplayAfterAmbiguousConfirm
   CrashWitnessKeyRace:NoKeyRaceReplay CrashWitnessWaitOnKeyRow:NoWaitOnKeyRow

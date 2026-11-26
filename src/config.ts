@@ -68,6 +68,17 @@ export const config = {
   // — so this has no effect on tests, which call the sweep directly rather
   // than waiting on the interval.
   reaperIntervalMs: intEnv("REAPER_INTERVAL_MS", 5000, { min: 1 }),
+  // How long a released Booking/Hold's Idempotency Key is remembered (issue #60, RF1,
+  // ADR-0030). Within this window a retry of a cancelled / confirmed / expired key is
+  // answered 410 key_released instead of creating a second Booking/Hold; after it the
+  // key is treated as new. 24 h is the usual idempotency-key horizon (a client retries
+  // within seconds to minutes; this covers a stale request parked in a queue for a
+  // day). { min: 1 } like the other time bounds: 0 would mean "forget immediately",
+  // silently switching the protection back off.
+  idempotencyRetentionSeconds: intEnv("IDEMPOTENCY_RETENTION_SECONDS", 86_400, { min: 1 }),
+  // How often expired tombstones are deleted. Pure housekeeping: lookups and the insert
+  // guard already ignore an expired tombstone, so this only bounds table growth.
+  idempotencyPruneIntervalMs: intEnv("IDEMPOTENCY_PRUNE_INTERVAL_MS", 60_000, { min: 1 }),
   // Database timeouts (issue #56, finding R4, ADR-0026). Before this nothing in
   // the stack gave up: a partition held every request, transaction and row lock
   // for its whole duration (a 30 s partition meant a 30 s stall). All four are

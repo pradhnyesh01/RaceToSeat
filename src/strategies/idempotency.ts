@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { DeadlockRetriesExhaustedError, withDeadlockRetry, withTransaction } from "../db/pool.js";
 import { isUniqueViolation } from "../db/pgErrors.js";
-import type { BookSeatResult, HoldSeatsResult } from "./types.js";
+import type { BookSeatResult, HoldSeatsResult, KeyReleaseReason } from "./types.js";
 
 // Lowercased once, then a plain default sort — not localeCompare, whose
 // collation depends on the runtime's default locale/ICU build and so isn't
@@ -36,6 +36,38 @@ export async function findExistingBookingByIdempotencyKey(
   return row ? { id: row.id, createdAt: row.created_at } : undefined;
 }
 
+// The constraint the insert-time guard (db/schema.sql, reject_released_idempotency_key)
+// names when a same-key insert reaches a released key's tombstone.
+const RELEASED_KEY_CONSTRAINT = "idempotency_tombstones_pkey";
+
+// Every mechanism's first step (ADR-0030): what, if anything, this key already
+// means. A live Booking replays; a Booking that existed and was cancelled within
+// the retention window answers key_released (a stale duplicate of an attempt that
+// already happened and was undone - never a second Booking); otherwise undefined,
+// and the key is new. One round trip for both tables. A live row and an unexpired
+// tombstone for the same key cannot coexist (the guard trigger), so which is
+// listed first is irrelevant; live is simply preferred.
+export async function findPriorBookingForKey(
+  client: PoolClient,
+  idempotencyKey: string,
+): Promise<BookSeatResult | undefined> {
+  const res = await client.query<{ state: "live" | "released"; id: string; at: Date; reason: KeyReleaseReason | null }>(
+    `SELECT 'live' AS state, id, created_at AS at, NULL AS reason FROM bookings WHERE idempotency_key = $1
+     UNION ALL
+     SELECT 'released', resource_id, released_at, reason FROM idempotency_tombstones
+     WHERE kind = 'booking' AND idempotency_key = $1 AND expires_at > now()
+     ORDER BY 1`,
+    [idempotencyKey],
+  );
+  const row = res.rows[0];
+  if (!row) {
+    return undefined;
+  }
+  return row.state === "live"
+    ? { kind: "idempotent_replay", bookingId: row.id, createdAt: row.at }
+    : { kind: "key_released", reason: row.reason!, releasedId: row.id };
+}
+
 // The fallback for every mechanism's shared race: two requests carrying the
 // same idempotency_key both pass findExistingBookingByIdempotencyKey and
 // both reach the insert — the loser hits bookings.idempotency_key's
@@ -51,16 +83,18 @@ export async function resolveIdempotencyKeyRace(
   idempotencyKey: string,
   err: unknown,
 ): Promise<BookSeatResult> {
-  if (!isUniqueViolation(err, "bookings_idempotency_key_key")) {
+  if (!isUniqueViolation(err, "bookings_idempotency_key_key") && !isUniqueViolation(err, RELEASED_KEY_CONSTRAINT)) {
     throw err;
   }
-  const existing = await findExistingBookingByIdempotencyKey(client, idempotencyKey);
-  if (!existing) {
+  // The winner is either still live (replay) or was cancelled in the meantime /
+  // before this insert reached the guard (released).
+  const prior = await findPriorBookingForKey(client, idempotencyKey);
+  if (!prior) {
     throw new Error(
-      `Expected a booking with idempotency_key "${idempotencyKey}" after a unique-violation, found none`,
+      `Expected a booking or a released key for idempotency_key "${idempotencyKey}" after a unique-violation, found none`,
     );
   }
-  return { kind: "idempotent_replay", bookingId: existing.id, createdAt: existing.createdAt };
+  return prior;
 }
 
 // Runs `work` inside a transaction (via withTransaction), committing only on
@@ -104,35 +138,46 @@ export async function runDeadlockRetryBooking(
   }
 }
 
-export interface ExistingHold {
-  id: string;
-  seatIds: string[];
-  heldUntil: Date;
-}
-
-// Hold's counterpart to findExistingBookingByIdempotencyKey. Unlike a
-// booking, a hold has no data of its own worth returning beyond its id — the
-// seat set and expiry both live on other tables (hold_seats, seats — ADR-
-// 0018/0020) — so this joins across both rather than reading the `holds` row
-// alone. held_until is identical across every seat in the same hold (all
-// updated from one `now() + interval` evaluated once per acquisition
-// transaction), so MIN(s.held_until) is just "the value," not an aggregate
-// choice among differing ones.
-export async function findExistingHoldByIdempotencyKey(
+// Hold's counterpart to findPriorBookingForKey (ADR-0030): a live Hold replays, a
+// Hold that was confirmed or expired-and-reaped within the retention window answers
+// key_released, otherwise undefined. Same single round trip, live row first. Unlike
+// a booking, a hold has no data of its own worth returning beyond its id - the seat
+// set and expiry live on other tables (hold_seats, seats - ADR-0018/0020) - so the
+// live branch joins across both. held_until is identical across every seat in the
+// same hold (all updated from one `now() + interval` evaluated once per acquisition
+// transaction), so MIN(s.held_until) is just "the value," not an aggregate choice
+// among differing ones.
+export async function findPriorHoldForKey(
   client: PoolClient,
   idempotencyKey: string,
-): Promise<ExistingHold | undefined> {
-  const res = await client.query<{ id: string; seat_ids: string[]; held_until: Date }>(
-    `SELECT h.id, array_agg(hs.seat_id ORDER BY hs.seat_id) AS seat_ids, MIN(s.held_until) AS held_until
+): Promise<HoldSeatsResult | undefined> {
+  const res = await client.query<{
+    state: "live" | "released";
+    id: string;
+    seat_ids: string[] | null;
+    held_until: Date | null;
+    reason: KeyReleaseReason | null;
+  }>(
+    `SELECT 'live' AS state, h.id, array_agg(hs.seat_id ORDER BY hs.seat_id) AS seat_ids,
+            MIN(s.held_until) AS held_until, NULL AS reason
      FROM holds h
      JOIN hold_seats hs ON hs.hold_id = h.id
      JOIN seats s ON s.id = hs.seat_id
      WHERE h.idempotency_key = $1
-     GROUP BY h.id`,
+     GROUP BY h.id
+     UNION ALL
+     SELECT 'released', resource_id, NULL::uuid[], NULL::timestamptz, reason FROM idempotency_tombstones
+     WHERE kind = 'hold' AND idempotency_key = $1 AND expires_at > now()
+     ORDER BY 1`,
     [idempotencyKey],
   );
   const row = res.rows[0];
-  return row ? { id: row.id, seatIds: row.seat_ids, heldUntil: row.held_until } : undefined;
+  if (!row) {
+    return undefined;
+  }
+  return row.state === "live"
+    ? { kind: "idempotent_replay", holdId: row.id, seatIds: row.seat_ids!, heldUntil: row.held_until! }
+    : { kind: "key_released", reason: row.reason!, releasedId: row.id };
 }
 
 // Hold's counterpart to resolveIdempotencyKeyRace, against holds' own unique
@@ -142,14 +187,16 @@ export async function resolveHoldIdempotencyKeyRace(
   idempotencyKey: string,
   err: unknown,
 ): Promise<HoldSeatsResult> {
-  if (!isUniqueViolation(err, "holds_idempotency_key_key")) {
+  if (!isUniqueViolation(err, "holds_idempotency_key_key") && !isUniqueViolation(err, RELEASED_KEY_CONSTRAINT)) {
     throw err;
   }
-  const existing = await findExistingHoldByIdempotencyKey(client, idempotencyKey);
-  if (!existing) {
-    throw new Error(`Expected a hold with idempotency_key "${idempotencyKey}" after a unique-violation, found none`);
+  const prior = await findPriorHoldForKey(client, idempotencyKey);
+  if (!prior) {
+    throw new Error(
+      `Expected a hold or a released key for idempotency_key "${idempotencyKey}" after a unique-violation, found none`,
+    );
   }
-  return { kind: "idempotent_replay", holdId: existing.id, seatIds: existing.seatIds, heldUntil: existing.heldUntil };
+  return prior;
 }
 
 // Hold's counterpart to runTransactionalBooking. No deadlock-retry variant
