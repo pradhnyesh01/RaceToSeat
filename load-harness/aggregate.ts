@@ -59,7 +59,7 @@ interface CombinedReport {
   anyDoubleBooked: boolean;
 }
 
-interface MatrixCell {
+export interface MatrixCell {
   file: string;
   ranAt: string;
   strategy: string;
@@ -130,7 +130,7 @@ function toCell(file: string, report: CombinedReport): MatrixCell {
   };
 }
 
-const STRATEGY_ORDER = ["naive", "unique_constraint", "pessimistic", "optimistic", "advisory", "serializable"];
+export const STRATEGY_ORDER = ["naive", "unique_constraint", "pessimistic", "optimistic", "advisory", "serializable"];
 
 function cellKey(c: Pick<MatrixCell, "strategy" | "pattern" | "concurrency">): string {
   return `${c.strategy}|${c.pattern}|${c.concurrency}`;
@@ -139,7 +139,7 @@ function cellKey(c: Pick<MatrixCell, "strategy" | "pattern" | "concurrency">): s
 // Scans docs/evidence for every JSON report matching the current schema and
 // keeps, per (strategy, pattern, concurrency) cell, only the most recent —
 // so re-running a single matrix cell doesn't produce duplicate rows.
-async function loadCells(evidenceDir: URL): Promise<MatrixCell[]> {
+export async function loadCells(evidenceDir: URL): Promise<MatrixCell[]> {
   const entries = await readdir(evidenceDir);
   const byKey = new Map<string, MatrixCell>();
   for (const entry of entries) {
@@ -255,7 +255,7 @@ const NEGATIVE_CONTROL_MARKER = "negative-control";
 // as its own small matrix, keyed the same way as the main one.
 const POOL_SCALING_MARKER = "pool-scaling";
 
-interface IsolationFile {
+export interface IsolationFile {
   file: string;
   report: IsolationReport;
 }
@@ -265,7 +265,7 @@ interface IsolationFile {
 // (strategy, backgroundOnly) "most recent wins" dedup that the widened-
 // configuration matrix uses — both are deliberately extra runs for whatever
 // strategy they target, not a replacement for that strategy's matrix cell.
-async function loadIsolationFiles(evidenceDir: URL): Promise<{
+export async function loadIsolationFiles(evidenceDir: URL): Promise<{
   matrix: Map<string, IsolationFile>;
   negativeControl: IsolationFile | null;
   poolScaling: Map<string, IsolationFile>;
@@ -306,7 +306,7 @@ async function loadIsolationFiles(evidenceDir: URL): Promise<{
   return { matrix, negativeControl, poolScaling };
 }
 
-interface IsolationCell {
+export interface IsolationCell {
   strategy: string;
   baseline: IsolationFile | null;
   combined: IsolationFile | null;
@@ -323,9 +323,9 @@ interface IsolationCell {
 
 // NFR2's stated threshold (PRD.md: "<10% degradation" — strict, so exactly
 // 10.0% fails).
-const NFR2_DEGRADATION_THRESHOLD = 0.1;
+export const NFR2_DEGRADATION_THRESHOLD = 0.1;
 
-function passesNfr2(degradationPct: number | null): boolean | null {
+export function passesNfr2(degradationPct: number | null): boolean | null {
   return degradationPct === null ? null : degradationPct < NFR2_DEGRADATION_THRESHOLD;
 }
 
@@ -333,7 +333,7 @@ function fmtPassLabel(pass: boolean | null): string {
   return pass === null ? "missing data" : pass ? "**PASS**" : "**FAIL**";
 }
 
-function buildIsolationCell(strategy: string, matrix: Map<string, IsolationFile>): IsolationCell {
+export function buildIsolationCell(strategy: string, matrix: Map<string, IsolationFile>): IsolationCell {
   const baseline = matrix.get(`${strategy}|true`) ?? null;
   const combined = matrix.get(`${strategy}|false`) ?? null;
 
@@ -364,7 +364,7 @@ function fmtMs(n: number | null): string {
   return n === null ? "—" : n.toFixed(1);
 }
 
-function fmtPctSigned(n: number | null): string {
+export function fmtPctSigned(n: number | null): string {
   if (n === null) return "—";
   const pct = n * 100;
   return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;

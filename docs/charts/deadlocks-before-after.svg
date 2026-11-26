@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="520" viewBox="0 0 760 520" font-family="Helvetica, Arial, sans-serif" role="img">
+<title>Deadlocks before and after the lock-ordering fix</title>
+<desc>Grouped bars per repeat. Before the fix: 8 deadlocks across 9,000 requests. After the fix: 0 deadlocks across 9,000 requests.</desc>
+<defs>
+<pattern id="pat-before" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#D55E00"/><path d="M-1 7L7 -1M-1 1L1 -1M5 7L7 5" stroke="#000000" stroke-width="1.3"/></pattern>
+</defs>
+<rect width="760" height="520" fill="#ffffff"/>
+<text x="78" y="28" font-size="18" text-anchor="start" fill="#1a1a1a" font-weight="bold">Deadlocks before and after the lock-ordering fix</text>
+<text x="78" y="48" font-size="11" text-anchor="start" fill="#555555">Exhibit D. Deadlocks / 9,000 requests, naive's multi-seat path, two-seat pairs requested in both orders.</text>
+<text x="78" y="64" font-size="11" text-anchor="start" fill="#555555">A deadlock is a Postgres 40P01 abort that reached the client as an unhandled HTTP 500.</text>
+<rect data-series="before" fill="url(#pat-before)" x="78" y="84" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="104" y="94" font-size="12" text-anchor="start" fill="#1a1a1a">Before: unordered seat_ids, no deadlock retry, 8 deadlocks</text>
+<rect data-series="after" fill="#0072B2" x="78" y="106" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="104" y="116" font-size="12" text-anchor="start" fill="#1a1a1a">After: sorted seat_ids + withDeadlockRetry, 0 deadlocks</text>
+<line x1="78" y1="410" x2="730" y2="410" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="414" font-size="10" text-anchor="end" fill="#555555">0</text>
+<line x1="78" y1="358" x2="730" y2="358" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="362" font-size="10" text-anchor="end" fill="#555555">1</text>
+<line x1="78" y1="306" x2="730" y2="306" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="310" font-size="10" text-anchor="end" fill="#555555">2</text>
+<line x1="78" y1="254" x2="730" y2="254" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="258" font-size="10" text-anchor="end" fill="#555555">3</text>
+<line x1="78" y1="202" x2="730" y2="202" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="206" font-size="10" text-anchor="end" fill="#555555">4</text>
+<line x1="78" y1="150" x2="730" y2="150" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="154" font-size="10" text-anchor="end" fill="#555555">5</text>
+<line x1="78" y1="150" x2="78" y2="410" stroke="#444444" stroke-width="1"/>
+<line x1="78" y1="410" x2="730" y2="410" stroke="#444444" stroke-width="1"/>
+<text x="18" y="280" font-size="11" text-anchor="middle" fill="#555555" transform="rotate(-90 18 280)">Deadlocks per repeat (unhandled 40P01)</text>
+<rect data-series="before-bar" data-repeat="1" x="119.7" y="202" width="64" height="208" fill="url(#pat-before)" stroke="#222222" stroke-width="1"/>
+<text x="151.7" y="196" font-size="14" text-anchor="middle" fill="#1a1a1a" font-weight="bold">4</text>
+<rect data-series="after-bar" data-repeat="1" x="189.7" y="410" width="64" height="0" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="221.7" y="404" font-size="14" text-anchor="middle" fill="#1a1a1a" font-weight="bold">0</text>
+<text x="186.7" y="430" font-size="12" text-anchor="middle" fill="#1a1a1a">Repeat 1</text>
+<rect data-series="before-bar" data-repeat="2" x="337" y="254" width="64" height="156" fill="url(#pat-before)" stroke="#222222" stroke-width="1"/>
+<text x="369" y="248" font-size="14" text-anchor="middle" fill="#1a1a1a" font-weight="bold">3</text>
+<rect data-series="after-bar" data-repeat="2" x="407" y="410" width="64" height="0" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="439" y="404" font-size="14" text-anchor="middle" fill="#1a1a1a" font-weight="bold">0</text>
+<text x="404" y="430" font-size="12" text-anchor="middle" fill="#1a1a1a">Repeat 2</text>
+<rect data-series="before-bar" data-repeat="3" x="554.3" y="358" width="64" height="52" fill="url(#pat-before)" stroke="#222222" stroke-width="1"/>
+<text x="586.3" y="352" font-size="14" text-anchor="middle" fill="#1a1a1a" font-weight="bold">1</text>
+<rect data-series="after-bar" data-repeat="3" x="624.3" y="410" width="64" height="0" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="656.3" y="404" font-size="14" text-anchor="middle" fill="#1a1a1a" font-weight="bold">0</text>
+<text x="621.3" y="430" font-size="12" text-anchor="middle" fill="#1a1a1a">Repeat 3</text>
+<text x="404" y="454" font-size="11" text-anchor="middle" fill="#555555">Independent repeat</text>
+<text x="78" y="504" font-size="11" text-anchor="start" fill="#555555">No Seat was double-booked in any of these runs (the Backstop, booking_seats.seat_id UNIQUE, ADR-0008, held).</text>
+</svg>

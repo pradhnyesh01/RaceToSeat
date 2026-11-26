@@ -1,0 +1,160 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="720" viewBox="0 0 980 720" font-family="Helvetica, Arial, sans-serif" role="img">
+<title>Throughput and p99 latency by Mechanism and load level</title>
+<desc>Grouped bars, one group per load level (hammer-seat 10, hammer-seat 100, hammer-seat 1000, spread-seats 1000), one bar per Mechanism and the Control. Top panel is throughput in requests per second, bottom panel is p99 latency in milliseconds. Each Mechanism and the Control has its own fill pattern.</desc>
+<defs>
+<pattern id="pat-naive" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="#BDBDBD"/><path d="M0 0L8 8M8 0L0 8" stroke="#333333" stroke-width="1"/></pattern>
+<pattern id="pat-unique-constraint" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#E69F00"/><path d="M-1 7L7 -1M-1 1L1 -1M5 7L7 5" stroke="#000000" stroke-width="1.3"/></pattern>
+<pattern id="pat-optimistic" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#D55E00"/><circle cx="3" cy="3" r="1.4" fill="#ffffff"/></pattern>
+<pattern id="pat-advisory" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#009E73"/><path d="M0 1.5H6M0 4.5H6" stroke="#ffffff" stroke-width="1.4"/></pattern>
+<pattern id="pat-serializable" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#CC79A7"/><path d="M1.5 0V6M4.5 0V6" stroke="#333333" stroke-width="1.4"/></pattern>
+</defs>
+<rect width="980" height="720" fill="#ffffff"/>
+<text x="78" y="28" font-size="18" text-anchor="start" fill="#1a1a1a" font-weight="bold">Throughput and p99 latency by Mechanism and load level</text>
+<text x="78" y="48" font-size="11" text-anchor="start" fill="#555555">Exhibit C. Mean across repeats per cell; one machine, containerized Postgres. Higher throughput is better, lower p99 is better.</text>
+<rect data-series="naive" fill="url(#pat-naive)" x="78" y="66" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="102" y="76" font-size="12" text-anchor="start" fill="#1a1a1a">naive (Control, with Backstop)</text>
+<rect data-series="unique_constraint" fill="url(#pat-unique-constraint)" x="378" y="66" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="402" y="76" font-size="12" text-anchor="start" fill="#1a1a1a">unique_constraint</text>
+<rect data-series="pessimistic" fill="#0072B2" x="678" y="66" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="702" y="76" font-size="12" text-anchor="start" fill="#1a1a1a">pessimistic</text>
+<rect data-series="optimistic" fill="url(#pat-optimistic)" x="78" y="86" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="102" y="96" font-size="12" text-anchor="start" fill="#1a1a1a">optimistic</text>
+<rect data-series="advisory" fill="url(#pat-advisory)" x="378" y="86" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="402" y="96" font-size="12" text-anchor="start" fill="#1a1a1a">advisory</text>
+<rect data-series="serializable" fill="url(#pat-serializable)" x="678" y="86" width="18" height="12" stroke="#222222" stroke-width="1"/>
+<text x="702" y="96" font-size="12" text-anchor="start" fill="#1a1a1a">serializable</text>
+<text x="78" y="120" font-size="13" text-anchor="start" fill="#1a1a1a" font-weight="bold">Throughput (req/s)</text>
+<line x1="78" y1="360" x2="956" y2="360" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="364" font-size="10" text-anchor="end" fill="#555555">0</text>
+<line x1="78" y1="302.5" x2="956" y2="302.5" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="306.5" font-size="10" text-anchor="end" fill="#555555">2,000</text>
+<line x1="78" y1="245" x2="956" y2="245" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="249" font-size="10" text-anchor="end" fill="#555555">4,000</text>
+<line x1="78" y1="187.5" x2="956" y2="187.5" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="191.5" font-size="10" text-anchor="end" fill="#555555">6,000</text>
+<line x1="78" y1="130" x2="956" y2="130" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="134" font-size="10" text-anchor="end" fill="#555555">8,000</text>
+<line x1="78" y1="130" x2="78" y2="360" stroke="#444444" stroke-width="1"/>
+<line x1="78" y1="360" x2="956" y2="360" stroke="#444444" stroke-width="1"/>
+<text x="16" y="245" font-size="11" text-anchor="middle" fill="#555555" transform="rotate(-90 16 245)">Throughput (req/s)</text>
+<rect data-mechanism="naive" data-load="hammer-seat 10" x="110.8" y="350.8" width="24" height="9.2" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="125.8" y="346.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 125.8 346.8)">318.9</text>
+<rect data-mechanism="unique_constraint" data-load="hammer-seat 10" x="136.8" y="350.1" width="24" height="9.9" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="151.8" y="346.1" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 151.8 346.1)">345.4</text>
+<rect data-mechanism="pessimistic" data-load="hammer-seat 10" x="162.8" y="347.6" width="24" height="12.4" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="177.8" y="343.6" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 177.8 343.6)">431.1</text>
+<rect data-mechanism="optimistic" data-load="hammer-seat 10" x="188.8" y="350.2" width="24" height="9.8" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="203.8" y="346.2" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 203.8 346.2)">339.5</text>
+<rect data-mechanism="advisory" data-load="hammer-seat 10" x="214.8" y="349.1" width="24" height="10.9" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="229.8" y="345.1" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 229.8 345.1)">377.8</text>
+<rect data-mechanism="serializable" data-load="hammer-seat 10" x="240.8" y="349" width="24" height="11" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="255.8" y="345" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 255.8 345)">380.9</text>
+<text x="187.8" y="378" font-size="12" text-anchor="middle" fill="#1a1a1a">hammer-seat 10</text>
+<rect data-mechanism="naive" data-load="hammer-seat 100" x="330.3" y="320.8" width="24" height="39.2" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="345.3" y="316.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 345.3 316.8)">1364.1</text>
+<rect data-mechanism="unique_constraint" data-load="hammer-seat 100" x="356.3" y="314.2" width="24" height="45.8" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="371.3" y="310.2" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 371.3 310.2)">1594.0</text>
+<rect data-mechanism="pessimistic" data-load="hammer-seat 100" x="382.3" y="306.4" width="24" height="53.6" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="397.3" y="302.4" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 397.3 302.4)">1863.4</text>
+<rect data-mechanism="optimistic" data-load="hammer-seat 100" x="408.3" y="309.4" width="24" height="50.6" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="423.3" y="305.4" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 423.3 305.4)">1759.8</text>
+<rect data-mechanism="advisory" data-load="hammer-seat 100" x="434.3" y="298.6" width="24" height="61.4" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="449.3" y="294.6" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 449.3 294.6)">2134.2</text>
+<rect data-mechanism="serializable" data-load="hammer-seat 100" x="460.3" y="309.8" width="24" height="50.2" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="475.3" y="305.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 475.3 305.8)">1745.6</text>
+<text x="407.3" y="378" font-size="12" text-anchor="middle" fill="#1a1a1a">hammer-seat 100</text>
+<rect data-mechanism="naive" data-load="hammer-seat 1000" x="549.8" y="238.7" width="24" height="121.3" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="564.8" y="234.7" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 564.8 234.7)">4218.0</text>
+<rect data-mechanism="unique_constraint" data-load="hammer-seat 1000" x="575.8" y="251.9" width="24" height="108.1" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="590.8" y="247.9" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 590.8 247.9)">3761.4</text>
+<rect data-mechanism="pessimistic" data-load="hammer-seat 1000" x="601.8" y="196.6" width="24" height="163.4" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="616.8" y="192.6" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 616.8 192.6)">5685.1</text>
+<rect data-mechanism="optimistic" data-load="hammer-seat 1000" x="627.8" y="264.2" width="24" height="95.8" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="642.8" y="260.2" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 642.8 260.2)">3331.7</text>
+<rect data-mechanism="advisory" data-load="hammer-seat 1000" x="653.8" y="197" width="24" height="163" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="668.8" y="193" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 668.8 193)">5670.3</text>
+<rect data-mechanism="serializable" data-load="hammer-seat 1000" x="679.8" y="219.4" width="24" height="140.6" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="694.8" y="215.4" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 694.8 215.4)">4891.9</text>
+<text x="626.8" y="378" font-size="12" text-anchor="middle" fill="#1a1a1a">hammer-seat 1000</text>
+<rect data-mechanism="naive" data-load="spread-seats 1000" x="769.3" y="285.6" width="24" height="74.4" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="784.3" y="281.6" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 784.3 281.6)">2588.8</text>
+<rect data-mechanism="unique_constraint" data-load="spread-seats 1000" x="795.3" y="252.3" width="24" height="107.7" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="810.3" y="248.3" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 810.3 248.3)">3746.6</text>
+<rect data-mechanism="pessimistic" data-load="spread-seats 1000" x="821.3" y="253" width="24" height="107" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="836.3" y="249" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 836.3 249)">3722.8</text>
+<rect data-mechanism="optimistic" data-load="spread-seats 1000" x="847.3" y="280.9" width="24" height="79.1" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="862.3" y="276.9" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 862.3 276.9)">2750.9</text>
+<rect data-mechanism="advisory" data-load="spread-seats 1000" x="873.3" y="312.8" width="24" height="47.2" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="888.3" y="308.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 888.3 308.8)">1642.6</text>
+<rect data-mechanism="serializable" data-load="spread-seats 1000" x="899.3" y="272.8" width="24" height="87.2" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="914.3" y="268.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 914.3 268.8)">3031.6</text>
+<text x="846.3" y="378" font-size="12" text-anchor="middle" fill="#1a1a1a">spread-seats 1000</text>
+<text x="517" y="396" font-size="11" text-anchor="middle" fill="#555555">Load level (pattern, concurrency)</text>
+<text x="78" y="420" font-size="13" text-anchor="start" fill="#1a1a1a" font-weight="bold">p99 (ms)</text>
+<line x1="78" y1="660" x2="956" y2="660" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="664" font-size="10" text-anchor="end" fill="#555555">0</text>
+<line x1="78" y1="602.5" x2="956" y2="602.5" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="606.5" font-size="10" text-anchor="end" fill="#555555">100</text>
+<line x1="78" y1="545" x2="956" y2="545" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="549" font-size="10" text-anchor="end" fill="#555555">200</text>
+<line x1="78" y1="487.5" x2="956" y2="487.5" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="491.5" font-size="10" text-anchor="end" fill="#555555">300</text>
+<line x1="78" y1="430" x2="956" y2="430" stroke="#d9d9d9" stroke-width="1"/>
+<text x="70" y="434" font-size="10" text-anchor="end" fill="#555555">400</text>
+<line x1="78" y1="430" x2="78" y2="660" stroke="#444444" stroke-width="1"/>
+<line x1="78" y1="660" x2="956" y2="660" stroke="#444444" stroke-width="1"/>
+<text x="16" y="545" font-size="11" text-anchor="middle" fill="#555555" transform="rotate(-90 16 545)">p99 (ms)</text>
+<rect data-mechanism="naive" data-load="hammer-seat 10" x="110.8" y="645.2" width="24" height="14.8" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="125.8" y="641.2" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 125.8 641.2)">25.7</text>
+<rect data-mechanism="unique_constraint" data-load="hammer-seat 10" x="136.8" y="644.3" width="24" height="15.7" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="151.8" y="640.3" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 151.8 640.3)">27.3</text>
+<rect data-mechanism="pessimistic" data-load="hammer-seat 10" x="162.8" y="647.6" width="24" height="12.4" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="177.8" y="643.6" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 177.8 643.6)">21.5</text>
+<rect data-mechanism="optimistic" data-load="hammer-seat 10" x="188.8" y="644" width="24" height="16" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="203.8" y="640" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 203.8 640)">27.8</text>
+<rect data-mechanism="advisory" data-load="hammer-seat 10" x="214.8" y="645.8" width="24" height="14.2" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="229.8" y="641.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 229.8 641.8)">24.7</text>
+<rect data-mechanism="serializable" data-load="hammer-seat 10" x="240.8" y="645.8" width="24" height="14.2" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="255.8" y="641.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 255.8 641.8)">24.7</text>
+<text x="187.8" y="678" font-size="12" text-anchor="middle" fill="#1a1a1a">hammer-seat 10</text>
+<rect data-mechanism="naive" data-load="hammer-seat 100" x="330.3" y="621" width="24" height="39" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="345.3" y="617" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 345.3 617)">67.8</text>
+<rect data-mechanism="unique_constraint" data-load="hammer-seat 100" x="356.3" y="625.9" width="24" height="34.1" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="371.3" y="621.9" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 371.3 621.9)">59.4</text>
+<rect data-mechanism="pessimistic" data-load="hammer-seat 100" x="382.3" y="631.3" width="24" height="28.7" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="397.3" y="627.3" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 397.3 627.3)">49.9</text>
+<rect data-mechanism="optimistic" data-load="hammer-seat 100" x="408.3" y="628.8" width="24" height="31.2" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="423.3" y="624.8" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 423.3 624.8)">54.3</text>
+<rect data-mechanism="advisory" data-load="hammer-seat 100" x="434.3" y="634.9" width="24" height="25.1" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="449.3" y="630.9" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 449.3 630.9)">43.7</text>
+<rect data-mechanism="serializable" data-load="hammer-seat 100" x="460.3" y="629.4" width="24" height="30.6" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="475.3" y="625.4" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 475.3 625.4)">53.3</text>
+<text x="407.3" y="678" font-size="12" text-anchor="middle" fill="#1a1a1a">hammer-seat 100</text>
+<rect data-mechanism="naive" data-load="hammer-seat 1000" x="549.8" y="637.7" width="24" height="22.3" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="564.8" y="633.7" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 564.8 633.7)">38.7</text>
+<rect data-mechanism="unique_constraint" data-load="hammer-seat 1000" x="575.8" y="586.2" width="24" height="73.8" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="590.8" y="582.2" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 590.8 582.2)">128.4</text>
+<rect data-mechanism="pessimistic" data-load="hammer-seat 1000" x="601.8" y="599.5" width="24" height="60.5" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="616.8" y="595.5" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 616.8 595.5)">105.3</text>
+<rect data-mechanism="optimistic" data-load="hammer-seat 1000" x="627.8" y="591.6" width="24" height="68.4" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="642.8" y="587.6" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 642.8 587.6)">119.0</text>
+<rect data-mechanism="advisory" data-load="hammer-seat 1000" x="653.8" y="614.4" width="24" height="45.6" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="668.8" y="610.4" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 668.8 610.4)">79.3</text>
+<rect data-mechanism="serializable" data-load="hammer-seat 1000" x="679.8" y="613.2" width="24" height="46.8" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="694.8" y="609.2" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 694.8 609.2)">81.3</text>
+<text x="626.8" y="678" font-size="12" text-anchor="middle" fill="#1a1a1a">hammer-seat 1000</text>
+<rect data-mechanism="naive" data-load="spread-seats 1000" x="769.3" y="579.1" width="24" height="80.9" fill="url(#pat-naive)" stroke="#222222" stroke-width="1"/>
+<text x="784.3" y="575.1" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 784.3 575.1)">140.7</text>
+<rect data-mechanism="unique_constraint" data-load="spread-seats 1000" x="795.3" y="586.2" width="24" height="73.8" fill="url(#pat-unique-constraint)" stroke="#222222" stroke-width="1"/>
+<text x="810.3" y="582.2" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 810.3 582.2)">128.4</text>
+<rect data-mechanism="pessimistic" data-load="spread-seats 1000" x="821.3" y="563.4" width="24" height="96.6" fill="#0072B2" stroke="#222222" stroke-width="1"/>
+<text x="836.3" y="559.4" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 836.3 559.4)">168.0</text>
+<rect data-mechanism="optimistic" data-load="spread-seats 1000" x="847.3" y="608" width="24" height="52" fill="url(#pat-optimistic)" stroke="#222222" stroke-width="1"/>
+<text x="862.3" y="604" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 862.3 604)">90.5</text>
+<rect data-mechanism="advisory" data-load="spread-seats 1000" x="873.3" y="579.1" width="24" height="80.9" fill="url(#pat-advisory)" stroke="#222222" stroke-width="1"/>
+<text x="888.3" y="575.1" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 888.3 575.1)">140.7</text>
+<rect data-mechanism="serializable" data-load="spread-seats 1000" x="899.3" y="511.3" width="24" height="148.7" fill="url(#pat-serializable)" stroke="#222222" stroke-width="1"/>
+<text x="914.3" y="507.3" font-size="9" text-anchor="start" fill="#1a1a1a" transform="rotate(-90 914.3 507.3)">258.5</text>
+<text x="846.3" y="678" font-size="12" text-anchor="middle" fill="#1a1a1a">spread-seats 1000</text>
+<text x="517" y="696" font-size="11" text-anchor="middle" fill="#555555">Load level (pattern, concurrency)</text>
+</svg>

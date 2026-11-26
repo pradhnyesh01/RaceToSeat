@@ -16,6 +16,7 @@
     "db:seed": "tsx db/seed.ts",
     "harness": "tsx load-harness/run.ts",
     "harness:aggregate": "tsx load-harness/aggregate.ts",
+    "charts": "tsx load-harness/charts.ts",
     "formal:check": "bash formal/check.sh",
     "formal:check:negative": "bash formal/check.sh --negative-control",
     "chaos": "tsx load-harness/chaos/run.ts",
